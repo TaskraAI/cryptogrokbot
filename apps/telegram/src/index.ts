@@ -13,14 +13,7 @@ import {
   setFlag,
   type Store,
 } from "@night/storage";
-import {
-  addGuardrail,
-  loadExtraRules,
-  loadGuardrails,
-  parseNeverRule,
-  removeGuardrail,
-  setExtraRuleEnabled,
-} from "@night/risk";
+import { addGuardrail, effectiveDailyBudgetSol, loadExtraRules, loadGuardrails, parseNeverRule, removeGuardrail, setExtraRuleEnabled } from "@night/risk";
 import { appendLesson, buildReview, formatReview, loadLessons } from "@night/learning";
 import { listTape } from "@night/storage";
 import { gradePosition } from "@night/storage";
@@ -139,7 +132,9 @@ export function createTelegramBot(token: string, chatId: string, ctx: TelegramCo
   bot.command("kill", async (c) => {
     if (!allow(c, chatId)) return;
     setFlag(ctx.store, "master", "false");
-    await c.reply("MASTER off. New entries halted. Exits still run.");
+    await c.reply(
+      "MASTER off. New live entries and live exits halted. Paper sells still run. MODE is unchanged (env only).",
+    );
   });
   bot.command("resume", async (c) => {
     if (!allow(c, chatId)) return;
@@ -148,7 +143,15 @@ export function createTelegramBot(token: string, chatId: string, ctx: TelegramCo
       return;
     }
     setFlag(ctx.store, "master", "true");
-    await c.reply("MASTER on.");
+    if (ctx.flags().mode !== "LIVE") {
+      await c.reply(
+        "MASTER on. MODE is PAPER — this does not enable live trading. Live still requires MODE=LIVE in .env plus a hot wallet. /resume is a kill/resume switch, not a way around MODE.",
+      );
+      return;
+    }
+    await c.reply(
+      "MASTER on. Live buys/sells allowed while MODE=LIVE and a hot wallet is present. /resume cannot change MODE; it only restores master after /kill.",
+    );
   });
   bot.command("sellall", async (c) => {
     if (!allow(c, chatId)) return;
@@ -162,8 +165,9 @@ export function createTelegramBot(token: string, chatId: string, ctx: TelegramCo
     if (!allow(c, chatId)) return;
     const b = getBudget(ctx.store, ctx.dayKey());
     const p = ctx.policy();
+    const cap = effectiveDailyBudgetSol(p, b.extra_budget_sol, Boolean(ctx.flags().allowExtraBudget));
     await c.reply(
-      `spent ${b.spent_sol.toFixed(3)}/${p.dailyBudgetSol + b.extra_budget_sol} SOL\ntrades ${b.trades}/${p.maxTradesPerDay}\nloss ${b.realized_loss_sol.toFixed(3)}/${p.dailyLossCapSol}`,
+      `spent ${b.spent_sol.toFixed(3)}/${cap.cap} SOL\ntrades ${b.trades}/${p.maxTradesPerDay}\nloss ${b.realized_loss_sol.toFixed(3)}/${p.dailyLossCapSol}`,
     );
   });
   bot.command("policy", async (c) => {
@@ -233,7 +237,7 @@ export function statusText(ctx: TelegramContext): string {
   return [
     `mode=${f.mode} master=${master}`,
     `rpc=${f.rpcHealthy} jupiter=${f.jupiterHealthy} tg=${f.telegramHealthy}`,
-    `budget ${b.spent_sol.toFixed(3)}/${p.dailyBudgetSol} trades ${b.trades}/${p.maxTradesPerDay}`,
+    `budget ${b.spent_sol.toFixed(3)}/${effectiveDailyBudgetSol(p, b.extra_budget_sol, Boolean(f.allowExtraBudget)).cap} trades ${b.trades}/${p.maxTradesPerDay}`,
     `open ${listOpenPositions(ctx.store).length}/${p.maxOpenPositions}`,
     ctx.crew ? ctx.crew().snapshot().map((x) => `${x.title}:${x.status}`).join(" ") : "",
   ]

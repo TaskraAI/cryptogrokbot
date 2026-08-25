@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_POLICY, dayKey } from "@night/shared";
-import { insertPosition, openStore } from "@night/storage";
+import { openStore } from "@night/storage";
 import { tryEnter } from "../apps/agent/src/entries.ts";
 import { hit, token } from "./fixtures.ts";
 
@@ -51,6 +51,30 @@ describe("paper entries", () => {
       dayKey: dayKey(),
     });
     expect(msg).toMatch(/MASTER_ENABLED/);
+  });
+
+  it("refuses a size above maxSolPerTrade instead of clipping", async () => {
+    const dir = join(tmpdir(), `ent3-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    const store = openStore(join(dir, "t.db"));
+    const msg = await tryEnter({
+      store,
+      policy: DEFAULT_POLICY,
+      flags: {
+        mode: "PAPER",
+        masterEnabled: false,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: false,
+      },
+      token: token(),
+      sources: [hit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      sol: 9.9,
+    });
+    expect(msg).toMatch(/maxSolPerTrade/);
+    expect(msg).not.toMatch(/^bought/);
   });
 });
 

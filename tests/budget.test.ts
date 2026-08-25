@@ -50,6 +50,24 @@ describe("canEnter", () => {
     expect(g.reason).toMatch(/budget/);
   });
 
+  it("does not let extra_budget_sol raise the cap unless allowExtraBudget is on", () => {
+    const blocked = canEnter({
+      policy,
+      budget: budget({ spentSol: 0.45, extraBudgetSol: 10 }),
+      openPositions: 0,
+      flags: flags(),
+    });
+    expect(blocked.ok).toBe(false);
+    expect(blocked.reason).toMatch(/budget/);
+    const allowed = canEnter({
+      policy,
+      budget: budget({ spentSol: 0.45, extraBudgetSol: 10 }),
+      openPositions: 0,
+      flags: flags({ allowExtraBudget: true }),
+    });
+    expect(allowed.ok).toBe(true);
+  });
+
   it("blocks when max trades per day is hit", () => {
     const g = canEnter({
       policy,

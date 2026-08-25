@@ -1,4 +1,4 @@
-import type { MarketSnapshot, Pattern, Policy, PositionState } from "@night/shared";
+import type { MarketSnapshot, Pattern, Policy, PositionState, RuntimeFlags } from "@night/shared";
 import { appendPatternPath, applyPeakAndGreen, classifyPattern, decideExit, mergeLlmAction } from "@night/patterns";
 import { tokensToRecoverPrincipal } from "@night/risk";
 import { executeSell } from "@night/execution";
@@ -46,6 +46,7 @@ export async function managePosition(opts: {
   lpPulled?: boolean;
   creatorDumping?: boolean;
   llm?: { pattern?: Pattern; action?: "hold" | "sell"; confidence?: number };
+  flags?: RuntimeFlags;
   connection?: Connection;
   keypair?: Keypair;
   pumpApiKey?: string;
@@ -126,13 +127,28 @@ export async function managePosition(opts: {
   }
 
   const solEstimate = tokensToSell * markSolPerToken;
+  const runtimeMode = opts.flags?.mode === "LIVE" ? "LIVE" : "PAPER";
+  const positionLive = opts.row.mode === "LIVE";
+  const wantLiveTx = runtimeMode === "LIVE" && positionLive;
+  if (wantLiveTx) {
+    if (opts.flags?.masterEnabled !== true) {
+      updatePosition(opts.store, pos.id, patch);
+      return `LIVE sell refused: MASTER_ENABLED is not true`;
+    }
+    if (!opts.keypair) {
+      updatePosition(opts.store, pos.id, patch);
+      return `LIVE sell refused: WALLET_SECRET_KEY is missing`;
+    }
+  }
+  const execMode = wantLiveTx ? "LIVE" : "PAPER";
   const result = await executeSell({
-    mode: pos.mode,
+    mode: execMode,
     graduated: true,
     mint: pos.mint,
     tokens: tokensToSell,
     slippagePct: opts.policy.slippagePctCap,
     solEstimate,
+    masterEnabled: opts.flags?.masterEnabled,
     connection: opts.connection,
     keypair: opts.keypair,
     pumpApiKey: opts.pumpApiKey,

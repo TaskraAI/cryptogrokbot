@@ -1,6 +1,6 @@
 import type { Connection, Keypair } from "@solana/web3.js";
 import { dayKey, type Policy, type RuntimeFlags, type TokenMetrics } from "@night/shared";
-import { loadExtraRules, type ExtraRule } from "@night/risk";
+import { effectiveDailyBudgetSol, loadExtraRules, type ExtraRule } from "@night/risk";
 import {
   fetchDexSearch,
   fetchDexToken,
@@ -26,6 +26,13 @@ export interface TradeOutcome {
   message: string;
 }
 
+export function liveTxBlocked(flags: RuntimeFlags, kind: "buy" | "sell", hasWallet?: boolean): string | null {
+  if (flags.mode !== "LIVE") return null;
+  if (!flags.masterEnabled) return `LIVE ${kind} refused: MASTER_ENABLED is not true`;
+  if (hasWallet === false) return `LIVE ${kind} refused: WALLET_SECRET_KEY is missing`;
+  return null;
+}
+
 export async function buyChosenMint(opts: {
   store: Store;
   policy: Policy;
@@ -42,11 +49,9 @@ export async function buyChosenMint(opts: {
   keypair?: Keypair;
   pumpApiKey?: string;
 }): Promise<TradeOutcome> {
-  if (opts.flags.mode === "LIVE" && !opts.flags.masterEnabled) {
-    return { ok: false, message: "LIVE buy refused: MASTER_ENABLED is not true" };
-  }
-  if (opts.flags.mode === "LIVE" && !opts.keypair) {
-    return { ok: false, message: "LIVE buy refused: WALLET_SECRET_KEY is missing" };
+  const blocked = liveTxBlocked(opts.flags, "buy", Boolean(opts.keypair));
+  if (blocked) {
+    return { ok: false, message: blocked };
   }
   if (opts.force && opts.flags.mode === "LIVE") {
     return { ok: false, message: "--force is paper-only" };
@@ -87,12 +92,24 @@ export async function sellChosen(opts: {
   store: Store;
   policy: Policy;
   idOrMint: string;
+  flags?: RuntimeFlags;
   connection?: Connection;
   keypair?: Keypair;
   pumpApiKey?: string;
   /** Skip DexScreener (tests / offline paper). */
   priceUsd?: number;
 }): Promise<TradeOutcome> {
+  const flags = opts.flags ?? {
+    mode: "PAPER" as const,
+    masterEnabled: false,
+    rpcHealthy: true,
+    jupiterHealthy: true,
+    telegramHealthy: false,
+  };
+  const blocked = liveTxBlocked(flags, "sell", Boolean(opts.keypair));
+  if (blocked) {
+    return { ok: false, message: blocked };
+  }
   const row = findOpenPosition(opts.store, opts.idOrMint);
   if (!row) {
     return { ok: false, message: `no open position matching ${opts.idOrMint}` };
@@ -117,6 +134,7 @@ export async function sellChosen(opts: {
     snap,
     policy: opts.policy,
     sellAll: true,
+    flags,
     connection: opts.connection,
     keypair: opts.keypair,
     pumpApiKey: opts.pumpApiKey,
@@ -200,11 +218,13 @@ export function positionsReport(store: Store): string {
 
 export function statusReport(opts: { flags: RuntimeFlags; policy: Policy; store: Store; tz: string }): string {
   const b = getBudget(opts.store, dayKey(Date.now(), opts.tz));
+  const cap = effectiveDailyBudgetSol(opts.policy, b.extra_budget_sol, Boolean(opts.flags.allowExtraBudget));
   return [
     `mode=${opts.flags.mode} master=${opts.flags.masterEnabled}`,
     `paper buys never send a transaction`,
     `live buys need MODE=LIVE and MASTER_ENABLED=true and WALLET_SECRET_KEY`,
-    `budget ${b.spent_sol}/${opts.policy.dailyBudgetSol + b.extra_budget_sol} SOL  trades ${b.trades}/${opts.policy.maxTradesPerDay}`,
+    `live sells need the same three; /resume is a kill/resume switch and cannot set MODE`,
+    `budget ${b.spent_sol}/${cap.cap} SOL  trades ${b.trades}/${opts.policy.maxTradesPerDay}`,
     `size ${opts.policy.maxSolPerTrade} SOL  hard stop ${opts.policy.hardStopPct}%`,
     `open ${listOpenPositions(opts.store).length}/${opts.policy.maxOpenPositions}`,
   ].join("\n");

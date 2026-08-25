@@ -192,6 +192,8 @@ export interface RuntimeFlags {
   rpcHealthy: boolean;
   jupiterHealthy: boolean;
   telegramHealthy: boolean;
+  /** When true, budget.extraBudgetSol may raise the daily cap. Default off. */
+  allowExtraBudget?: boolean;
 }
 
 export function dayKey(now = Date.now(), timeZone = "UTC"): string {

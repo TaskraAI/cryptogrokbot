@@ -29,7 +29,7 @@ npm run trade -- positions
 npm run trade -- sell 1
 ```
 
-`--sol` is capped by `config/policy.json` `maxSolPerTrade`. `--strict` also applies `config/rules.yaml`. `--force` skips scoring (**paper only**).
+`--sol` is refused if it exceeds `config/policy.json` `maxSolPerTrade` (also enforced inside `executeBuy`). `--strict` also applies `config/rules.yaml`. `--force` skips scoring (**paper only**).
 
 Starter watchlist (BONK, WIF, POPCAT, TRUMP) is in [`config/sources.yaml`](config/sources.yaml).
 
@@ -74,8 +74,9 @@ Default policy (`config/policy.json`): 0.5 SOL/day, 5 trades, 0.1 SOL each, −2
 |---|---|---|
 | What happens | SQLite ledger only. No transaction is sent. | Jupiter (graduated) or PumpPortal local-sign (curve), then a signed tx |
 | Wallet | Not required | `WALLET_SECRET_KEY` **or** a dashboard wallet secret required or the buy **fails closed** |
-| Master switch | Ignored | Must be `MASTER_ENABLED=true` or the buy **fails closed** |
-| Dashboard buy/sell | Paper unless both live flags are set on the server | Same fail-closed rules; the client cannot force live |
+| Master switch | Ignored for paper fills | Must be `MASTER_ENABLED=true` **or** `/resume CONFIRM` after a `/kill` or the live tx **fails closed** |
+| Dashboard buy/sell | Paper unless the process is `MODE=LIVE` | Same fail-closed rules; the client cannot force live. Live sells also need master + wallet |
+| Extra daily budget | Ignored (`ALLOW_EXTRA_BUDGET` default false) | Ignored unless `ALLOW_EXTRA_BUDGET=true` (logged; not settable from an unauthenticated path) |
 
 Live is two flags **and** a dedicated hot-wallet secret (`.env` or `data/wallet-secrets.json`):
 
@@ -86,7 +87,9 @@ WALLET_SECRET_KEY=   # JSON byte array or base58. Hot wallet only. Never the mai
 HELIUS_RPC_URL=      # recommended over public RPC
 ```
 
-Telegram `/kill` turns master off (new buys stop; exits still run). `/resume CONFIRM` turns it back on.
+Telegram `/kill` turns the SQLite `master` flag off (live buys **and** live sells fail closed; paper sells still run). `/resume CONFIRM` turns master back on. That is a **kill/resume switch only**: it cannot change `MODE`. The DB cannot flip paper to live. Live still requires `MODE=LIVE` from env **and** master **and** a hot wallet.
+
+Dashboard bind defaults to `127.0.0.1`. A public bind is optional (`DASHBOARD_BIND=0.0.0.0`); when bind is not loopback, the session cookie is `Secure` unless you set `DASHBOARD_SECURE_COOKIE=false`.
 
 Dashboard wallets: add a **label + public key** and optionally a secret. The secret is written to gitignored `data/wallet-secrets.json` and is **never returned to the browser after save**. The UI shows `connected` (secret present), assigned desk, and a read-only SOL balance via RPC when a public key is set.
 
@@ -95,8 +98,11 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 | Var | Required | Purpose |
 |-----|----------|---------|
 | `MODE` | no (default PAPER) | `PAPER` or `LIVE` |
-| `MASTER_ENABLED` | no (default false) | live entries |
+| `MASTER_ENABLED` | no (default false) | live entries and live exits (kill/resume via Telegram when MODE=LIVE) |
+| `ALLOW_EXTRA_BUDGET` | no (default false) | if true, `extra_budget_sol` may raise the daily cap (logged) |
 | `WALLET_SECRET_KEY` | live only | hot wallet |
+| `DASHBOARD_BIND` | no | default `127.0.0.1` |
+| `DASHBOARD_SECURE_COOKIE` | no | auto-on when bind is not loopback; set `true` behind HTTPS |
 | `DASHBOARD_EMAIL` | no | login email (default `hello@taskra.ai`; persisted to `data/.dashboard-email`) |
 | `DASHBOARD_PASSWORD` | no | login; else generated into `data/.dashboard-password` |
 | `DASHBOARD_HOST` | no | default `cryptogrokbot.com` |
@@ -114,12 +120,14 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 ## Safety
 
 - Dedicated hot wallet. Never point this at your main wallet.
-- Hitting `dailyBudgetSol`, `maxTradesPerDay`, or `dailyLossCapSol` **stops buys**, not exits.
+- Hitting `dailyBudgetSol`, `maxTradesPerDay`, or `dailyLossCapSol` **stops buys**, not paper exits. Live exits also stop when master is off.
+- `extra_budget_sol` does **not** raise the daily cap unless `ALLOW_EXTRA_BUDGET=true`.
+- Per-trade size is refused inside `executeBuy` if it exceeds `maxSolPerTrade`.
 - Live buy runs a Jupiter sell-sim first. Freeze / guardrails / `/never` rules are hard denies.
 - LLM cannot disable a hard stop or sell through a `healthy_dip`.
 - Unauthenticated mutating API calls return 401. The old open crew board is behind the same login.
-- Dashboard login is email + password + TOTP 2FA. Wallet secrets are never returned after save.
-- Auditor (6th crew agent) records scans in SQLite: paper default, secrets not in git, live fail-closed.
+- Dashboard login is email + password + TOTP 2FA. Wallet secrets are never returned after save. Default bind is localhost.
+- Auditor (6th crew agent) records scans in SQLite: paper default, secrets not in git, live fail-closed (sell gate, size cap, extra budget off, localhost bind).
 
 ## Telegram
 
@@ -130,7 +138,7 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 | `/pnl` `/review [today\|7d\|30d\|all]` `/trade <id>` | journal |
 | `/grade <id> win\|meh\|fail [note]` | train the journal |
 | `/lesson <text>` `/never <rule>` `/guardrails` `/unguard <id>` | lessons + hard denies |
-| `/kill` `/resume CONFIRM` `/sellall CONFIRM` | halt entries / flatten |
+| `/kill` `/resume CONFIRM` `/sellall CONFIRM` | halt live txs / resume master (MODE unchanged) / flatten |
 | `/crew` | live Grok crew (Scout / Sentinel / Grok / Scholar / Auditor) |
 | `/rules` `/rule on\|off <id>` | extra rules in `config/rules.yaml` |
 | `/research <mint>` | Grok multi-agent research (needs `XAI_API_KEY`) |

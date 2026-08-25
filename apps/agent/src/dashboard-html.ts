@@ -334,7 +334,7 @@ async function renderTrade() {
   ).join("");
   $("page-trade").innerHTML =
     "<h1>Trade</h1>" +
-    '<div class="banner">' + pill(d.mode) + " Paper buy writes the SQLite ledger only. Live needs MODE=LIVE and MASTER.</div>" +
+    '<div class="banner">' + pill(d.mode) + " Paper buy writes the SQLite ledger only. Live needs MODE=LIVE, MASTER, and a hot wallet. Size above maxSolPerTrade is refused.</div>" +
     '<div class="card"><label>Mint address</label><input id="buyMint" placeholder="Solana mint"/>' +
     '<label>Size (SOL)</label><input id="buySol" type="number" step="0.01" value="0.05"/>' +
     '<div class="row" style="margin-top:10px"><button id="doBuy">Paper buy mint</button>' +

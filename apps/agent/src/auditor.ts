@@ -51,13 +51,16 @@ function checkEnvExample(repoRoot: string): AuditorCheck {
   const modePaper = /^\s*MODE\s*=\s*PAPER\s*$/m.test(text);
   const masterOff = /^\s*MASTER_ENABLED\s*=\s*false\s*$/m.test(text);
   const liveDefault = /^\s*MODE\s*=\s*LIVE\s*$/m.test(text);
-  const ok = modePaper && masterOff && !liveDefault;
+  const bindLocal = /^\s*DASHBOARD_BIND\s*=\s*127\.0\.0\.1\s*$/m.test(text);
+  const bindAll = /^\s*DASHBOARD_BIND\s*=\s*0\.0\.0\.0\s*$/m.test(text);
+  const extraOn = /^\s*ALLOW_EXTRA_BUDGET\s*=\s*true\s*$/m.test(text);
+  const ok = modePaper && masterOff && !liveDefault && bindLocal && !bindAll && !extraOn;
   return {
     id: "paper-default",
     ok,
     detail: ok
-      ? "MODE=PAPER and MASTER_ENABLED=false in .env.example"
-      : "paper/live defaults drifted in .env.example",
+      ? "MODE=PAPER, MASTER_ENABLED=false, DASHBOARD_BIND=127.0.0.1 in .env.example"
+      : "paper/live/bind defaults drifted in .env.example",
   };
 }
 
@@ -106,17 +109,38 @@ function checkNoSecretsInGit(repoRoot: string): AuditorCheck {
 
 function checkLiveFailClosed(repoRoot: string): AuditorCheck {
   const cfg = loadAppConfig({ MODE: "PAPER", MASTER_ENABLED: "false" } as NodeJS.ProcessEnv);
-  const defaultsOk = cfg.mode === "PAPER" && cfg.masterEnabled === false;
+  const defaultsOk =
+    cfg.mode === "PAPER" &&
+    cfg.masterEnabled === false &&
+    cfg.dashboardBind === "127.0.0.1" &&
+    cfg.allowExtraBudget === false &&
+    cfg.dashboardSecureCookie === false;
   const liveNeedsBoth = loadAppConfig({ MODE: "LIVE" } as NodeJS.ProcessEnv).masterEnabled === false;
+  const publicBindSecure =
+    loadAppConfig({ DASHBOARD_BIND: "0.0.0.0" } as NodeJS.ProcessEnv).dashboardSecureCookie === true;
+  const extraOffUnlessEnv =
+    loadAppConfig({ ALLOW_EXTRA_BUDGET: "true" } as NodeJS.ProcessEnv).allowExtraBudget === true;
   const trade = readFileSync(resolve(repoRoot, "apps/agent/src/trade.ts"), "utf8");
+  const board = readFileSync(resolve(repoRoot, "apps/agent/src/board.ts"), "utf8");
+  const exec = readFileSync(resolve(repoRoot, "packages/execution/src/index.ts"), "utf8");
+  const risk = readFileSync(resolve(repoRoot, "packages/risk/src/index.ts"), "utf8");
+  const loop = readFileSync(resolve(repoRoot, "apps/agent/src/loop.ts"), "utf8");
   const refuses =
-    trade.includes("LIVE buy refused: MASTER_ENABLED") && trade.includes("LIVE buy refused: WALLET_SECRET_KEY");
-  const ok = defaultsOk && liveNeedsBoth && refuses;
+    trade.includes("liveTxBlocked") &&
+    trade.includes("MASTER_ENABLED is not true") &&
+    trade.includes("WALLET_SECRET_KEY is missing") &&
+    board.includes("LIVE sell refused: MASTER_ENABLED") &&
+    exec.includes("refuseOversizeBuy") &&
+    exec.includes("size") &&
+    exec.includes("exceeds maxSolPerTrade") &&
+    risk.includes("allowExtraBudget") &&
+    loop.includes("cannot flip PAPER to LIVE");
+  const ok = defaultsOk && liveNeedsBoth && publicBindSecure && extraOffUnlessEnv && refuses;
   return {
     id: "live-fail-closed",
     ok,
     detail: ok
-      ? "LIVE buys require MODE=LIVE and MASTER_ENABLED=true and a wallet"
+      ? "LIVE needs MODE=LIVE + MASTER_ENABLED + wallet; sell gated; size cap in executeBuy; extra budget off; bind localhost"
       : "live fail-closed invariants missing",
   };
 }

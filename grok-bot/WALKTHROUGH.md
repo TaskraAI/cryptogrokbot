@@ -226,7 +226,7 @@ Telegram equivalents: `/review today`, `/grade <id> win|meh|fail [note]`, `/less
 > @Chief print policy.json caps and whether MASTER is off. Confirm MODE=PAPER.
 
 **Expect:** 0.5 SOL/day, 5 trades, 0.1 per trade, −25% hard stop, MASTER false.  
-Telegram: `/status` `/budget` `/policy` `/kill` (halts **new buys**; exits still run). `/resume CONFIRM` is live-adjacent — do not use until you mean it.
+Telegram: `/status` `/budget` `/policy` `/kill` (halts **live** buys and live sells; paper sells still run). `/resume CONFIRM` restores master when `MODE=LIVE` — it cannot set `MODE` and does not enable live while `MODE=PAPER`.
 
 ### 9. Telegram cockpit (optional second screen)
 

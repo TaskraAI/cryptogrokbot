@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { DEFAULT_POLICY, dayKey } from "@night/shared";
+import { DEFAULT_POLICY, dayKey, type RuntimeFlags } from "@night/shared";
 import { lastAuditorScan, listOpenPositions, listTodos, openStore } from "@night/storage";
 import { CrewBoard } from "@night/crew";
 import { loadAppConfig } from "../apps/agent/src/config.ts";
@@ -20,15 +20,20 @@ function tmp() {
   return dir;
 }
 
-const paperFlags = {
-  mode: "PAPER" as const,
+const paperFlags: RuntimeFlags = {
+  mode: "PAPER",
   masterEnabled: false,
   rpcHealthy: true,
   jupiterHealthy: true,
   telegramHealthy: false,
 };
 
-async function startCtx(dir: string, password = "test-dashboard-pass", email = "hello@taskra.ai") {
+async function startCtx(
+  dir: string,
+  password = "test-dashboard-pass",
+  email = "hello@taskra.ai",
+  runtimeFlags: RuntimeFlags = { ...paperFlags },
+) {
   const store = openStore(join(dir, "t.db"));
   const lessonsPath = join(dir, "lessons.md");
   writeFileSync(lessonsPath, "# Lessons\n");
@@ -50,7 +55,7 @@ async function startCtx(dir: string, password = "test-dashboard-pass", email = "
     crew,
     cfg,
     policy: DEFAULT_POLICY,
-    flags: () => paperFlags,
+    flags: () => runtimeFlags,
     password,
     email,
     totpFile: join(dir, ".dashboard-totp"),
@@ -58,14 +63,15 @@ async function startCtx(dir: string, password = "test-dashboard-pass", email = "
       buyChosenMint({
         store,
         policy: DEFAULT_POLICY,
-        flags: paperFlags,
+        flags: runtimeFlags,
         mint: opts.mint,
         token: token({ mint: opts.mint, ticker: "API" }),
         sol: opts.sol ?? 0.05,
         force: opts.force,
         dayKey: dayKey(),
       }),
-    sell: (idOrMint) => sellChosen({ store, policy: DEFAULT_POLICY, idOrMint, priceUsd: 0.001 }),
+    sell: (idOrMint) =>
+      sellChosen({ store, policy: DEFAULT_POLICY, idOrMint, flags: runtimeFlags, priceUsd: 0.001 }),
   };
   const server = createDashboardServer(ctx);
   const port = await new Promise<number>((resolve, reject) => {
@@ -76,7 +82,7 @@ async function startCtx(dir: string, password = "test-dashboard-pass", email = "
     });
   });
   const url = `http://127.0.0.1:${port}`;
-  return { store, ctx, server, url, dir };
+  return { store, ctx, server, url, dir, flags: runtimeFlags };
 }
 
 function cookiesOf(res: Response): string {
@@ -302,6 +308,17 @@ describe("dashboard auth and paper API", () => {
     expect("secret" in wallet).toBe(false);
     const disk = JSON.parse(readFileSync(join(dir, "wallet-secrets.json"), "utf8")) as Record<string, string>;
     expect(Object.values(disk)).toContain(secret);
+
+    const pos = listOpenPositions(store)[0]!;
+    const sold = await fetch(`${url}/api/sell`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ idOrMint: String(pos.id) }),
+    });
+    expect(sold.status).toBe(200);
+    const soldBody = (await sold.json()) as { ok: boolean; message: string };
+    expect(soldBody.ok).toBe(true);
+    expect(listOpenPositions(store)).toHaveLength(0);
   });
 
   it("serves the mobile dashboard HTML without auth and health without secrets", async () => {
@@ -316,6 +333,40 @@ describe("dashboard auth and paper API", () => {
     const health = await fetch(`${url}/health`);
     expect(health.status).toBe(200);
     expect(JSON.stringify(await health.json())).not.toMatch(/cfat_|WALLET_SECRET/);
+  });
+
+  it("refuses LIVE /api/sell when master is off and still paper-sells in PAPER", async () => {
+    const dir = tmp();
+    const { server, url, store, flags } = await startCtx(dir, "sell-gate-pass");
+    servers.push(server);
+    const cookie = await completeLogin(url, "sell-gate-pass");
+    const mint = "SellGateMint1111111111111111111111111111111";
+    const buy = await fetch(`${url}/api/buy`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ mint, sol: 0.05 }),
+    });
+    expect(buy.status).toBe(200);
+    const id = String(listOpenPositions(store)[0]!.id);
+    flags.mode = "LIVE";
+    flags.masterEnabled = false;
+    const liveSell = await fetch(`${url}/api/sell`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ idOrMint: id }),
+    });
+    expect(liveSell.status).toBe(403);
+    expect(((await liveSell.json()) as { error?: string }).error).toMatch(/MASTER_ENABLED/);
+    expect(listOpenPositions(store)).toHaveLength(1);
+    flags.mode = "PAPER";
+    flags.masterEnabled = false;
+    const paperSell = await fetch(`${url}/api/sell`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ idOrMint: id }),
+    });
+    expect(paperSell.status).toBe(200);
+    expect(listOpenPositions(store)).toHaveLength(0);
   });
 });
 

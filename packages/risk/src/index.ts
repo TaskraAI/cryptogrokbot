@@ -44,9 +44,9 @@ export function canEnter(opts: {
   if (opts.flags.mode === "LIVE" && !opts.flags.jupiterHealthy) {
     return { ok: false, reason: "Jupiter unhealthy; refusing new buys" };
   }
-  const budgetCap = opts.policy.dailyBudgetSol + opts.budget.extraBudgetSol;
-  if (opts.budget.spentSol + opts.policy.maxSolPerTrade > budgetCap + 1e-9) {
-    return { ok: false, reason: `daily budget exhausted (${opts.budget.spentSol.toFixed(3)}/${budgetCap} SOL)` };
+  const budgetCap = effectiveDailyBudgetSol(opts.policy, opts.budget.extraBudgetSol, Boolean(opts.flags.allowExtraBudget));
+  if (opts.budget.spentSol + opts.policy.maxSolPerTrade > budgetCap.cap + 1e-9) {
+    return { ok: false, reason: `daily budget exhausted (${opts.budget.spentSol.toFixed(3)}/${budgetCap.cap} SOL)` };
   }
   if (opts.budget.trades >= opts.policy.maxTradesPerDay) {
     return { ok: false, reason: `max trades per day hit (${opts.budget.trades}/${opts.policy.maxTradesPerDay})` };
@@ -153,6 +153,16 @@ export function scoreCandidate(opts: {
     return { score, passed: false, blockedReason: `score ${score} < ${opts.policy.minScore}`, checks };
   }
   return { score, passed: true, checks };
+}
+
+/** Fail-closed: extra budget never raises the cap unless an explicit control is on. */
+export function effectiveDailyBudgetSol(
+  policy: Policy,
+  extraBudgetSol: number,
+  allowExtraBudget: boolean,
+): { cap: number; extraApplied: number } {
+  const extra = allowExtraBudget ? Math.max(0, extraBudgetSol) : 0;
+  return { cap: policy.dailyBudgetSol + extra, extraApplied: extra };
 }
 
 export function applyEntryToBudget(budget: BudgetState, sol: number, now: number): BudgetState {

@@ -426,6 +426,11 @@ async function routeAuthed(
       json(res, 400, { error: "idOrMint required" });
       return;
     }
+    const flags = ctx.flags();
+    if (flags.mode === "LIVE" && !flags.masterEnabled) {
+      json(res, 403, { error: "LIVE sell refused: MASTER_ENABLED is not true", ok: false });
+      return;
+    }
     const result = await ctx.sell(idOrMint);
     json(res, result.ok ? 200 : 400, result);
     return;
@@ -563,9 +568,9 @@ export function startCrewServer(board: CrewBoard, port: number, ctx?: DashboardC
     throw new Error("dashboard context required — crew board is now behind login");
   }
   const server = createDashboardServer(ctx);
-  const bind = ctx.cfg.dashboardBind || "0.0.0.0";
+  const bind = ctx.cfg.dashboardBind || "127.0.0.1";
   server.listen(port, bind, () => {
-    console.log(`Dashboard http://127.0.0.1:${port}/  (login required; JSON /api/crew)`);
+    console.log(`Dashboard http://127.0.0.1:${port}/  bind=${bind} (login required; JSON /api/crew)`);
   });
   return server;
 }

@@ -26,6 +26,7 @@ export interface AppConfig {
   dashboardEmailFile: string;
   dashboardTotpFile: string;
   dashboardSecureCookie: boolean;
+  allowExtraBudget: boolean;
   walletSecretsPath: string;
   databasePath: string;
   configDir: string;
@@ -37,8 +38,21 @@ export interface AppConfig {
   rulesPath: string;
 }
 
+export function isLoopbackBind(bind: string): boolean {
+  const b = bind.trim().toLowerCase();
+  return b === "127.0.0.1" || b === "::1" || b === "localhost" || b === "0:0:0:0:0:0:0:1";
+}
+
+/** Secure cookie is on when not bound to loopback, unless explicitly set. */
+export function resolveDashboardSecureCookie(env: NodeJS.ProcessEnv, bind: string): boolean {
+  if (env.DASHBOARD_SECURE_COOKIE === "true") return true;
+  if (env.DASHBOARD_SECURE_COOKIE === "false") return false;
+  return !isLoopbackBind(bind);
+}
+
 export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const configDir = resolve(env.CONFIG_DIR ?? "./config");
+  const dashboardBind = env.DASHBOARD_BIND ?? "127.0.0.1";
   return {
     mode: env.MODE === "LIVE" ? "LIVE" : "PAPER",
     masterEnabled: env.MASTER_ENABLED === "true",
@@ -55,14 +69,15 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     grokModel: env.GROK_MODEL ?? "grok-4-fast",
     llmTimeoutMs: Number(env.LLM_TIMEOUT_MS ?? 4000),
     crewPort: Number(env.CREW_PORT ?? 8787),
-    dashboardBind: env.DASHBOARD_BIND ?? "0.0.0.0",
+    dashboardBind,
     dashboardHost: env.DASHBOARD_HOST ?? "cryptogrokbot.com",
     dashboardPassword: env.DASHBOARD_PASSWORD ?? "",
     dashboardPasswordFile: resolve(env.DASHBOARD_PASSWORD_FILE ?? "./data/.dashboard-password"),
     dashboardEmail: env.DASHBOARD_EMAIL ?? "",
     dashboardEmailFile: resolve(env.DASHBOARD_EMAIL_FILE ?? "./data/.dashboard-email"),
     dashboardTotpFile: resolve(env.DASHBOARD_TOTP_FILE ?? "./data/.dashboard-totp"),
-    dashboardSecureCookie: env.DASHBOARD_SECURE_COOKIE === "true",
+    dashboardSecureCookie: resolveDashboardSecureCookie(env, dashboardBind),
+    allowExtraBudget: env.ALLOW_EXTRA_BUDGET === "true",
     walletSecretsPath: resolve(env.WALLET_SECRETS_PATH ?? "./data/wallet-secrets.json"),
     databasePath: resolve(env.DATABASE_PATH ?? "./data/night-agent.db"),
     configDir,

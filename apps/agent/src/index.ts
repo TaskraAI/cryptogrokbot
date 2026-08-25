@@ -71,6 +71,7 @@ async function main(): Promise<void> {
         store,
         policy,
         idOrMint,
+        flags: runtime.currentFlags(),
         connection: runtime.connection,
         keypair: runtime.keypair,
         pumpApiKey: cfg.pumpApiKey,

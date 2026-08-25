@@ -48,11 +48,12 @@ export class AgentRuntime {
     public store: Store,
   ) {
     this.flags = {
-      mode: cfg.mode,
+      mode: cfg.mode === "LIVE" ? "LIVE" : "PAPER",
       masterEnabled: cfg.masterEnabled,
       rpcHealthy: true,
       jupiterHealthy: true,
       telegramHealthy: Boolean(cfg.telegramToken),
+      allowExtraBudget: cfg.allowExtraBudget,
     };
     try {
       this.connection = new Connection(cfg.heliusRpc, "confirmed");
@@ -63,9 +64,20 @@ export class AgentRuntime {
     }
   }
 
+  /**
+   * MODE always comes from env (`cfg.mode`). The SQLite `master` flag is only a
+   * kill/resume switch: `/resume CONFIRM` can re-enable live *when MODE=LIVE*,
+   * and cannot flip PAPER to LIVE.
+   */
   currentFlags(): RuntimeFlags {
+    const mode: Mode = this.cfg.mode === "LIVE" ? "LIVE" : "PAPER";
     const master = getFlag(this.store, "master", String(this.flags.masterEnabled)) === "true";
-    return { ...this.flags, masterEnabled: master, mode: this.cfg.mode };
+    return {
+      ...this.flags,
+      mode,
+      masterEnabled: master,
+      allowExtraBudget: this.cfg.allowExtraBudget,
+    };
   }
 
   async tick(): Promise<string[]> {
@@ -311,6 +323,7 @@ export class AgentRuntime {
         llm: llm
           ? { pattern: llm.pattern as never, action: llm.action, confidence: llm.confidence }
           : undefined,
+        flags: this.currentFlags(),
         connection: conn,
         keypair: this.keypair,
         pumpApiKey: this.cfg.pumpApiKey,
@@ -328,8 +341,14 @@ export class AgentRuntime {
           if (netMatch) {
             const net = Number(netMatch[1]);
             let extra = b.extra_budget_sol;
-            if (this.policy.compoundWins && net > 0) {
+            const allowExtra = this.currentFlags().allowExtraBudget;
+            if (this.policy.compoundWins && net > 0 && allowExtra) {
               extra += net * this.policy.compoundWinsFraction;
+              console.warn(
+                `ALLOW_EXTRA_BUDGET: extra_budget_sol raised to ${extra} SOL after compound win (logged, non-default)`,
+              );
+            } else if (this.policy.compoundWins && net > 0 && !allowExtra) {
+              extra = b.extra_budget_sol;
             }
             const next = applyRealizedPnl(
               {
@@ -393,6 +412,7 @@ export class AgentRuntime {
           snap,
           policy: this.policy,
           sellAll: true,
+          flags: this.currentFlags(),
           connection: this.connection,
           keypair: this.keypair,
           pumpApiKey: this.cfg.pumpApiKey,

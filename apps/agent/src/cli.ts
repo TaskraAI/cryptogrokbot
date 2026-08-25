@@ -20,9 +20,10 @@ Defaults (from .env):
   MODE=PAPER          dry-run ledger only; no chain tx
   MASTER_ENABLED=false
   Live spend requires MODE=LIVE and MASTER_ENABLED=true and WALLET_SECRET_KEY.
+  Live sells need the same three. /resume cannot set MODE.
 
 Flags:
-  --sol N     size, capped by policy.json maxSolPerTrade
+  --sol N     size; refused if above policy.json maxSolPerTrade
   --strict    also apply config/rules.yaml (night-agent filters)
   --force     skip score (PAPER only) — still no chain tx
   --json      machine-readable scan/buy/sell
@@ -71,6 +72,7 @@ async function main(): Promise<void> {
     rpcHealthy: true,
     jupiterHealthy: true,
     telegramHealthy: Boolean(cfg.telegramToken),
+    allowExtraBudget: cfg.allowExtraBudget,
   };
   let connection: Connection | undefined;
   let keypair: ReturnType<typeof loadKeypair> | undefined;
@@ -154,6 +156,7 @@ async function main(): Promise<void> {
       store,
       policy,
       idOrMint,
+      flags: flagsRun,
       connection,
       keypair,
       pumpApiKey: cfg.pumpApiKey,

@@ -45,7 +45,7 @@ export async function tryEnter(opts: {
   keypair?: Keypair;
   pumpApiKey?: string;
   now?: number;
-  /** Override size; still capped at policy.maxSolPerTrade. */
+  /** Override size; refused if above policy.maxSolPerTrade (not clipped). */
   sol?: number;
   /** Skip scoring (PAPER only). LIVE always scores. */
   skipScore?: boolean;
@@ -146,12 +146,20 @@ export async function tryEnter(opts: {
     }
   }
 
-  const sol = Math.min(opts.sol ?? opts.policy.maxSolPerTrade, opts.policy.maxSolPerTrade);
+  const requested = opts.sol ?? opts.policy.maxSolPerTrade;
+  if (!Number.isFinite(requested) || requested <= 0) {
+    return `blocked ${opts.token.ticker}: invalid SOL size`;
+  }
+  if (requested > opts.policy.maxSolPerTrade + 1e-12) {
+    return `blocked ${opts.token.ticker}: size ${requested} exceeds maxSolPerTrade ${opts.policy.maxSolPerTrade}`;
+  }
   const result = await executeBuy({
     mode: opts.flags.mode,
     graduated: opts.token.graduated,
     mint: opts.token.mint,
-    sol,
+    sol: requested,
+    maxSolPerTrade: opts.policy.maxSolPerTrade,
+    masterEnabled: opts.flags.masterEnabled,
     slippagePct: opts.policy.slippagePctCap,
     connection: opts.connection,
     keypair: opts.keypair,
