@@ -2,7 +2,7 @@
   "dailyBudgetSol": 0.5,
   "maxTradesPerDay": 5,
   "maxOpenPositions": 3,
-  "maxSolPerTrade": 0.1,
+  "maxSolPerTrade": 0.05,
   "dailyLossCapSol": 0.3,
   "cooldownSeconds": 180,
   "minIndependentSources": 2,

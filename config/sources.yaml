@@ -1,8 +1,8 @@
 # Starter watchlist — well-known, liquid Solana memes.
 # Edit this file. The night agent (MODE=PAPER by default) may paper-buy a mint
 # listed here when DexScreener or Pump.fun shows a live Solana market AND
-# scoring + config/rules.yaml pass. It will not send a real transaction unless
-# you set MODE=LIVE and MASTER_ENABLED=true in .env (do not do that yet).
+# scoring + config/rules.yaml pass. Real transactions require MODE=LIVE,
+# MASTER_ENABLED=true, and WALLET_SECRET_KEY (dedicated hot wallet only).
 #
 # Add your own coins like this:
 #   - mint: "<Solana mint address>"
@@ -59,6 +59,7 @@ wallets:
   #   action: copy   # copy | ignore | fade
   #   notes: ""
 
-mute: []
-  # - type: mint      # mint | ticker | handle | keyword
-  #   value: ""
+mute:
+  - type: mint
+    value: GeSfrQiscfsEv4Hx2TKaB9Nfid12qND1YYRYS1vSpump
+    # GrokBot impersonator — paper exception only; never live

@@ -10,7 +10,7 @@ import {
   fetchDexToken,
   fetchPumpNewTokens,
   heliusHealth,
-  jupiterPrice,
+  jupiterQuote,
   pairToMetrics,
 } from "@night/signals";
 import { loadKeypair } from "@night/execution";
@@ -144,8 +144,13 @@ export class AgentRuntime {
 
   private async refreshHealth(): Promise<void> {
     this.flags.rpcHealthy = await heliusHealth(this.cfg.heliusRpc);
-    const px = await jupiterPrice("So11111111111111111111111111111111111111112");
-    this.flags.jupiterHealthy = px != null;
+    const quote = await jupiterQuote({
+      inputMint: "So11111111111111111111111111111111111111112",
+      outputMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      amount: 1_000_000,
+      slippageBps: 50,
+    });
+    this.flags.jupiterHealthy = Boolean(quote && quote.outAmount > 0);
   }
 
   private async considerWatchlist(
