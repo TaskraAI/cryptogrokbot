@@ -57,6 +57,20 @@ Keep `MODE=PAPER` until you have graded a week of shadow trades.
 
 Set `XAI_API_KEY` and open `http://127.0.0.1:8787/` while `npm run agent` is running to see agents work at the same time.
 
+## Grok Bot app (Mac / iOS)
+
+The **Grok Bot** desktop/iOS app is not this Node process and is not the xAI API key. There is no API to create Bots from this repo — you paste profiles in the app.
+
+Copy-paste pack: [`grok-bot/README.md`](grok-bot/README.md)
+
+1. Create five Bots (Chief, Scout, Sentinel, Grok, Scholar) from `grok-bot/profiles/`
+2. Attach skills from `grok-bot/skills/`
+3. Connect GitHub so the Agent Computer can clone this private repo
+4. Paste `grok-bot/first-tasks/bring-up-paper.md` to Chief — paper only
+5. Open a group chat and paste `grok-bot/first-tasks/group-desk.md`
+
+Stay in `MODE=PAPER`. Do not put wallet keys in a Bot profile.
+
 ## Extra rules
 
 Add more in [`config/rules.yaml`](config/rules.yaml) without shipping code. Types include age, holders, 5m volume, mcap floor/ceiling, buy/sell ratio, session hours, loss streak, keywords, copy/fade wallets. `/rule off skip-fresh-snipe` disables one immediately.
@@ -75,6 +89,7 @@ packages/execution  paper + Jupiter swap + PumpPortal local-sign
 packages/storage    SQLite journal
 packages/learning   review, lessons, nightly pattern stats
 config/             policy, sources, guardrails, lessons
+grok-bot/           Grok Bot app profiles, skills, first tasks
 ```
 
 ## Default policy

@@ -5,7 +5,9 @@ description: Solana meme-coin night agent. Use when running or inspecting the Gr
 
 # Night Agent Grok crew
 
-Four named agents run **at the same time** on one hot wallet:
+**Setting up the Grok Bot Mac/iOS app?** Start at [`README.md`](README.md) in this folder (profiles, skills, first tasks, group chat). This skill is for the Node crew inside the repo.
+
+Five named desks run **at the same time** on one hot wallet:
 
 | Bot | Job |
 |---|---|
