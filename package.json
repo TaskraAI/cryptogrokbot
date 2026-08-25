@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "agent": "tsx apps/agent/src/index.ts",
+    "trade": "tsx apps/agent/src/cli.ts",
     "dev": "tsx apps/agent/src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",

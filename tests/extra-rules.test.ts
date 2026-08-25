@@ -67,6 +67,22 @@ describe("extra rules", () => {
     expect(inHours("22-4", 12)).toBe(false);
   });
 
+  it("skips min_holders when holder count is unknown (0)", () => {
+    const r = evaluateExtraRules([on({ id: "min-holders", type: "min_holders", value: 30 })], {
+      token: token({ holders: 0 }),
+      sources: [hit()],
+    });
+    expect(r.ok).toBe(true);
+  });
+
+  it("blocks when holder count is known and too low", () => {
+    const r = evaluateExtraRules([on({ id: "min-holders", type: "min_holders", value: 30 })], {
+      token: token({ holders: 5 }),
+      sources: [hit()],
+    });
+    expect(r.ok).toBe(false);
+  });
+
   it("counts a loss streak from newest-first nets", () => {
     expect(consecutiveLosses([-0.1, -0.05, 0.2])).toBe(2);
     expect(consecutiveLosses([0.1, -0.2])).toBe(0);

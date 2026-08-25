@@ -14,6 +14,15 @@ test -f .env || cp .env.example .env
 MODE=PAPER npm run agent
 ```
 
+Paper buy/sell of a mint you pick (no night loop):
+
+```bash
+npm run trade -- scan
+npm run trade -- buy <mint>
+npm run trade -- positions
+npm run trade -- sell 1
+```
+
 Then open `http://127.0.0.1:8787/` in **this** computer’s browser.
 
 ## One process

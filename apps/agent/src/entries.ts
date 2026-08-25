@@ -1,4 +1,17 @@
 import type { Policy, RuntimeFlags, SourceHit, TokenMetrics } from "@night/shared";
+
+/** Trusted hit so a user-chosen mint can pass the multi-source scorer. */
+export function manualSource(mint: string, ticker?: string): SourceHit {
+  return {
+    platform: "dexscreener",
+    key: "manual",
+    weight: "trusted",
+    snippet: "user-selected mint",
+    at: Date.now(),
+    mint,
+    ticker,
+  };
+}
 import { applyEntryToBudget, canEnter, evaluateExtraRules, scoreCandidate, type ExtraRule, type Guardrail } from "@night/risk";
 import { executeBuy } from "@night/execution";
 import { simulateSell } from "@night/signals";
@@ -32,6 +45,10 @@ export async function tryEnter(opts: {
   keypair?: Keypair;
   pumpApiKey?: string;
   now?: number;
+  /** Override size; still capped at policy.maxSolPerTrade. */
+  sol?: number;
+  /** Skip scoring (PAPER only). LIVE always scores. */
+  skipScore?: boolean;
 }): Promise<string> {
   const now = opts.now ?? Date.now();
   const open = listOpenPositions(opts.store);
@@ -65,13 +82,19 @@ export async function tryEnter(opts: {
     return `blocked ${opts.token.ticker}: ${gate.reason}`;
   }
 
-  const scored = scoreCandidate({
-    token: opts.token,
-    sources: opts.sources,
-    guardrails: opts.guardrails,
-    policy: opts.policy,
-    now,
-  });
+  if (opts.skipScore && opts.flags.mode === "LIVE") {
+    return `blocked ${opts.token.ticker}: --force is paper-only`;
+  }
+
+  const scored = opts.skipScore
+    ? { passed: true as const, score: 0, blockedReason: undefined as string | undefined, checks: { forced: true } }
+    : scoreCandidate({
+        token: opts.token,
+        sources: opts.sources,
+        guardrails: opts.guardrails,
+        policy: opts.policy,
+        now,
+      });
   if (!scored.passed) {
     insertDecision(opts.store, {
       at: now,
@@ -123,7 +146,7 @@ export async function tryEnter(opts: {
     }
   }
 
-  const sol = opts.policy.maxSolPerTrade;
+  const sol = Math.min(opts.sol ?? opts.policy.maxSolPerTrade, opts.policy.maxSolPerTrade);
   const result = await executeBuy({
     mode: opts.flags.mode,
     graduated: opts.token.graduated,

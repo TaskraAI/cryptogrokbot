@@ -201,6 +201,34 @@ export function findPositionByMint(store: Store, mint: string): PositionRow | un
     .get(mint) as PositionRow | undefined;
 }
 
+export function findOpenPosition(store: Store, idOrMint: string): PositionRow | undefined {
+  const asId = Number(idOrMint);
+  if (Number.isInteger(asId) && asId > 0 && String(asId) === idOrMint.trim()) {
+    const row = getPosition(store, asId);
+    return row?.status === "open" ? row : undefined;
+  }
+  return store.db
+    .prepare("SELECT * FROM positions WHERE mint = ? AND status = 'open' ORDER BY id DESC LIMIT 1")
+    .get(idOrMint) as PositionRow | undefined;
+}
+
+export function listFills(store: Store, positionId: number) {
+  return store.db
+    .prepare("SELECT * FROM fills WHERE position_id = ? ORDER BY id")
+    .all(positionId) as Array<{
+    id: number;
+    position_id: number;
+    at: number;
+    side: string;
+    sol: number;
+    tokens: number;
+    price_usd: number;
+    reason: string;
+    tx: string | null;
+    paper: number;
+  }>;
+}
+
 export interface PositionRow {
   id: number;
   mint: string;

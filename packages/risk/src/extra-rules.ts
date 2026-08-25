@@ -92,6 +92,8 @@ function fire(rule: ExtraRule, ctx: ExtraRuleContext, now: number): string | nul
     case "max_age_minutes":
       return t.ageMinutes > n ? `rule ${rule.id}: age ${t.ageMinutes.toFixed(1)}m > ${n}` : null;
     case "min_holders":
+      // DexScreener (and most public tickers) do not report holder count. 0 = unknown, not "zero holders".
+      if (t.holders <= 0) return null;
       return t.holders < n ? `rule ${rule.id}: holders ${t.holders} < ${n}` : null;
     case "min_volume_5m_usd":
       return t.volume5m < n ? `rule ${rule.id}: vol5m ${t.volume5m} < ${n}` : null;
