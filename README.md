@@ -59,15 +59,11 @@ Set `XAI_API_KEY` and open `http://127.0.0.1:8787/` while `npm run agent` is run
 
 ## Grok Bot app (Mac / iOS)
 
-The **Grok Bot** desktop/iOS app is not this Node process and is not the xAI API key. There is no API to create Bots from this repo — you paste profiles in the app.
+Sign into the Grok Bot app with the **same Cursor account** you use in Cursor IDE. That is the Cursor connection — Grok Bot is not an extension inside Cursor Settings.
 
-Copy-paste pack: [`grok-bot/README.md`](grok-bot/README.md)
-
-1. Create five Bots (Chief, Scout, Sentinel, Grok, Scholar) from `grok-bot/profiles/`
-2. Attach skills from `grok-bot/skills/`
-3. Connect GitHub so the Agent Computer can clone this private repo
-4. Paste `grok-bot/first-tasks/bring-up-paper.md` to Chief — paper only
-5. Open a group chat and paste `grok-bot/first-tasks/group-desk.md`
+Full walkthrough (Cursor sign-in, five Bots, crew board, Scout/Sentinel/Grok/Scholar, Telegram, rules): [`grok-bot/WALKTHROUGH.md`](grok-bot/WALKTHROUGH.md)  
+Copy-paste prompts: [`grok-bot/feature-prompts.md`](grok-bot/feature-prompts.md)  
+Profiles/skills: [`grok-bot/README.md`](grok-bot/README.md)
 
 Stay in `MODE=PAPER`. Do not put wallet keys in a Bot profile.
 

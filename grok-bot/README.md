@@ -1,6 +1,9 @@
 # Grok Bot setup — Taskra night desk
 
-This folder is everything you paste into **Grok Bot** (the Mac/iOS app from xAI).  
+**Start here for Cursor sign-in + click-by-click + feature walkthrough:** [`WALKTHROUGH.md`](WALKTHROUGH.md)  
+**Copy-paste chat lines:** [`feature-prompts.md`](feature-prompts.md)
+
+This folder is everything you paste into **Grok Bot** (the Mac/iOS app).  
 It is **not** the same product as Grok Build CLI (`grok`) or the xAI API key used by this repo.
 
 I (the Cursor cloud agent) **cannot sign into your Grok Bot account**. There is no public API to create Bots remotely. You create them once in the app; after that they share one **Agent Computer** and can run this repo so you watch five desks at once.
