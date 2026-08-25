@@ -212,7 +212,7 @@ async function verifyEmailStep() {
 async function joinInvite() {
   $("inviteErr").textContent = "";
   let raw = ($("inviteToken").value || "").trim();
-  const m = raw.match(/\/invite\/([^/?#]+)/);
+  const m = raw.match(new RegExp("/invite/([^/?#]+)"));
   if (m) raw = decodeURIComponent(m[1]);
   if (!raw) {
     $("inviteErr").textContent = "Paste the invite token";

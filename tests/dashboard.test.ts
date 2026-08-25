@@ -173,6 +173,10 @@ describe("dashboard auth and paper API", () => {
     expect(html).toContain('type="submit"');
     expect(html).toContain('id="login" class="login"');
     expect(html).not.toContain('id="login" class="login hidden"');
+    expect(html).not.toMatch(/match\(\/\/invite/);
+    const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+    expect(script).toBeTruthy();
+    expect(() => new Function(script!)).not.toThrow();
     expect(html).not.toContain("not financial advice");
     expect(html).not.toContain("Dashboard password");
     expect(html).not.toContain("Google Authenticator");
