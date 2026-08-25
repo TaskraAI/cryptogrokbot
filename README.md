@@ -15,11 +15,12 @@ npm test
 npm run agent                 # dashboard + night loop; http://127.0.0.1:8787/
 ```
 
-Open the URL on your phone or desktop. Log in with **email + password + 2FA**.
+Open the URL on your phone or desktop. Log in with **email + password + email verification**.
 
 - Email: `DASHBOARD_EMAIL` (default `hello@taskra.ai` if unset; stored in gitignored `data/.dashboard-email`)
 - Password: `DASHBOARD_PASSWORD`, or a one-time generated value in `data/.dashboard-password`
-- 2FA: first successful email/password login shows an Authenticator setup (`otpauth://` + secret). After that, every login needs the 6-digit code. Secret is gitignored `data/.dashboard-totp`.
+- Email code: after password, a 6-digit code is sent to that inbox (`RESEND_API_KEY` optional). If email sending is not configured, the code is printed in the agent log and shown on the login screen.
+- Grok Bot: after you log in, Home → **Invite Grok Bot** gives a URL/token. The bot opens `/invite/<token>` or pastes the token on the login screen. Bearer `Authorization: Bearer cgbot_…` also works for `/api/*`.
 
 ```bash
 # CLI still works (same paper ledger)
@@ -53,7 +54,7 @@ On the durable host:
 1. Delete parking/URL-forward records for `@` and `www`.
 2. Add the CNAMEs above (or grant the API token **Zone.DNS Edit** and we can do it next time).
 3. Run `npm run agent` and `cloudflared tunnel run` with the named tunnel.
-4. Set `DASHBOARD_SECURE_COOKIE=true` behind HTTPS. Set `DASHBOARD_EMAIL` and `DASHBOARD_PASSWORD` in `.env` on that host only. Restart the agent, then enroll an authenticator on first login (secret is never printed after enroll).
+4. Set `DASHBOARD_SECURE_COOKIE=true` behind HTTPS. Set `DASHBOARD_EMAIL` and `DASHBOARD_PASSWORD` in `.env` on that host only. Restart the agent. Login uses email verification (not authenticator). Invite Grok Bot from the Home Access card.
 
 `CLOUDFLARE_API_TOKEN` is used only to look up the zone / manage the tunnel. Never commit it. Placeholders are in `.env.example`.
 
@@ -105,6 +106,7 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 | `DASHBOARD_SECURE_COOKIE` | no | auto-on when bind is not loopback; set `true` behind HTTPS |
 | `DASHBOARD_EMAIL` | no | login email (default `hello@taskra.ai`; persisted to `data/.dashboard-email`) |
 | `DASHBOARD_PASSWORD` | no | login; else generated into `data/.dashboard-password` |
+| `RESEND_API_KEY` | no | send login codes by email; else code is logged / shown |
 | `DASHBOARD_HOST` | no | default `cryptogrokbot.com` |
 | `CREW_PORT` | no | dashboard port (default 8787) |
 | `WALLET_SECRETS_PATH` | no | gitignored JSON map of wallet secrets |

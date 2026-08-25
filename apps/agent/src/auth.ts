@@ -146,7 +146,18 @@ export function clearPendingCookieHeader(secure: boolean): string {
   return bits.join("; ");
 }
 
-export function signPending(password: string, step: "enroll" | "totp", extra = "", now = Date.now()): string {
+export type PendingStep = "email" | "enroll" | "totp";
+
+export function makeEmailCode(): string {
+  const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
+  return n.toString().padStart(6, "0");
+}
+
+export function hashEmailCode(code: string, password: string): string {
+  return createHmac("sha256", cookieSecretFromPassword(password)).update(code.trim()).digest("hex");
+}
+
+export function signPending(password: string, step: PendingStep, extra = "", now = Date.now()): string {
   const exp = now + PENDING_AGE_SEC * 1000;
   const nonce = randomBytes(12).toString("base64url");
   const payload = `p1.${step}.${exp}.${nonce}.${extra}`;
@@ -157,7 +168,7 @@ export function signPending(password: string, step: "enroll" | "totp", extra = "
 export function verifyPending(
   token: string,
   password: string,
-  step: "enroll" | "totp",
+  step: PendingStep,
   now = Date.now(),
 ): { ok: boolean; extra: string } {
   const lastDot = token.lastIndexOf(".");
@@ -165,12 +176,13 @@ export function verifyPending(
   const payload = token.slice(0, lastDot);
   const sig = token.slice(lastDot + 1);
   const parts = payload.split(".");
-  if (parts[0] !== "p1" || parts[1] !== step || parts.length !== 5) return { ok: false, extra: "" };
+  if (parts[0] !== "p1" || parts[1] !== step || parts.length < 5) return { ok: false, extra: "" };
   const exp = Number(parts[2]);
   if (!Number.isFinite(exp) || exp < now) return { ok: false, extra: "" };
+  const extra = parts.slice(4).join(".");
   const expected = createHmac("sha256", cookieSecretFromPassword(password)).update(payload).digest("base64url");
   const a = Buffer.from(sig);
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return { ok: false, extra: "" };
-  return { ok: true, extra: parts[4] ?? "" };
+  return { ok: true, extra };
 }

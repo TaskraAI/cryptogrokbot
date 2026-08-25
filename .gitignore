@@ -11,4 +11,5 @@ coverage
 .dashboard-password
 .dashboard-email
 .dashboard-totp
+dashboard-access.json
 wallet-secrets.json

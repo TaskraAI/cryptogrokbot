@@ -24,9 +24,10 @@ export interface AppConfig {
   dashboardPasswordFile: string;
   dashboardEmail: string;
   dashboardEmailFile: string;
-  dashboardTotpFile: string;
+  dashboardAccessFile: string;
   dashboardSecureCookie: boolean;
   allowExtraBudget: boolean;
+  resendApiKey: string;
   walletSecretsPath: string;
   databasePath: string;
   configDir: string;
@@ -76,8 +77,10 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     dashboardEmail: env.DASHBOARD_EMAIL ?? "",
     dashboardEmailFile: resolve(env.DASHBOARD_EMAIL_FILE ?? "./data/.dashboard-email"),
     dashboardTotpFile: resolve(env.DASHBOARD_TOTP_FILE ?? "./data/.dashboard-totp"),
+    dashboardAccessFile: resolve(env.DASHBOARD_ACCESS_FILE ?? "./data/dashboard-access.json"),
     dashboardSecureCookie: resolveDashboardSecureCookie(env, dashboardBind),
     allowExtraBudget: env.ALLOW_EXTRA_BUDGET === "true",
+    resendApiKey: env.RESEND_API_KEY ?? "",
     walletSecretsPath: resolve(env.WALLET_SECRETS_PATH ?? "./data/wallet-secrets.json"),
     databasePath: resolve(env.DATABASE_PATH ?? "./data/night-agent.db"),
     configDir,

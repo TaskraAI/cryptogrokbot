@@ -24,12 +24,12 @@ import {
   clearPendingCookieHeader,
   clearSessionCookieHeader,
   emailsEqual,
-  loadTotpSecret,
+  hashEmailCode,
+  makeEmailCode,
   parseCookies,
   passwordsEqual,
   PENDING_COOKIE,
   pendingCookieHeader,
-  saveTotpSecret,
   SESSION_COOKIE,
   sessionCookieHeader,
   signPending,
@@ -37,7 +37,18 @@ import {
   verifyPending,
   verifySession,
 } from "./auth.ts";
-import { generateTotpSecret, otpauthUrl, verifyTotp } from "./totp.ts";
+import {
+  addGrant,
+  createGrant,
+  findGrantByEmail,
+  findGrantByToken,
+  grokBotEmail,
+  loadAccess,
+  markRedeemed,
+  publicGrants,
+  revokeGrant,
+} from "./access.ts";
+import { sendLoginCode, type SendCodeFn } from "./mail.ts";
 import { addWallet, listPublicWallets, removeWallet } from "./wallets.ts";
 import { auditorPulseDetail, runAuditorScan } from "./auditor.ts";
 import type { AppConfig } from "./config.ts";
@@ -51,6 +62,8 @@ export interface DashboardContext {
   password: string;
   email: string;
   totpFile: string;
+  accessFile: string;
+  sendCode?: SendCodeFn;
   buy: (opts: { mint: string; sol?: number; force?: boolean }) => Promise<TradeOutcome>;
   sell: (idOrMint: string) => Promise<TradeOutcome>;
   repoRoot?: string;
@@ -76,7 +89,34 @@ function isSecure(req: IncomingMessage, cfg: AppConfig): boolean {
 
 function authed(req: IncomingMessage, ctx: DashboardContext): boolean {
   const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
-  return Boolean(token && verifySession(token, ctx.password));
+  if (token && verifySession(token, ctx.password)) return true;
+  const header = String(req.headers.authorization ?? "");
+  const m = header.match(/^Bearer\s+(.+)$/i);
+  if (m?.[1] && findGrantByToken(ctx.accessFile, m[1].trim())) return true;
+  return false;
+}
+
+function publicOrigin(req: IncomingMessage, cfg: AppConfig): string {
+  const xfProto = String(req.headers["x-forwarded-proto"] ?? "").split(",")[0]?.trim();
+  const proto = xfProto || (cfg.dashboardSecureCookie ? "https" : "http");
+  const host =
+    String(req.headers["x-forwarded-host"] ?? "")
+      .split(",")[0]
+      ?.trim() ||
+    String(req.headers.host ?? "").trim() ||
+    cfg.dashboardHost;
+  return `${proto}://${host}`;
+}
+
+async function deliverCode(ctx: DashboardContext, to: string, code: string) {
+  if (ctx.sendCode) return ctx.sendCode(to, code);
+  return sendLoginCode({
+    to,
+    code,
+    resendKey: ctx.cfg.resendApiKey,
+    telegramToken: ctx.cfg.telegramToken,
+    telegramChatId: ctx.cfg.telegramChatId,
+  });
 }
 
 async function readBody(req: IncomingMessage, limit = 256_000): Promise<string> {
@@ -152,6 +192,25 @@ export async function handleDashboardRequest(
     return;
   }
 
+  const invitePath = path.match(/^\/invite\/([^/]+)$/);
+  if (invitePath && method === "GET") {
+    const grant = findGrantByToken(ctx.accessFile, decodeURIComponent(invitePath[1]));
+    if (!grant) {
+      res.writeHead(401, { "content-type": "text/plain; charset=utf-8" });
+      res.end("Invite expired or invalid.");
+      return;
+    }
+    markRedeemed(ctx.accessFile, grant.id);
+    const secure = isSecure(req, ctx.cfg);
+    const session = signSession(ctx.password);
+    res.writeHead(302, {
+      location: "/",
+      "set-cookie": [sessionCookieHeader(session, secure), clearPendingCookieHeader(secure)],
+    });
+    res.end();
+    return;
+  }
+
   if (path === "/api/login" && method === "POST") {
     let body: Record<string, unknown> = {};
     try {
@@ -160,51 +219,42 @@ export async function handleDashboardRequest(
       json(res, 400, { error: "invalid json" });
       return;
     }
-    const email = str(body.email);
+    const email = str(body.email).trim().toLowerCase();
     const password = str(body.password);
-    const code = str(body.code);
-    const secure = isSecure(req, ctx.cfg);
     const loginEmail = email || ctx.email;
-    if (!emailsEqual(loginEmail, ctx.email) || !passwordsEqual(password, ctx.password)) {
+    const invited = findGrantByEmail(ctx.accessFile, loginEmail);
+    const isOwner = emailsEqual(loginEmail, ctx.email);
+    if (isOwner) {
+      if (!passwordsEqual(password, ctx.password)) {
+        json(res, 401, { error: "Wrong email or password" });
+        return;
+      }
+    } else if (!invited || invited.kind === "grokbot") {
       json(res, 401, { error: "Wrong email or password" });
       return;
     }
-    const totpSecret = loadTotpSecret(ctx.totpFile);
-    if (!totpSecret) {
-      const pendingSecret = generateTotpSecret();
-      const token = signPending(ctx.password, "enroll", pendingSecret);
-      json(
-        res,
-        200,
-        {
-          ok: false,
-          step: "enroll",
-          email: ctx.email,
-          secret: pendingSecret,
-          otpauth: otpauthUrl({ email: ctx.email, secret: pendingSecret }),
-        },
-        [pendingCookieHeader(token, secure), clearSessionCookieHeader(secure)],
-      );
-      return;
-    }
-    if (!code) {
-      const token = signPending(ctx.password, "totp");
-      json(res, 200, { ok: false, step: "totp" }, [
-        pendingCookieHeader(token, secure),
-        clearSessionCookieHeader(secure),
-      ]);
-      return;
-    }
-    if (!verifyTotp(totpSecret, code)) {
-      json(res, 401, { error: "invalid 2fa code" });
-      return;
-    }
-    const session = signSession(ctx.password);
-    json(res, 200, { ok: true }, [sessionCookieHeader(session, secure), clearPendingCookieHeader(secure)]);
+    const code = makeEmailCode();
+    const extra = `${hashEmailCode(code, ctx.password)}|${loginEmail}`;
+    const token = signPending(ctx.password, "email", extra);
+    const sent = await deliverCode(ctx, loginEmail, code);
+    const secure = isSecure(req, ctx.cfg);
+    json(
+      res,
+      200,
+      {
+        ok: false,
+        step: "email",
+        email: loginEmail,
+        sent: sent.delivered,
+        via: sent.via,
+        ...(sent.delivered ? {} : { devCode: code }),
+      },
+      [pendingCookieHeader(token, secure), clearSessionCookieHeader(secure)],
+    );
     return;
   }
 
-  if (path === "/api/2fa/enroll" && method === "POST") {
+  if (path === "/api/email/verify" && method === "POST") {
     let body: Record<string, unknown> = {};
     try {
       body = await readJson(req);
@@ -213,27 +263,24 @@ export async function handleDashboardRequest(
       return;
     }
     const pending = parseCookies(req.headers.cookie)[PENDING_COOKIE] ?? "";
-    const checked = verifyPending(pending, ctx.password, "enroll");
+    const checked = verifyPending(pending, ctx.password, "email");
     if (!checked.ok || !checked.extra) {
-      json(res, 401, { error: "2fa setup expired — log in again" });
+      json(res, 401, { error: "Email code expired — log in again" });
       return;
     }
-    if (loadTotpSecret(ctx.totpFile)) {
-      json(res, 409, { error: "2fa already enrolled" });
+    const [wantHash] = checked.extra.split("|");
+    const got = hashEmailCode(str(body.code), ctx.password);
+    if (!wantHash || !passwordsEqual(got, wantHash)) {
+      json(res, 401, { error: "Wrong email code" });
       return;
     }
-    if (!verifyTotp(checked.extra, str(body.code))) {
-      json(res, 401, { error: "invalid 2fa code" });
-      return;
-    }
-    saveTotpSecret(ctx.totpFile, checked.extra);
     const secure = isSecure(req, ctx.cfg);
     const session = signSession(ctx.password);
     json(res, 200, { ok: true }, [sessionCookieHeader(session, secure), clearPendingCookieHeader(secure)]);
     return;
   }
 
-  if (path === "/api/2fa/verify" && method === "POST") {
+  if (path === "/api/bot-token" && method === "POST") {
     let body: Record<string, unknown> = {};
     try {
       body = await readJson(req);
@@ -241,20 +288,18 @@ export async function handleDashboardRequest(
       json(res, 400, { error: "invalid json" });
       return;
     }
-    const pending = parseCookies(req.headers.cookie)[PENDING_COOKIE] ?? "";
-    const checked = verifyPending(pending, ctx.password, "totp");
-    if (!checked.ok) {
-      json(res, 401, { error: "2fa expired — log in again" });
+    const grant = findGrantByToken(ctx.accessFile, str(body.token));
+    if (!grant) {
+      json(res, 401, { error: "Invalid invite" });
       return;
     }
-    const totpSecret = loadTotpSecret(ctx.totpFile);
-    if (!totpSecret || !verifyTotp(totpSecret, str(body.code))) {
-      json(res, 401, { error: "invalid 2fa code" });
-      return;
-    }
+    markRedeemed(ctx.accessFile, grant.id);
     const secure = isSecure(req, ctx.cfg);
     const session = signSession(ctx.password);
-    json(res, 200, { ok: true }, [sessionCookieHeader(session, secure), clearPendingCookieHeader(secure)]);
+    json(res, 200, { ok: true, email: grant.email, label: grant.label }, [
+      sessionCookieHeader(session, secure),
+      clearPendingCookieHeader(secure),
+    ]);
     return;
   }
 
@@ -306,8 +351,56 @@ async function routeAuthed(
       masterEnabled: flags.masterEnabled,
       host: ctx.cfg.dashboardHost,
       email: ctx.email,
-      twoFactor: true,
+      twoFactor: "email",
     });
+    return;
+  }
+
+  if (path === "/api/access" && method === "GET") {
+    json(res, 200, {
+      owner: ctx.email,
+      grants: publicGrants(loadAccess(ctx.accessFile)),
+    });
+    return;
+  }
+
+  if (path === "/api/access/invite" && method === "POST") {
+    const body = await readJson(req);
+    const kind = str(body.kind) === "human" ? "human" : "grokbot";
+    const email = kind === "grokbot" ? grokBotEmail() : str(body.email).trim().toLowerCase();
+    if (kind === "human" && (!email || !email.includes("@"))) {
+      json(res, 400, { error: "email required" });
+      return;
+    }
+    if (kind === "human" && emailsEqual(email, ctx.email)) {
+      json(res, 400, { error: "owner already has access" });
+      return;
+    }
+    const label = str(body.label).trim() || (kind === "grokbot" ? "Grok Bot" : email);
+    const { grant, token } = createGrant({ email, label, kind });
+    addGrant(ctx.accessFile, grant);
+    const origin = publicOrigin(req, ctx.cfg);
+    json(res, 200, {
+      ok: true,
+      id: grant.id,
+      email: grant.email,
+      label: grant.label,
+      kind: grant.kind,
+      token,
+      url: `${origin}/invite/${token}`,
+      expiresAt: grant.expiresAt,
+    });
+    return;
+  }
+
+  if (path === "/api/access/revoke" && method === "POST") {
+    const body = await readJson(req);
+    const id = str(body.id);
+    if (!id) {
+      json(res, 400, { error: "id required" });
+      return;
+    }
+    json(res, 200, { ok: true, grants: publicGrants(revokeGrant(ctx.accessFile, id)) });
     return;
   }
 
@@ -327,6 +420,7 @@ async function routeAuthed(
       masterEnabled: flags.masterEnabled,
       pnl: pnlPayload(ctx.store),
       openCount: listOpenPositions(ctx.store).length,
+      email: ctx.email,
       todos: listTodos(ctx.store).map((t) => ({
         id: t.id,
         title: t.title,

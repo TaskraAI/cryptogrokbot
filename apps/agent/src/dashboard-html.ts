@@ -85,23 +85,20 @@ export function dashboardHtml(): string {
     <input id="pw" type="password" autocomplete="current-password" />
     <p id="loginErr" class="bad"></p>
     <button id="loginBtn" style="width:100%;margin-top:12px">Log in</button>
+    <p class="muted" style="margin-top:20px">Grok Bot invite</p>
+    <label for="inviteToken">Invite token or URL</label>
+    <input id="inviteToken" autocomplete="off" placeholder="cgbot_… or https://…/invite/…" />
+    <p id="inviteErr" class="bad"></p>
+    <button id="inviteBtn" class="ghost" style="width:100%;margin-top:8px">Join with invite</button>
   </div>
-  <div id="loginStepTotp" class="hidden">
-    <p class="muted">Enter the 6-digit code from your authenticator app.</p>
-    <label for="totp">2FA code</label>
-    <input id="totp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
-    <p id="totpErr" class="bad"></p>
-    <button id="totpBtn" style="width:100%;margin-top:12px">Verify</button>
-    <button id="totpBack" class="ghost" style="width:100%;margin-top:8px">Back</button>
-  </div>
-  <div id="loginStepEnroll" class="hidden">
-    <p>Add this account in <b>Google Authenticator</b>, <b>Authy</b>, or iOS Passwords, then enter the first code.</p>
-    <p><a id="otpauthLink" href="#">Open authenticator</a></p>
-    <p class="mint" id="totpSecret"></p>
-    <label for="enrollCode">First 2FA code</label>
-    <input id="enrollCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
-    <p id="enrollErr" class="bad"></p>
-    <button id="enrollBtn" style="width:100%;margin-top:12px">Enable 2FA and log in</button>
+  <div id="loginStepEmail" class="hidden">
+    <p class="muted">Enter the 6-digit code sent to <b id="emailTo"></b>.</p>
+    <p class="mint hidden" id="devCodeBox"></p>
+    <label for="emailCode">Email code</label>
+    <input id="emailCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
+    <p id="emailErr" class="bad"></p>
+    <button id="emailBtn" style="width:100%;margin-top:12px">Verify email</button>
+    <button id="emailBack" class="ghost" style="width:100%;margin-top:8px">Back</button>
   </div>
 </div>
 <div id="app" class="hidden">
@@ -158,16 +155,14 @@ document.querySelectorAll(".nav button").forEach((b) => b.addEventListener("clic
 $("loginBtn").addEventListener("click", login);
 $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
 $("email").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
-$("totpBtn").addEventListener("click", verifyTotpStep);
-$("totp").addEventListener("keydown", (e) => { if (e.key === "Enter") verifyTotpStep(); });
-$("totpBack").addEventListener("click", () => showLoginStep("creds"));
-$("enrollBtn").addEventListener("click", enrollTotp);
-$("enrollCode").addEventListener("keydown", (e) => { if (e.key === "Enter") enrollTotp(); });
+$("emailBtn").addEventListener("click", verifyEmailStep);
+$("emailCode").addEventListener("keydown", (e) => { if (e.key === "Enter") verifyEmailStep(); });
+$("emailBack").addEventListener("click", () => showLoginStep("creds"));
+$("inviteBtn").addEventListener("click", joinInvite);
 
 function showLoginStep(step) {
   $("loginStepCreds").classList.toggle("hidden", step !== "creds");
-  $("loginStepTotp").classList.toggle("hidden", step !== "totp");
-  $("loginStepEnroll").classList.toggle("hidden", step !== "enroll");
+  $("loginStepEmail").classList.toggle("hidden", step !== "email");
 }
 
 async function login() {
@@ -178,15 +173,17 @@ async function login() {
       body: JSON.stringify({ email: $("email").value, password: $("pw").value }),
     });
     $("pw").value = "";
-    if (data.step === "enroll") {
-      $("otpauthLink").href = data.otpauth;
-      $("totpSecret").textContent = data.secret;
-      showLoginStep("enroll");
-      return;
-    }
-    if (data.step === "totp") {
-      showLoginStep("totp");
-      $("totp").focus();
+    if (data.step === "email") {
+      $("emailTo").textContent = data.email || $("email").value;
+      if (data.devCode) {
+        $("devCodeBox").classList.remove("hidden");
+        $("devCodeBox").textContent = "Code (email sending not configured): " + data.devCode;
+      } else {
+        $("devCodeBox").classList.add("hidden");
+        $("devCodeBox").textContent = "";
+      }
+      showLoginStep("email");
+      $("emailCode").focus();
       return;
     }
     showApp();
@@ -195,25 +192,32 @@ async function login() {
   }
 }
 
-async function verifyTotpStep() {
-  $("totpErr").textContent = "";
+async function verifyEmailStep() {
+  $("emailErr").textContent = "";
   try {
-    await api("/api/2fa/verify", { method: "POST", body: JSON.stringify({ code: $("totp").value }) });
-    $("totp").value = "";
+    await api("/api/email/verify", { method: "POST", body: JSON.stringify({ code: $("emailCode").value }) });
+    $("emailCode").value = "";
     showApp();
   } catch (e) {
-    $("totpErr").textContent = e.message || "2fa failed";
+    $("emailErr").textContent = e.message || "email verify failed";
   }
 }
 
-async function enrollTotp() {
-  $("enrollErr").textContent = "";
+async function joinInvite() {
+  $("inviteErr").textContent = "";
+  let raw = ($("inviteToken").value || "").trim();
+  const m = raw.match(/\/invite\/([^/?#]+)/);
+  if (m) raw = decodeURIComponent(m[1]);
+  if (!raw) {
+    $("inviteErr").textContent = "Paste the invite token";
+    return;
+  }
   try {
-    await api("/api/2fa/enroll", { method: "POST", body: JSON.stringify({ code: $("enrollCode").value }) });
-    $("enrollCode").value = "";
+    await api("/api/bot-token", { method: "POST", body: JSON.stringify({ token: raw }) });
+    $("inviteToken").value = "";
     showApp();
   } catch (e) {
-    $("enrollErr").textContent = e.message || "2fa setup failed";
+    $("inviteErr").textContent = e.message || "invite failed";
   }
 }
 
@@ -270,7 +274,13 @@ async function renderHome() {
     '<div class="card"><h2 style="margin-top:0">P&amp;L</h2>' +
     "<p>Paper net <b>" + Number(d.pnl.paperNetSol).toFixed(4) + " SOL</b> · " + d.pnl.paperTrades + " closed</p>" +
     "<p>Live net <b>" + Number(d.pnl.liveNetSol).toFixed(4) + " SOL</b> · " + d.pnl.liveTrades + " closed</p>" +
-    "<p class='muted'>Open positions: " + d.openCount + "</p></div>" +
+    "<p>Open positions: " + d.openCount + "</p></div>" +
+    '<div class="card" id="accessCard"><h2 style="margin-top:0">Access</h2>' +
+    "<p class='muted'>Owner: " + esc(d.email || "") + " · email verification</p>" +
+    '<button id="inviteGrok" style="width:100%">Invite Grok Bot</button>' +
+    '<label style="margin-top:12px">Invite by email</label>' +
+    '<div class="row"><input id="inviteEmail" type="email" placeholder="teammate@email"/><button class="ghost" id="inviteHuman">Send invite</button></div>' +
+    '<p id="inviteMsg" class="muted"></p><div id="grantList"></div></div>' +
     "<h2>Todos</h2>" + todos +
     '<div class="row"><input id="newTodo" placeholder="Add a todo"/><button id="addTodo">Add</button></div>' +
     "<h2>Bugs (Auditor)</h2>" + bugs +
@@ -294,6 +304,45 @@ async function renderHome() {
     finally { renderHome(); }
   };
   $("logout").onclick = async () => { await api("/api/logout", { method: "POST", body: "{}" }); showLogin(); };
+  await bindAccess();
+}
+
+async function bindAccess() {
+  const box = $("grantList");
+  const msg = $("inviteMsg");
+  if (!box) return;
+  async function refreshGrants() {
+    const a = await api("/api/access");
+    const rows = (a.grants || []).map((g) =>
+      '<div class="card" style="margin:8px 0"><b>' + esc(g.label) + "</b> " +
+      '<span class="pill">' + esc(g.kind) + "</span>" +
+      '<div class="muted">' + esc(g.email) + "</div>" +
+      '<button class="danger" data-revoke="' + esc(g.id) + '">Revoke</button></div>'
+    ).join("");
+    box.innerHTML = rows || "<p class='muted'>No invites yet.</p>";
+    box.querySelectorAll("button[data-revoke]").forEach((b) => {
+      b.onclick = async () => {
+        await api("/api/access/revoke", { method: "POST", body: JSON.stringify({ id: b.dataset.revoke }) });
+        refreshGrants();
+      };
+    });
+  }
+  async function invite(kind, email) {
+    msg.textContent = "creating…";
+    try {
+      const r = await api("/api/access/invite", {
+        method: "POST",
+        body: JSON.stringify({ kind, email, label: kind === "grokbot" ? "Grok Bot" : "" }),
+      });
+      msg.innerHTML = "Share this URL with " + esc(r.label) + ":<br><span class='mint'>" + esc(r.url) + "</span>";
+      await refreshGrants();
+    } catch (e) {
+      msg.textContent = e.message || "invite failed";
+    }
+  }
+  $("inviteGrok").onclick = () => invite("grokbot");
+  $("inviteHuman").onclick = () => invite("human", $("inviteEmail").value);
+  await refreshGrants();
 }
 
 async function renderCrew() {
