@@ -56,7 +56,7 @@ export function dashboardHtml(opts?: { ownerEmail?: string }): string {
     .pill.idle { background: #1f2937; color: #d1d5db; }
     .pill.blocked { background: #78350f; color: #fde68a; }
     .pill.error { background: #7f1d1d; color: #fecaca; }
-    .nav { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr);
+    .nav { position: fixed; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(6, 1fr);
       background: #0c1016; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0);
       z-index: 20; }
     .nav button { background: transparent; color: var(--muted); border-radius: 0; font-size: 11px;
@@ -77,6 +77,8 @@ export function dashboardHtml(opts?: { ownerEmail?: string }): string {
       font-size: 13px; margin: 8px 0 12px; }
     label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 6px; }
     .pulse-age { font-size: 12px; color: var(--muted); }
+    details.card > summary { cursor: pointer; font-weight: 700; min-height: var(--tap); display: flex; align-items: center; }
+    pre.desk { white-space: pre-wrap; font-size: 13px; line-height: 1.45; margin: 0; }
     .login form { margin: 0; }
   </style>
 </head>
@@ -113,6 +115,7 @@ export function dashboardHtml(opts?: { ownerEmail?: string }): string {
     <section id="page-crew" class="hidden"></section>
     <section id="page-trade" class="hidden"></section>
     <section id="page-book" class="hidden"></section>
+    <section id="page-intel" class="hidden"></section>
     <section id="page-improve" class="hidden"></section>
   </div>
   <nav class="nav">
@@ -120,6 +123,7 @@ export function dashboardHtml(opts?: { ownerEmail?: string }): string {
     <button data-page="crew">${icon("crew")}<span>Crew</span></button>
     <button data-page="trade">${icon("trade")}<span>Trade</span></button>
     <button data-page="book">${icon("book")}<span>Book</span></button>
+    <button data-page="intel">${icon("intel")}<span>Intel</span></button>
     <button data-page="improve">${icon("improve")}<span>Improve</span></button>
   </nav>
 </div>
@@ -150,7 +154,7 @@ async function api(path, opts = {}) {
 function go(name) {
   page = name;
   document.querySelectorAll(".nav button").forEach((b) => b.classList.toggle("on", b.dataset.page === name));
-  ["home","crew","trade","book","improve"].forEach((p) => {
+  ["home","crew","trade","book","intel","improve"].forEach((p) => {
     $("page-" + p).classList.toggle("hidden", p !== name);
   });
   refresh();
@@ -254,6 +258,7 @@ async function refresh() {
     if (page === "crew") await renderCrew();
     if (page === "trade") await renderTrade();
     if (page === "book") await renderBook();
+    if (page === "intel") await renderIntel();
     if (page === "improve") await renderImprove();
   } catch (e) {
     if (e.status === 401) { showLogin(); return; }
@@ -281,6 +286,8 @@ async function renderHome() {
     "<p>Paper net <b>" + Number(d.pnl.paperNetSol).toFixed(4) + " SOL</b> · " + d.pnl.paperTrades + " closed</p>" +
     "<p>Live net <b>" + Number(d.pnl.liveNetSol).toFixed(4) + " SOL</b> · " + d.pnl.liveTrades + " closed</p>" +
     "<p>Open positions: " + d.openCount + "</p></div>" +
+    '<div class="card"><h2 style="margin-top:0">Intel</h2><p class="muted">Eight Grok desks: X sentiment, gems, project eval, whales, timing, narratives, portfolio, scam radar.</p>' +
+    '<button id="goIntel" style="width:100%">Open Intel</button></div>' +
     '<div class="card" id="accessCard"><h2 style="margin-top:0">Access</h2>' +
     "<p class='muted'>Owner: " + esc(d.email || "") + " · email verification</p>" +
     '<button id="inviteGrok" style="width:100%">Invite Grok Bot</button>' +
@@ -310,6 +317,8 @@ async function renderHome() {
     finally { renderHome(); }
   };
   $("logout").onclick = async () => { await api("/api/logout", { method: "POST", body: "{}" }); showLogin(); };
+  const gi = $("goIntel");
+  if (gi) gi.onclick = () => go("intel");
   await bindAccess();
 }
 
@@ -486,6 +495,56 @@ async function renderBook() {
   };
 }
 
+async function renderIntel() {
+  const d = await api("/api/desks");
+  const cards = (d.desks || []).map((desk) => {
+    const fields = (desk.fields || []).map((f) => {
+      if (f.type === "select") {
+        const opts = (f.options || []).map((o) => "<option>" + esc(o) + "</option>").join("");
+        return "<label>" + esc(f.label) + '</label><select data-k="' + esc(f.key) + '">' + opts + "</select>";
+      }
+      return "<label>" + esc(f.label) + '</label><input data-k="' + esc(f.key) + '" placeholder="' + esc(f.placeholder || "") + '"/>';
+    }).join("");
+    const last = desk.last
+      ? '<p class="muted">Last ' + esc(desk.last.via) + " · " + esc(new Date(desk.last.at).toLocaleString()) + "</p>"
+      : "";
+    const x = desk.useXSearch ? '<span class="pill">X search</span> ' : "";
+    return '<details class="card" data-desk="' + esc(desk.id) + '"><summary>' + x + esc(desk.title) +
+      "</summary><p class='muted'>" + esc(desk.blurb) + "</p>" + fields + last +
+      '<button data-run="' + esc(desk.id) + '" style="width:100%;margin-top:12px">Run</button>' +
+      '<p class="bad" data-err="' + esc(desk.id) + '"></p>' +
+      '<pre class="desk" data-out="' + esc(desk.id) + '"></pre></details>';
+  }).join("");
+  $("page-intel").innerHTML =
+    "<h1>Intel</h1>" +
+    '<div class="banner">' + (d.grokReady ? "Grok/xAI ready — X search on sentiment and narratives." :
+      "No XAI_API_KEY yet — desks still return a framework plus Dex grounding. Add the key for live X.") + "</div>" +
+    cards;
+  $("page-intel").querySelectorAll("button[data-run]").forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.run;
+      const box = $("page-intel").querySelector('details[data-desk="' + id + '"]');
+      const err = $("page-intel").querySelector('[data-err="' + id + '"]');
+      const out = $("page-intel").querySelector('[data-out="' + id + '"]');
+      const fields = {};
+      box.querySelectorAll("[data-k]").forEach((el) => { fields[el.dataset.k] = el.value; });
+      btn.disabled = true;
+      btn.textContent = "Running…";
+      err.textContent = "";
+      out.textContent = "";
+      try {
+        const r = await api("/api/desks/" + id, { method: "POST", body: JSON.stringify({ fields }) });
+        out.textContent = (r.via ? "[" + r.via + "]\\n\\n" : "") + (r.report || "");
+      } catch (e) {
+        err.textContent = e.message || "failed";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Run";
+      }
+    };
+  });
+}
+
 async function renderImprove() {
   const d = await api("/api/improve");
   const rules = (d.rules || []).map((r) =>
@@ -555,6 +614,7 @@ function icon(name: string): string {
     crew: "M8 10 a4 4 0 1 0 0.01 0 M16 11 a3 3 0 1 0 0.01 0 M4 19 c0-3 3-5 8-5 s8 2 8 5",
     trade: "M4 16 L10 10 L14 14 L20 8 M14 8 H20 V14",
     book: "M5 5 H19 V19 H5 Z M5 10 H19",
+    intel: "M12 3 L14 9 L20 9 L15 13 L17 19 L12 15 L7 19 L9 13 L4 9 L10 9 Z",
     improve: "M12 4 V20 M4 12 H20",
   };
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${paths[name] ? `<path d="${paths[name]}"/>` : ""}</svg>`;

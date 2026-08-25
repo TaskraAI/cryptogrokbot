@@ -2,7 +2,7 @@
 
 Personal assistant for **discovering, buying, and selling Solana meme coins** you choose. Paper (dry-run) is the default. Nothing spends real SOL unless you opt in. This is not financial advice. Meme coins rug.
 
-Mobile dashboard (intended host: **cryptogrokbot.com**): login, crew pulses, paper buys with DexScreener, wallets, P&L, todos, lessons, Auditor bug scan.
+Mobile dashboard (intended host: **cryptogrokbot.com**): login, crew pulses, paper buys with DexScreener, wallets, P&L, **Intel** (eight Grok desks), todos, lessons, Auditor bug scan.
 
 ## Run the dashboard (paper)
 
@@ -21,6 +21,7 @@ Open the URL on your phone or desktop. Log in with **email + password + email ve
 - Password: `DASHBOARD_PASSWORD`, or a one-time generated value in `data/.dashboard-password`
 - Email code: after password, a 6-digit code is sent to that inbox (`RESEND_API_KEY` optional). If email sending is not configured, the code is printed in the agent log and shown on the login screen.
 - Grok Bot: after you log in, Home → **Invite Grok Bot** gives a URL/token. The bot opens `/invite/<token>` or pastes the token on the login screen. Bearer `Authorization: Bearer cgbot_…` also works for `/api/*`.
+- Intel: after login, open **Intel** (or Home → Open Intel). Eight desks — X sentiment, early gems, project eval, whales, entry/exit timing, narratives, portfolio, scam radar. Set `XAI_API_KEY` for live Grok + X search; without it each desk still returns a Dex-grounded framework. Research only — they do not override hard stops or the HOLD rule.
 
 ```bash
 # CLI still works (same paper ledger)
@@ -109,7 +110,7 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | no | phone cockpit |
 | `X_BEARER_TOKEN` | no | official X timelines for the night agent |
 | `PUMPPORTAL_API_KEY` | live curve buys | PumpPortal `trade-local` |
-| `XAI_API_KEY` | no | Grok thesis / `/research` |
+| `XAI_API_KEY` | no | Grok thesis, `/research`, and Intel desks (X search on sentiment/gems/eval/narratives/scams) |
 
 ## Safety
 

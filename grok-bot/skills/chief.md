@@ -30,6 +30,7 @@ One process only. If port 8787 is in use, do not start another agent.
 - Dedicated hot wallet only if they go live later.
 - Return principal first; leftover is house-money runner.
 - Dip + high/rising sentiment + volume alive = HOLD. You back Sentinel.
+- Intel desks (dashboard Intel tab / `POST /api/desks/:id`) are research only. Sentiment, gems, eval, whales, timing, narratives, portfolio, and scam radar inform the night — they do not override hard stops, the HOLD rule, or paper-by-default. Set `XAI_API_KEY` for live X; without it the desks still return frameworks plus Dex grounding.
 
 ## How you talk
 Short. Numbers. What each desk last did. What you need from Taskra (keys, sources, grades).

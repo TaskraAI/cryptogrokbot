@@ -12,7 +12,8 @@ npx tsx apps/telegram/src/index.ts   # not required
 # or ask Chief to expose research via running agent / Telegram /research
 ```
 
-Prefer: running agent + Taskra's Telegram `/research <mint>` if bot token exists.  
+Prefer: running agent + Taskra's Telegram `/research <mint>` if bot token exists.
+Intel tab on cryptogrokbot.com (`POST /api/desks/:id`) is the same Grok research path for X sentiment, gems, eval, whales, timing, narratives, portfolio, and scam radar.
 If no API key: say so; still write a cautious thesis from Dex/tape JSON on the computer, no fake citations.
 
 ## Constraints

@@ -321,6 +321,87 @@ export async function askGrokResearch(opts: {
   }
 }
 
+export async function askGrokDesk(opts: {
+  xaiKey?: string;
+  openaiKey?: string;
+  model?: string;
+  prompt: string;
+  timeoutMs?: number;
+  useXSearch?: boolean;
+}): Promise<{ text: string; via: "xai" | "openai" | "none" }> {
+  const timeoutMs = opts.timeoutMs ?? 55_000;
+  if (opts.xaiKey) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const tools: Array<{ type: string }> = [{ type: "web_search" }];
+      if (opts.useXSearch !== false) tools.push({ type: "x_search" });
+      const res = await fetch("https://api.x.ai/v1/responses", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${opts.xaiKey}`,
+          "content-type": "application/json",
+        },
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          model: opts.model && !opts.model.startsWith("gpt-") ? opts.model : "grok-4.20-multi-agent",
+          reasoning: { effort: "low" },
+          tools,
+          input: [{ role: "user", content: opts.prompt }],
+        }),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
+        const text =
+          body.output_text ||
+          body.output?.flatMap((o) => o.content ?? []).map((c) => c.text ?? "").join("\n") ||
+          "";
+        if (text.trim()) return { text, via: "xai" };
+      }
+    } catch {
+      // fall through to OpenAI
+    } finally {
+      clearTimeout(t);
+    }
+  }
+  if (opts.openaiKey) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), Math.min(timeoutMs, 40_000));
+    try {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${opts.openaiKey}`,
+          "content-type": "application/json",
+        },
+        signal: ctrl.signal,
+        body: JSON.stringify({
+          model: opts.model && opts.model.startsWith("gpt-") ? opts.model : "gpt-4.1-mini",
+          temperature: 0.2,
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are the CryptoGrokBot research desk for a personal Solana meme-coin paper agent. Be objective. Number every requested section. Call out missing data. This is not financial advice.",
+            },
+            { role: "user", content: opts.prompt },
+          ],
+        }),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+        const text = body.choices?.[0]?.message?.content ?? "";
+        if (text.trim()) return { text, via: "openai" };
+      }
+    } catch {
+      // none
+    } finally {
+      clearTimeout(t);
+    }
+  }
+  return { text: "", via: "none" };
+}
+
 export function lessonPrompt(lessons: string, few: PositionRow[]): string {
   const shots = few
     .map(

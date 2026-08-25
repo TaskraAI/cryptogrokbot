@@ -168,6 +168,9 @@ describe("dashboard auth and paper API", () => {
     expect(html).toContain("Invite Grok Bot");
     expect(html).toContain("Join with invite");
     expect(html).toContain("Log in");
+    expect(html).toContain('data-page="intel"');
+    expect(html).toContain(">Intel<");
+    expect(html).toContain("Open Intel");
     expect(html).toContain('<form id="loginStepCreds">');
     expect(html).toContain('<form id="loginStepEmail"');
     expect(html).toContain('type="submit"');

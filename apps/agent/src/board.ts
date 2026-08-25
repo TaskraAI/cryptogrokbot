@@ -51,6 +51,7 @@ import {
 import { sendLoginCode, type SendCodeFn } from "./mail.ts";
 import { addWallet, listPublicWallets, removeWallet } from "./wallets.ts";
 import { auditorPulseDetail, runAuditorScan } from "./auditor.ts";
+import { getDesk, lastDeskMeta, lastDeskRun, listDesks, runDeskAnalysis } from "./desks.ts";
 import type { AppConfig } from "./config.ts";
 
 export interface DashboardContext {
@@ -675,6 +676,64 @@ async function routeAuthed(
     if (result.ok) ctx.crew.idle("auditor", result.summary);
     else ctx.crew.error("auditor", result.summary);
     json(res, 200, result);
+    return;
+  }
+
+  if (path === "/api/desks" && method === "GET") {
+    json(res, 200, {
+      desks: listDesks().map((d) => ({
+        id: d.id,
+        title: d.title,
+        blurb: d.blurb,
+        fields: d.fields,
+        useXSearch: d.useXSearch,
+        last: lastDeskMeta(d.id),
+      })),
+      grokReady: Boolean(ctx.cfg.xaiKey || ctx.cfg.openaiKey),
+    });
+    return;
+  }
+
+  const deskOne = path.match(/^\/api\/desks\/([a-z]+)$/);
+  if (deskOne && method === "GET") {
+    const desk = getDesk(deskOne[1]!);
+    if (!desk) {
+      json(res, 404, { error: "unknown desk" });
+      return;
+    }
+    json(res, 200, {
+      ...desk,
+      last: lastDeskRun(desk.id) ?? null,
+      grokReady: Boolean(ctx.cfg.xaiKey || ctx.cfg.openaiKey),
+    });
+    return;
+  }
+
+  if (deskOne && method === "POST") {
+    const id = deskOne[1]!;
+    if (!getDesk(id)) {
+      json(res, 404, { error: "unknown desk" });
+      return;
+    }
+    const body = await readJson(req);
+    const fields = (body.fields && typeof body.fields === "object" && !Array.isArray(body.fields)
+      ? (body.fields as Record<string, string>)
+      : body) as Record<string, string>;
+    ctx.crew.start("grok", `intel ${id}`);
+    try {
+      const run = await runDeskAnalysis({
+        id,
+        fields,
+        cfg: ctx.cfg,
+        store: ctx.store,
+        policy: ctx.policy,
+      });
+      ctx.crew.idle("grok", `${id} ${run.via}`);
+      json(res, 200, run);
+    } catch (err) {
+      ctx.crew.error("grok", err instanceof Error ? err.message : "desk failed");
+      json(res, 400, { error: err instanceof Error ? err.message : "desk failed" });
+    }
     return;
   }
 
