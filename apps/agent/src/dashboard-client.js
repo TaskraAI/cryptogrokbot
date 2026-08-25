@@ -161,6 +161,10 @@ async function renderHome() {
     '<div class="card"><h2 style="margin-top:0">P&amp;L</h2>' +
     "<p>Paper net <b>" + Number(d.pnl.paperNetSol).toFixed(4) + " SOL</b> · " + d.pnl.paperTrades + " closed</p>" +
     "<p>Live net <b>" + Number(d.pnl.liveNetSol).toFixed(4) + " SOL</b> · " + d.pnl.liveTrades + " closed</p>" +
+    (d.budget
+      ? "<p>Paper day <b>" + Number(d.budget.paper.spentSol).toFixed(3) + "/" + Number(d.budget.paper.cap) +
+        " SOL</b> · Live day <b>" + Number(d.budget.live.spentSol).toFixed(3) + "/" + Number(d.budget.live.cap) + " SOL</b></p>"
+      : "") +
     "<p>Open positions: " + d.openCount + "</p></div>" +
     '<div class="card"><h2 style="margin-top:0">Intel</h2><p class="muted">Eight Grok desks: X sentiment, gems, project eval, whales, timing, narratives, portfolio, scam radar.</p>' +
     '<button id="goIntel" style="width:100%">Open Intel</button></div>' +
@@ -325,7 +329,7 @@ async function renderTrade() {
     "<h1>Trade</h1>" +
     '<div class="banner">' + pill(d.mode) + " Paper buy writes the SQLite ledger only. Live needs MODE=LIVE, MASTER, and a hot wallet. Size above maxSolPerTrade is refused.</div>" +
     '<div class="card"><label>Mint address</label><input id="buyMint" placeholder="Solana mint"/>' +
-    '<label>Size (SOL)</label><input id="buySol" type="number" step="0.001" min="0.001" value="0.01"/>' +
+    '<label>Size (SOL)</label><input id="buySol" type="number" step="0.001" min="0.001" value="0.05"/>' +
     '<div class="row" style="margin-top:10px"><button id="doBuy">Paper buy mint</button>' +
     '<button class="ghost" id="loadDex">Load DexScreener</button></div>' +
     '<p id="buyMsg" class="muted"></p><div id="dexBox"></div></div>' +

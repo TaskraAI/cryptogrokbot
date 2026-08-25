@@ -37,3 +37,5 @@ Newest lessons are injected into the LLM prompt first.
 - 2026-08-25T23:00:00.000Z TEST SIZE (user, via app): keep buys tiny until Taskra raises limits. maxSolPerTrade=0.01, dailyBudgetSol=0.05, dailyLossCapSol=0.03. Grok Bot on the app may change the desk when Taskra tells it to. Do not raise size, daily cap, or 0.1 tickets unless Taskra explicitly increases buy limits.
 
 - 2026-08-25T23:15:00.000Z HIGH SENTIMENT SIZE ASK (user): if sentiment is high, Grok Bot must ask Taskra in the app whether to increase trade size **before investing**. Do not auto-bump. Keep 0.01 unless they confirm a one-shot 0.02 or 0.05 (`sizeAskCeilingSol`). Never 0.1. Home **Grok asks** + `GET/POST /api/size-asks`.
+
+- 2026-08-25T23:20:00.000Z BUDGET SPLIT (bugfix): PAPER spend must not count toward the LIVE daily budget (and vice versa). Live daily cap stays 0.05 SOL. Do not raise live size. GrokBot mint stays muted / never live.

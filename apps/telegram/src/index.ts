@@ -163,11 +163,18 @@ export function createTelegramBot(token: string, chatId: string, ctx: TelegramCo
   });
   bot.command("budget", async (c) => {
     if (!allow(c, chatId)) return;
-    const b = getBudget(ctx.store, ctx.dayKey());
     const p = ctx.policy();
-    const cap = effectiveDailyBudgetSol(p, b.extra_budget_sol, Boolean(ctx.flags().allowExtraBudget));
+    const day = ctx.dayKey();
+    const paper = getBudget(ctx.store, day, "PAPER");
+    const live = getBudget(ctx.store, day, "LIVE");
+    const allowExtra = Boolean(ctx.flags().allowExtraBudget);
+    const paperCap = effectiveDailyBudgetSol(p, paper.extra_budget_sol, allowExtra);
+    const liveCap = effectiveDailyBudgetSol(p, live.extra_budget_sol, allowExtra);
     await c.reply(
-      `spent ${b.spent_sol.toFixed(3)}/${cap.cap} SOL\ntrades ${b.trades}/${p.maxTradesPerDay}\nloss ${b.realized_loss_sol.toFixed(3)}/${p.dailyLossCapSol}`,
+      [
+        `paper spent ${paper.spent_sol.toFixed(3)}/${paperCap.cap} SOL trades ${paper.trades}/${p.maxTradesPerDay} loss ${paper.realized_loss_sol.toFixed(3)}/${p.dailyLossCapSol}`,
+        `live spent ${live.spent_sol.toFixed(3)}/${liveCap.cap} SOL trades ${live.trades}/${p.maxTradesPerDay} loss ${live.realized_loss_sol.toFixed(3)}/${p.dailyLossCapSol}`,
+      ].join("\n"),
     );
   });
   bot.command("policy", async (c) => {
@@ -232,12 +239,16 @@ function allowed(c: { from?: { id?: number } }, chatId: string): boolean {
 export function statusText(ctx: TelegramContext): string {
   const f = ctx.flags();
   const p = ctx.policy();
-  const b = getBudget(ctx.store, ctx.dayKey());
+  const day = ctx.dayKey();
+  const paper = getBudget(ctx.store, day, "PAPER");
+  const live = getBudget(ctx.store, day, "LIVE");
   const master = getFlag(ctx.store, "master", String(f.masterEnabled));
+  const allowExtra = Boolean(f.allowExtraBudget);
   return [
     `mode=${f.mode} master=${master}`,
     `rpc=${f.rpcHealthy} jupiter=${f.jupiterHealthy} tg=${f.telegramHealthy}`,
-    `budget ${b.spent_sol.toFixed(3)}/${effectiveDailyBudgetSol(p, b.extra_budget_sol, Boolean(f.allowExtraBudget)).cap} trades ${b.trades}/${p.maxTradesPerDay}`,
+    `paper ${paper.spent_sol.toFixed(3)}/${effectiveDailyBudgetSol(p, paper.extra_budget_sol, allowExtra).cap} trades ${paper.trades}/${p.maxTradesPerDay}`,
+    `live ${live.spent_sol.toFixed(3)}/${effectiveDailyBudgetSol(p, live.extra_budget_sol, allowExtra).cap} trades ${live.trades}/${p.maxTradesPerDay}`,
     `open ${listOpenPositions(ctx.store).length}/${p.maxOpenPositions}`,
     ctx.crew ? ctx.crew().snapshot().map((x) => `${x.title}:${x.status}`).join(" ") : "",
   ]

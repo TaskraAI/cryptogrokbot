@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type Policy, type RuntimeFlags, type Grade } from "@night/shared";
+import { type Policy, type RuntimeFlags, type Grade, dayKey } from "@night/shared";
 import { CrewBoard, CREW_META } from "@night/crew";
 import {
   gradePosition,
@@ -18,10 +18,11 @@ import {
   setTodoDone,
   getSizeAsk,
   answerSizeAsk,
+  getBudget,
   type Store,
 } from "@night/storage";
 import { appendLesson, buildReview, loadLessons } from "@night/learning";
-import { loadExtraRules, setExtraRuleEnabled } from "@night/risk";
+import { loadExtraRules, setExtraRuleEnabled, effectiveDailyBudgetSol } from "@night/risk";
 import { loadSources } from "@night/social";
 import { fetchDexToken } from "@night/signals";
 import type { TradeOutcome } from "./trade.ts";
@@ -194,6 +195,19 @@ function pnlPayload(store: Store) {
     liveNetSol: review.live.netSol,
     liveTrades: review.live.trades,
     winRatePaper: review.paper.winRate,
+  };
+}
+
+function dayBudgetPayload(store: Store, policy: Policy, allowExtra: boolean) {
+  const day = dayKey(Date.now(), policy.timezone);
+  const paper = getBudget(store, day, "PAPER");
+  const live = getBudget(store, day, "LIVE");
+  const paperCap = effectiveDailyBudgetSol(policy, paper.extra_budget_sol, allowExtra);
+  const liveCap = effectiveDailyBudgetSol(policy, live.extra_budget_sol, allowExtra);
+  return {
+    day,
+    paper: { spentSol: paper.spent_sol, trades: paper.trades, cap: paperCap.cap },
+    live: { spentSol: live.spent_sol, trades: live.trades, cap: liveCap.cap },
   };
 }
 
@@ -486,6 +500,7 @@ async function routeAuthed(
       mode: flags.mode,
       masterEnabled: flags.masterEnabled,
       pnl: pnlPayload(ctx.store),
+      budget: dayBudgetPayload(ctx.store, ctx.policy, Boolean(flags.allowExtraBudget)),
       openCount: listOpenPositions(ctx.store).length,
       email: ctx.email,
       todos: listTodos(ctx.store).map((t) => ({

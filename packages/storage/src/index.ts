@@ -105,12 +105,14 @@ function migrate(db: DatabaseSync): void {
     );
 
     CREATE TABLE IF NOT EXISTS budget (
-      day_key TEXT PRIMARY KEY,
+      day_key TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'PAPER',
       spent_sol REAL NOT NULL DEFAULT 0,
       trades INTEGER NOT NULL DEFAULT 0,
       realized_loss_sol REAL NOT NULL DEFAULT 0,
       last_entry_at INTEGER NOT NULL DEFAULT 0,
-      extra_budget_sol REAL NOT NULL DEFAULT 0
+      extra_budget_sol REAL NOT NULL DEFAULT 0,
+      PRIMARY KEY (day_key, mode)
     );
 
     CREATE TABLE IF NOT EXISTS flags (
@@ -170,7 +172,35 @@ function migrate(db: DatabaseSync): void {
       note TEXT NOT NULL DEFAULT ''
     );
   `);
+  migrateBudgetByMode(db);
   seedStarterTodos(db);
+}
+
+function budgetColumns(db: DatabaseSync): Set<string> {
+  const cols = db.prepare("PRAGMA table_info(budget)").all() as Array<{ name: string }>;
+  return new Set(cols.map((c) => c.name));
+}
+
+/** Old DBs had one ledger per day. Mixed spend was paper; LIVE must start at 0. */
+function migrateBudgetByMode(db: DatabaseSync): void {
+  const cols = budgetColumns(db);
+  if (cols.has("mode")) return;
+  db.exec(`
+    CREATE TABLE budget_by_mode (
+      day_key TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      spent_sol REAL NOT NULL DEFAULT 0,
+      trades INTEGER NOT NULL DEFAULT 0,
+      realized_loss_sol REAL NOT NULL DEFAULT 0,
+      last_entry_at INTEGER NOT NULL DEFAULT 0,
+      extra_budget_sol REAL NOT NULL DEFAULT 0,
+      PRIMARY KEY (day_key, mode)
+    );
+    INSERT INTO budget_by_mode (day_key, mode, spent_sol, trades, realized_loss_sol, last_entry_at, extra_budget_sol)
+    SELECT day_key, 'PAPER', spent_sol, trades, realized_loss_sol, last_entry_at, extra_budget_sol FROM budget;
+    DROP TABLE budget;
+    ALTER TABLE budget_by_mode RENAME TO budget;
+  `);
 }
 
 export function setFlag(store: Store, key: string, value: string): void {
@@ -233,7 +263,12 @@ function asRows<T>(rows: unknown): T {
   return rows as T;
 }
 
-export function listOpenPositions(store: Store) {
+export function listOpenPositions(store: Store, mode?: Mode) {
+  if (mode) {
+    return asRows<PositionRow[]>(
+      store.db.prepare("SELECT * FROM positions WHERE status = 'open' AND mode = ? ORDER BY id").all(mode),
+    );
+  }
   return asRows<PositionRow[]>(store.db.prepare("SELECT * FROM positions WHERE status = 'open' ORDER BY id").all());
 }
 
@@ -426,20 +461,24 @@ export function recentSourceHits(store: Store, since: number) {
   }>;
 }
 
-export function getBudget(store: Store, day: string) {
-  const row = store.db.prepare("SELECT * FROM budget WHERE day_key = ?").get(day) as
-    | {
-        day_key: string;
-        spent_sol: number;
-        trades: number;
-        realized_loss_sol: number;
-        last_entry_at: number;
-        extra_budget_sol: number;
-      }
+export interface BudgetRow {
+  day_key: string;
+  mode: Mode;
+  spent_sol: number;
+  trades: number;
+  realized_loss_sol: number;
+  last_entry_at: number;
+  extra_budget_sol: number;
+}
+
+export function getBudget(store: Store, day: string, mode: Mode): BudgetRow {
+  const row = store.db.prepare("SELECT * FROM budget WHERE day_key = ? AND mode = ?").get(day, mode) as
+    | BudgetRow
     | undefined;
   return (
     row ?? {
       day_key: day,
+      mode,
       spent_sol: 0,
       trades: 0,
       realized_loss_sol: 0,
@@ -453,6 +492,7 @@ export function upsertBudget(
   store: Store,
   row: {
     day_key: string;
+    mode: Mode;
     spent_sol: number;
     trades: number;
     realized_loss_sol: number;
@@ -462,16 +502,16 @@ export function upsertBudget(
 ): void {
   store.db
     .prepare(
-      `INSERT INTO budget (day_key, spent_sol, trades, realized_loss_sol, last_entry_at, extra_budget_sol)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(day_key) DO UPDATE SET
+      `INSERT INTO budget (day_key, mode, spent_sol, trades, realized_loss_sol, last_entry_at, extra_budget_sol)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(day_key, mode) DO UPDATE SET
          spent_sol = excluded.spent_sol,
          trades = excluded.trades,
          realized_loss_sol = excluded.realized_loss_sol,
          last_entry_at = excluded.last_entry_at,
          extra_budget_sol = excluded.extra_budget_sol`,
     )
-    .run(row.day_key, row.spent_sol, row.trades, row.realized_loss_sol, row.last_entry_at, row.extra_budget_sol);
+    .run(row.day_key, row.mode, row.spent_sol, row.trades, row.realized_loss_sol, row.last_entry_at, row.extra_budget_sol);
 }
 
 export function listClosedSince(store: Store, since: number) {

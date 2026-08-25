@@ -220,14 +220,18 @@ export function positionsReport(store: Store): string {
 }
 
 export function statusReport(opts: { flags: RuntimeFlags; policy: Policy; store: Store; tz: string }): string {
-  const b = getBudget(opts.store, dayKey(Date.now(), opts.tz));
-  const cap = effectiveDailyBudgetSol(opts.policy, b.extra_budget_sol, Boolean(opts.flags.allowExtraBudget));
+  const day = dayKey(Date.now(), opts.tz);
+  const paper = getBudget(opts.store, day, "PAPER");
+  const live = getBudget(opts.store, day, "LIVE");
+  const cap = effectiveDailyBudgetSol(opts.policy, live.extra_budget_sol, Boolean(opts.flags.allowExtraBudget));
+  const paperCap = effectiveDailyBudgetSol(opts.policy, paper.extra_budget_sol, Boolean(opts.flags.allowExtraBudget));
   return [
     `mode=${opts.flags.mode} master=${opts.flags.masterEnabled}`,
     `paper buys never send a transaction`,
     `live buys need MODE=LIVE and MASTER_ENABLED=true and WALLET_SECRET_KEY`,
     `live sells need the same three; /resume is a kill/resume switch and cannot set MODE`,
-    `budget ${b.spent_sol}/${cap.cap} SOL  trades ${b.trades}/${opts.policy.maxTradesPerDay}`,
+    `paper budget ${paper.spent_sol}/${paperCap.cap} SOL  trades ${paper.trades}/${opts.policy.maxTradesPerDay}`,
+    `live budget ${live.spent_sol}/${cap.cap} SOL  trades ${live.trades}/${opts.policy.maxTradesPerDay}`,
     `size ${opts.policy.maxSolPerTrade} SOL  hard stop ${opts.policy.hardStopPct}%`,
     `open ${listOpenPositions(opts.store).length}/${opts.policy.maxOpenPositions}`,
   ].join("\n");

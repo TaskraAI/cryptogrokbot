@@ -91,7 +91,7 @@ export async function tryEnter(opts: {
   if (open.some((p) => p.mint === opts.token.mint)) {
     return `already in ${opts.token.ticker}`;
   }
-  const b = getBudget(opts.store, opts.dayKey);
+  const b = getBudget(opts.store, opts.dayKey, opts.flags.mode);
   const budget: BudgetState = {
     dayKey: b.day_key,
     spentSol: b.spent_sol,
@@ -103,7 +103,7 @@ export async function tryEnter(opts: {
   const gate = canEnter({
     policy: opts.policy,
     budget,
-    openPositions: open.length,
+    openPositions: listOpenPositions(opts.store, opts.flags.mode).length,
     flags: opts.flags,
     now,
   });
@@ -355,6 +355,7 @@ export async function tryEnter(opts: {
   const next = applyEntryToBudget(budget, result.sol, now);
   upsertBudget(opts.store, {
     day_key: next.dayKey,
+    mode: opts.flags.mode,
     spent_sol: next.spentSol,
     trades: next.trades,
     realized_loss_sol: next.realizedLossSol,

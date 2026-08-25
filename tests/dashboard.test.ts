@@ -185,6 +185,8 @@ describe("dashboard auth and paper API", () => {
     expect(js).toContain("Invite Grok Bot");
     expect(js).toContain("Open Intel");
     expect(js).toContain("Grok asks");
+    expect(js).toContain("Paper day");
+    expect(js).toContain("Live day");
     expect(js).toContain("renderIntel");
     expect(js).toContain('new RegExp("/invite/');
     expect(js).not.toMatch(/match\(\/\/invite/);

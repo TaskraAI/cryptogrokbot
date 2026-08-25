@@ -354,7 +354,8 @@ export class AgentRuntime {
           `${msg}\nGrade with /grade ${row.id} win|meh|fail`,
         );
         if (msg.startsWith("closed")) {
-          const b = getBudget(this.store, dayKey(Date.now(), this.policy.timezone));
+          const posMode: Mode = row.mode === "LIVE" ? "LIVE" : "PAPER";
+          const b = getBudget(this.store, dayKey(Date.now(), this.policy.timezone), posMode);
           const netMatch = /net=([-\d.]+)/.exec(msg);
           if (netMatch) {
             const net = Number(netMatch[1]);
@@ -381,6 +382,7 @@ export class AgentRuntime {
             );
             upsertBudget(this.store, {
               day_key: next.dayKey,
+              mode: posMode,
               spent_sol: next.spentSol,
               trades: next.trades,
               realized_loss_sol: next.realizedLossSol,
