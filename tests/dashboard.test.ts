@@ -32,6 +32,7 @@ async function startCtx(
   password = "test-dashboard-pass",
   email = "hello@taskra.ai",
   runtimeFlags: RuntimeFlags = { ...paperFlags },
+  policy = DEFAULT_POLICY,
 ) {
   const store = openStore(join(dir, "t.db"));
   const lessonsPath = join(dir, "lessons.md");
@@ -54,7 +55,7 @@ async function startCtx(
     store,
     crew,
     cfg,
-    policy: DEFAULT_POLICY,
+    policy,
     flags: () => runtimeFlags,
     password,
     email,
@@ -67,16 +68,17 @@ async function startCtx(
     buy: (opts) =>
       buyChosenMint({
         store,
-        policy: DEFAULT_POLICY,
+        policy,
         flags: runtimeFlags,
         mint: opts.mint,
         token: token({ mint: opts.mint, ticker: "API" }),
-        sol: opts.sol ?? 0.05,
+        sol: opts.sol ?? policy.maxSolPerTrade,
         force: opts.force,
+        sizeAskId: opts.sizeAskId,
         dayKey: dayKey(),
       }),
     sell: (idOrMint) =>
-      sellChosen({ store, policy: DEFAULT_POLICY, idOrMint, flags: runtimeFlags, priceUsd: 0.001 }),
+      sellChosen({ store, policy, idOrMint, flags: runtimeFlags, priceUsd: 0.001 }),
   };
   const server = createDashboardServer(ctx);
   const port = await new Promise<number>((resolve, reject) => {
@@ -182,6 +184,7 @@ describe("dashboard auth and paper API", () => {
     const js = await jsRes.text();
     expect(js).toContain("Invite Grok Bot");
     expect(js).toContain("Open Intel");
+    expect(js).toContain("Grok asks");
     expect(js).toContain("renderIntel");
     expect(js).toContain('new RegExp("/invite/');
     expect(js).not.toMatch(/match\(\/\/invite/);
@@ -479,6 +482,48 @@ describe("dashboard auth and paper API", () => {
     });
     expect(paperSell.status).toBe(200);
     expect(listOpenPositions(store)).toHaveLength(0);
+  });
+
+  it("lets Grok Bot list pending size asks and keep test size before investing", async () => {
+    const dir = tmp();
+    const policy = { ...DEFAULT_POLICY, maxSolPerTrade: 0.01, sizeAskCeilingSol: 0.05 };
+    const { server, url, store, codes } = await startCtx(dir, "size-ask-pass", "hello@taskra.ai", { ...paperFlags }, policy);
+    servers.push(server);
+    const cookie = await completeLogin(url, "size-ask-pass", "hello@taskra.ai", codes);
+    const invited = await fetch(`${url}/api/access/invite`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ kind: "grokbot" }),
+    });
+    const grant = (await invited.json()) as { token?: string };
+    const { insertSizeAsk } = await import("@night/storage");
+    const row = insertSizeAsk(store, {
+      mint: "SizeAskMint11111111111111111111111111111111",
+      ticker: "HOT",
+      sentiment: 0.77,
+      testSol: 0.01,
+      note: "high sentiment",
+    });
+    const listed = await fetch(`${url}/api/size-asks`, {
+      headers: { authorization: `Bearer ${grant.token}` },
+    });
+    expect(listed.status).toBe(200);
+    const body = (await listed.json()) as { asks: Array<{ ticker: string }> };
+    expect(body.asks[0]?.ticker).toBe("HOT");
+    const home = await fetch(`${url}/api/home`, { headers: { cookie } });
+    expect(((await home.json()) as { sizeAsks: Array<{ ticker: string }> }).sizeAsks[0]?.ticker).toBe("HOT");
+    const keep = await fetch(`${url}/api/size-asks/${row.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${grant.token}` },
+      body: JSON.stringify({ action: "keep" }),
+    });
+    expect(keep.status).toBe(200);
+    const kept = (await keep.json()) as { ok: boolean; message: string; chosenSol: number };
+    expect(kept.ok).toBe(true);
+    expect(kept.chosenSol).toBe(0.01);
+    expect(kept.message).toMatch(/^bought #/);
+    expect(kept.message).toMatch(/0.01 SOL/);
+    expect(listOpenPositions(store)).toHaveLength(1);
   });
 });
 

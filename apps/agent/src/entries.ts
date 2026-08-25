@@ -1,4 +1,26 @@
 import type { Policy, RuntimeFlags, SourceHit, TokenMetrics } from "@night/shared";
+import { applyEntryToBudget, canEnter, effectiveDailyBudgetSol, evaluateExtraRules, scoreCandidate, type ExtraRule, type Guardrail } from "@night/risk";
+import { executeBuy } from "@night/execution";
+import { simulateSell } from "@night/signals";
+import { scoreSentiment } from "@night/tape";
+import {
+  closeSizeAsksForMint,
+  getBudget,
+  getSizeAsk,
+  insertDecision,
+  insertFill,
+  insertPosition,
+  insertSizeAsk,
+  insertSourceHit,
+  latestOpenSizeAsk,
+  listOpenPositions,
+  markSizeAskFilled,
+  upsertBudget,
+  type SizeAskRow,
+  type Store,
+} from "@night/storage";
+import type { Connection, Keypair } from "@solana/web3.js";
+import type { BudgetState } from "@night/shared";
 
 /** Trusted hit so a user-chosen mint can pass the multi-source scorer. */
 export function manualSource(mint: string, ticker?: string): SourceHit {
@@ -12,21 +34,33 @@ export function manualSource(mint: string, ticker?: string): SourceHit {
     ticker,
   };
 }
-import { applyEntryToBudget, canEnter, evaluateExtraRules, scoreCandidate, type ExtraRule, type Guardrail } from "@night/risk";
-import { executeBuy } from "@night/execution";
-import { simulateSell } from "@night/signals";
-import {
-  getBudget,
-  insertDecision,
-  insertFill,
-  insertPosition,
-  insertSourceHit,
-  listOpenPositions,
-  upsertBudget,
-  type Store,
-} from "@night/storage";
-import type { Connection, Keypair } from "@solana/web3.js";
-import type { BudgetState } from "@night/shared";
+
+export function sizeAskWaitMessage(opts: {
+  id: number;
+  ticker: string;
+  sentiment: number;
+  testSol: number;
+  ceilingSol: number;
+}): string {
+  return (
+    `ask #${opts.id} ${opts.ticker}: Grok is waiting — sentiment ${opts.sentiment.toFixed(2)} is high. ` +
+    `Keep ${opts.testSol} SOL or increase up to ${opts.ceilingSol} before investing.`
+  );
+}
+
+function clampIncreaseSol(chosen: number, testSol: number, ceilingSol: number): number {
+  if (!Number.isFinite(chosen) || chosen <= 0) return ceilingSol;
+  return Math.min(ceilingSol, Math.max(testSol, chosen));
+}
+
+function ticketFromAsk(ask: SizeAskRow, testSol: number, ceilingSol: number): { sol: number; cap: number } {
+  if (ask.status === "increase") {
+    const sol = clampIncreaseSol(ask.chosen_sol ?? ceilingSol, testSol, ceilingSol);
+    return { sol, cap: Math.max(testSol, sol) };
+  }
+  const sol = Number.isFinite(ask.chosen_sol) && (ask.chosen_sol ?? 0) > 0 ? Number(ask.chosen_sol) : testSol;
+  return { sol: Math.min(sol, testSol), cap: testSol };
+}
 
 export async function tryEnter(opts: {
   store: Store;
@@ -45,10 +79,12 @@ export async function tryEnter(opts: {
   keypair?: Keypair;
   pumpApiKey?: string;
   now?: number;
-  /** Override size; refused if above policy.maxSolPerTrade (not clipped). */
+  /** Override size; refused if above policy.maxSolPerTrade (not clipped), unless filling a confirmed size ask. */
   sol?: number;
   /** Skip scoring (PAPER only). LIVE always scores. */
   skipScore?: boolean;
+  /** Confirmed keep/increase row; allows one-shot size up to sizeAskCeilingSol. */
+  sizeAskId?: number;
 }): Promise<string> {
   const now = opts.now ?? Date.now();
   const open = listOpenPositions(opts.store);
@@ -146,19 +182,120 @@ export async function tryEnter(opts: {
     }
   }
 
-  const requested = opts.sol ?? opts.policy.maxSolPerTrade;
+  const testSol = opts.policy.maxSolPerTrade;
+  const ceilingSol = opts.policy.sizeAskCeilingSol;
+  const sentiment = scoreSentiment(opts.sources);
+  const userPickedSize = opts.sol != null && opts.sizeAskId == null;
+  let ask = opts.sizeAskId != null ? getSizeAsk(opts.store, opts.sizeAskId) : latestOpenSizeAsk(opts.store, opts.token.mint);
+
+  if (opts.sizeAskId != null) {
+    if (!ask || ask.mint !== opts.token.mint) {
+      return `blocked ${opts.token.ticker}: size ask not found`;
+    }
+    if (ask.status === "pending") {
+      return sizeAskWaitMessage({
+        id: ask.id,
+        ticker: opts.token.ticker,
+        sentiment: ask.sentiment,
+        testSol,
+        ceilingSol,
+      });
+    }
+    if (ask.status !== "keep" && ask.status !== "increase") {
+      return `blocked ${opts.token.ticker}: size ask ${ask.status}`;
+    }
+  }
+
+  if (ask?.status === "pending" && !userPickedSize) {
+    insertDecision(opts.store, {
+      at: now,
+      kind: "ask",
+      mint: opts.token.mint,
+      allowed: false,
+      reason: `waiting on size ask #${ask.id}`,
+      score: scored.score,
+      payload: { sentiment, askId: ask.id },
+    });
+    return sizeAskWaitMessage({
+      id: ask.id,
+      ticker: opts.token.ticker,
+      sentiment: ask.sentiment,
+      testSol,
+      ceilingSol,
+    });
+  }
+
+  const highSentiment = sentiment >= opts.policy.highSentiment;
+  const shouldAsk = !userPickedSize && !opts.skipScore && highSentiment;
+
+  if (shouldAsk && (!ask || ask.status === "pending")) {
+    if (!ask) {
+      ask = insertSizeAsk(opts.store, {
+        mint: opts.token.mint,
+        ticker: opts.token.ticker,
+        sentiment,
+        testSol,
+        note: `High sentiment ${sentiment.toFixed(2)}. Ask Taskra in the Grok Bot app before investing: keep ${testSol} SOL or increase up to ${ceilingSol}.`,
+      });
+    }
+    insertDecision(opts.store, {
+      at: now,
+      kind: "ask",
+      mint: opts.token.mint,
+      allowed: false,
+      reason: `high sentiment ${sentiment.toFixed(2)}; waiting on size ask #${ask.id}`,
+      score: scored.score,
+      payload: { sentiment, askId: ask.id },
+    });
+    return sizeAskWaitMessage({
+      id: ask.id,
+      ticker: opts.token.ticker,
+      sentiment,
+      testSol,
+      ceilingSol,
+    });
+  }
+
+  let requested: number;
+  let cap = testSol;
+  let fillAskId: number | undefined;
+
+  if (ask && (ask.status === "keep" || ask.status === "increase") && (shouldAsk || opts.sizeAskId != null)) {
+    const ticket = ticketFromAsk(ask, testSol, ceilingSol);
+    requested = ticket.sol;
+    cap = ticket.cap;
+    fillAskId = ask.id;
+  } else {
+    requested = opts.sol ?? testSol;
+    cap = testSol;
+  }
+
   if (!Number.isFinite(requested) || requested <= 0) {
     return `blocked ${opts.token.ticker}: invalid SOL size`;
   }
-  if (requested > opts.policy.maxSolPerTrade + 1e-12) {
-    return `blocked ${opts.token.ticker}: size ${requested} exceeds maxSolPerTrade ${opts.policy.maxSolPerTrade}`;
+  if (requested > cap + 1e-12) {
+    return `blocked ${opts.token.ticker}: size ${requested} exceeds maxSolPerTrade ${cap}`;
   }
+
+  const daily = effectiveDailyBudgetSol(opts.policy, budget.extraBudgetSol, Boolean(opts.flags.allowExtraBudget));
+  if (budget.spentSol + requested > daily.cap + 1e-9) {
+    insertDecision(opts.store, {
+      at: now,
+      kind: "block",
+      mint: opts.token.mint,
+      allowed: false,
+      reason: `daily budget exhausted (${budget.spentSol.toFixed(3)}/${daily.cap} SOL)`,
+      score: scored.score,
+    });
+    return `blocked ${opts.token.ticker}: daily budget exhausted (${budget.spentSol.toFixed(3)}/${daily.cap} SOL)`;
+  }
+
   const result = await executeBuy({
     mode: opts.flags.mode,
     graduated: opts.token.graduated,
     mint: opts.token.mint,
     sol: requested,
-    maxSolPerTrade: opts.policy.maxSolPerTrade,
+    maxSolPerTrade: cap,
     masterEnabled: opts.flags.masterEnabled,
     slippagePct: opts.policy.slippagePctCap,
     connection: opts.connection,
@@ -224,6 +361,8 @@ export async function tryEnter(opts: {
     last_entry_at: next.lastEntryAt,
     extra_budget_sol: next.extraBudgetSol,
   });
+  if (fillAskId != null) markSizeAskFilled(opts.store, fillAskId);
+  closeSizeAsksForMint(opts.store, opts.token.mint);
   insertDecision(opts.store, {
     at: now,
     kind: "entry",

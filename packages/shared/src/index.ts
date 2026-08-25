@@ -11,6 +11,8 @@ export interface Policy {
   maxTradesPerDay: number;
   maxOpenPositions: number;
   maxSolPerTrade: number;
+  /** One-shot ceiling when Taskra confirms a high-sentiment size increase. */
+  sizeAskCeilingSol: number;
   dailyLossCapSol: number;
   cooldownSeconds: number;
   minIndependentSources: number;
@@ -42,6 +44,7 @@ export const DEFAULT_POLICY: Policy = {
   maxTradesPerDay: 5,
   maxOpenPositions: 3,
   maxSolPerTrade: 0.1,
+  sizeAskCeilingSol: 0.05,
   dailyLossCapSol: 0.3,
   cooldownSeconds: 180,
   minIndependentSources: 2,
@@ -125,7 +128,7 @@ export interface TokenMetrics {
 
 export interface DecisionLog {
   at: number;
-  kind: "entry" | "exit" | "block" | "hold" | "sentiment";
+  kind: "entry" | "exit" | "block" | "hold" | "sentiment" | "ask";
   mint: string;
   allowed: boolean;
   reason: string;

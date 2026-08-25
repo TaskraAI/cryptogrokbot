@@ -515,7 +515,7 @@ const FRAMEWORK_NOTES: Record<string, string[]> = {
     "Rebalance: after a 1x principal return, or weekly, not every candle.",
     "Take profits: principal first, then scale out into strength. Do not disable stops to 'let it run'.",
     "Risk: daily budget, max trades, loss cap, cooldown. Hitting a cap stops buys, not paper exits.",
-    "Sizing: ≤ maxSolPerTrade and ≤ remaining daily budget.",
+    "Sizing: ≤ maxSolPerTrade unless Taskra confirms a high-sentiment one-shot up to sizeAskCeilingSol. Never auto-bump.",
     "Review: after each session + a weekly grade of closed fills (win/meh/fail).",
   ],
   scams: [

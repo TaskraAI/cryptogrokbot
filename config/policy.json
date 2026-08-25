@@ -3,6 +3,7 @@
   "maxTradesPerDay": 5,
   "maxOpenPositions": 3,
   "maxSolPerTrade": 0.01,
+  "sizeAskCeilingSol": 0.05,
   "dailyLossCapSol": 0.03,
   "cooldownSeconds": 180,
   "minIndependentSources": 2,

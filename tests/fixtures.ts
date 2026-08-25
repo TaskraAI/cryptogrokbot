@@ -17,6 +17,11 @@ export function hit(partial: Partial<SourceHit> = {}): SourceHit {
   };
 }
 
+/** Trusted listing chatter without moon/send language — below policy.highSentiment. */
+export function quietHit(partial: Partial<SourceHit> = {}): SourceHit {
+  return hit({ snippet: "watchlist listing", ...partial });
+}
+
 export function token(partial: Partial<TokenMetrics> = {}): TokenMetrics {
   return {
     mint: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",

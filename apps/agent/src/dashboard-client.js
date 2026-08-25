@@ -157,6 +157,7 @@ async function renderHome() {
     "<h1>Desk</h1>" +
     '<div class="banner">' + pill(d.mode) + " master=" + esc(String(d.masterEnabled)) +
     " · live stays fail-closed without MASTER</div>" +
+    grokAsksHtml(d) +
     '<div class="card"><h2 style="margin-top:0">P&amp;L</h2>' +
     "<p>Paper net <b>" + Number(d.pnl.paperNetSol).toFixed(4) + " SOL</b> · " + d.pnl.paperTrades + " closed</p>" +
     "<p>Live net <b>" + Number(d.pnl.liveNetSol).toFixed(4) + " SOL</b> · " + d.pnl.liveTrades + " closed</p>" +
@@ -194,7 +195,56 @@ async function renderHome() {
   $("logout").onclick = async () => { await api("/api/logout", { method: "POST", body: "{}" }); showLogin(); };
   const gi = $("goIntel");
   if (gi) gi.onclick = () => go("intel");
+  bindSizeAsks();
   await bindAccess();
+}
+
+function grokAsksHtml(d) {
+  const asks = d.sizeAsks || [];
+  if (!asks.length) return "";
+  return asks.map((a) => {
+    const test = Number(a.testSol);
+    const ceil = Number(a.ceilingSol);
+    const mid = 0.02;
+    const keepLabel = "Keep " + test;
+    const extra = [];
+    extra.push('<button data-ask="' + a.id + '" data-action="keep">' + esc(keepLabel) + "</button>");
+    if (mid > test + 1e-12 && mid <= ceil + 1e-12) {
+      extra.push('<button class="ghost" data-ask="' + a.id + '" data-action="increase" data-sol="0.02">Increase 0.02</button>');
+    }
+    extra.push('<button data-ask="' + a.id + '" data-action="increase" data-sol="' + ceil + '">Increase ' + ceil + "</button>");
+    return (
+      '<div class="card"><h2 style="margin-top:0">Grok asks</h2>' +
+      "<p>Sentiment <b>" + Number(a.sentiment).toFixed(2) + "</b> is high on <b>" + esc(a.ticker) +
+      "</b>. Increase trade size before investing?</p>" +
+      "<p class='muted'>" + esc(a.mint) + "</p>" +
+      '<div class="row">' + extra.join("") + "</div>" +
+      '<p class="muted" data-ask-msg="' + a.id + '"></p></div>'
+    );
+  }).join("");
+}
+
+function bindSizeAsks() {
+  document.querySelectorAll("button[data-ask]").forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.ask;
+      const action = btn.dataset.action;
+      const sol = btn.dataset.sol ? Number(btn.dataset.sol) : undefined;
+      const msg = document.querySelector('[data-ask-msg="' + id + '"]');
+      document.querySelectorAll("button[data-ask='" + id + "']").forEach((b) => { b.disabled = true; });
+      if (msg) msg.textContent = "sending…";
+      try {
+        const r = await api("/api/size-asks/" + id, {
+          method: "POST",
+          body: JSON.stringify({ action, sol }),
+        });
+        if (msg) msg.textContent = r.message || (r.ok ? "done" : "answered");
+      } catch (e) {
+        if (msg) msg.textContent = e.message || "failed";
+      }
+      renderHome();
+    };
+  });
 }
 
 async function bindAccess() {

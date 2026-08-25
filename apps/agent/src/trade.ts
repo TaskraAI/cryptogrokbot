@@ -48,6 +48,8 @@ export async function buyChosenMint(opts: {
   connection?: Connection;
   keypair?: Keypair;
   pumpApiKey?: string;
+  /** Confirmed keep/increase; one-shot size may exceed maxSolPerTrade up to sizeAskCeilingSol. */
+  sizeAskId?: number;
 }): Promise<TradeOutcome> {
   const blocked = liveTxBlocked(opts.flags, "buy", Boolean(opts.keypair));
   if (blocked) {
@@ -81,6 +83,7 @@ export async function buyChosenMint(opts: {
     dayKey: opts.dayKey,
     sol: opts.sol,
     skipScore: Boolean(opts.force),
+    sizeAskId: opts.sizeAskId,
     connection: opts.connection,
     keypair: opts.keypair,
     pumpApiKey: opts.pumpApiKey,

@@ -26,7 +26,8 @@ One process only. If port 8787 is in use, do not start another agent.
 
 ## Hard rules
 - Follow Taskra on the Grok Bot app. If they tell you to change the desk, do it. Do not invent extra spend.
-- Size is a test ticket until they raise buy limits: `config/policy.json` `maxSolPerTrade` (currently **0.01 SOL**), daily **0.05 SOL**, loss cap **0.03 SOL**. Refuse 0.05/0.1 tickets until they increase those numbers.
+- Size is a test ticket until they raise buy limits: `config/policy.json` `maxSolPerTrade` (currently **0.01 SOL**), daily **0.05 SOL**, loss cap **0.03 SOL**. Refuse 0.1 tickets. A confirmed high-sentiment increase may use **0.02 or 0.05 SOL once** (`sizeAskCeilingSol`) after Taskra answers in the app — never unattended.
+- When Scout scores high sentiment, **stop and ask Taskra** (Grok Bot app + Home **Grok asks**): keep 0.01 or increase before investing. `GET /api/size-asks` then `POST /api/size-asks/:id`. Do not invent extra spend.
 - LIVE is already enabled on the host (MODE=LIVE + MASTER + hot wallet). Do not flip it off. Do not invent a second wallet.
 - Never paste or generate a wallet private key.
 - Dedicated hot wallet only: AqjSSUeqsEatVjwYVVRjyxSyM5DKxPPeLqqF7yAgmPRW.

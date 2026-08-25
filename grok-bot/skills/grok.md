@@ -21,5 +21,6 @@ If no API key: say so; still write a cautious thesis from Dex/tape JSON on the c
 - Never disable Sentinel stops.
 - One agent process (Chief owns it).
 - Test size until Taskra raises limits: 0.01 SOL per trade. Do not recommend 0.05/0.1 tickets.
+- If sentiment is high on a candidate, **ask Taskra in the Grok Bot app** whether to keep 0.01 or increase (0.02 / 0.05 ceiling) **before investing**. Poll `GET /api/size-asks` (Bearer invite token). Submit `POST /api/size-asks/:id` with `{ "action": "keep" }` or `{ "action": "increase", "sol": 0.05 }` only after they answer. Do not bump size unattended.
 - If Taskra tells you in the Grok Bot app to change the desk, implement it. Do not raise size on your own.
 - Not financial advice.

@@ -117,7 +117,7 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 - Dedicated hot wallet. Never point this at your main wallet.
 - Hitting `dailyBudgetSol`, `maxTradesPerDay`, or `dailyLossCapSol` **stops buys**, not paper exits. Live exits also stop when master is off.
 - `extra_budget_sol` does **not** raise the daily cap unless `ALLOW_EXTRA_BUDGET=true`.
-- Per-trade size is refused inside `executeBuy` if it exceeds `maxSolPerTrade`.
+- Per-trade size is refused inside `executeBuy` if it exceeds `maxSolPerTrade`. High sentiment does **not** auto-raise size: Grok Bot asks first (keep 0.01 or a one-shot increase up to `sizeAskCeilingSol`, currently 0.05).
 - Live buy runs a Jupiter sell-sim first. Freeze / guardrails / `/never` rules are hard denies.
 - LLM cannot disable a hard stop or sell through a `healthy_dip`.
 - Unauthenticated mutating API calls return 401. The old open crew board is behind the same login.

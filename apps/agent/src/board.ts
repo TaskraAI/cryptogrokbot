@@ -12,9 +12,12 @@ import {
   listRecentPositions,
   listTodos,
   listUngradedClosed,
+  listPendingSizeAsks,
   insertTodo,
   insertFeedback,
   setTodoDone,
+  getSizeAsk,
+  answerSizeAsk,
   type Store,
 } from "@night/storage";
 import { appendLesson, buildReview, loadLessons } from "@night/learning";
@@ -68,7 +71,7 @@ export interface DashboardContext {
   totpFile: string;
   accessFile: string;
   sendCode?: SendCodeFn;
-  buy: (opts: { mint: string; sol?: number; force?: boolean }) => Promise<TradeOutcome>;
+  buy: (opts: { mint: string; sol?: number; force?: boolean; sizeAskId?: number }) => Promise<TradeOutcome>;
   sell: (idOrMint: string) => Promise<TradeOutcome>;
   repoRoot?: string;
 }
@@ -208,6 +211,20 @@ function publicPosition(p: ReturnType<typeof listRecentPositions>[number]) {
     grade_note: p.grade_note,
     opened_at: p.opened_at,
     closed_at: p.closed_at,
+  };
+}
+
+function publicSizeAsk(a: ReturnType<typeof listPendingSizeAsks>[number], policy: Policy) {
+  return {
+    id: a.id,
+    mint: a.mint,
+    ticker: a.ticker,
+    sentiment: a.sentiment,
+    testSol: a.test_sol,
+    ceilingSol: policy.sizeAskCeilingSol,
+    status: a.status,
+    note: a.note,
+    at: a.at,
   };
 }
 
@@ -480,6 +497,7 @@ async function routeAuthed(
       auditor: scan
         ? { ok: scan.ok === 1, summary: scan.summary, at: scan.at, details: JSON.parse(scan.details_json) }
         : null,
+      sizeAsks: listPendingSizeAsks(ctx.store).map((a) => publicSizeAsk(a, ctx.policy)),
     });
     return;
   }
@@ -750,6 +768,64 @@ async function routeAuthed(
       ctx.crew.error("grok", err instanceof Error ? err.message : "desk failed");
       json(res, 400, { error: err instanceof Error ? err.message : "desk failed" });
     }
+    return;
+  }
+
+  if (path === "/api/size-asks" && method === "GET") {
+    json(res, 200, {
+      asks: listPendingSizeAsks(ctx.store).map((a) => publicSizeAsk(a, ctx.policy)),
+      testSol: ctx.policy.maxSolPerTrade,
+      ceilingSol: ctx.policy.sizeAskCeilingSol,
+      highSentiment: ctx.policy.highSentiment,
+    });
+    return;
+  }
+
+  const sizeAskOne = path.match(/^\/api\/size-asks\/(\d+)$/);
+  if (sizeAskOne && method === "POST") {
+    const askId = Number(sizeAskOne[1]);
+    const existing = getSizeAsk(ctx.store, askId);
+    if (!existing) {
+      json(res, 404, { error: "size ask not found" });
+      return;
+    }
+    if (existing.status !== "pending") {
+      json(res, 409, { error: `size ask already ${existing.status}` });
+      return;
+    }
+    const body = await readJson(req);
+    const action = str(body.action).toLowerCase();
+    const testSol = ctx.policy.maxSolPerTrade;
+    const ceilingSol = ctx.policy.sizeAskCeilingSol;
+    let status: "keep" | "increase";
+    let chosenSol: number;
+    if (action === "keep") {
+      status = "keep";
+      chosenSol = testSol;
+    } else if (action === "increase") {
+      status = "increase";
+      const want = typeof body.sol === "number" ? body.sol : Number(body.sol);
+      chosenSol = Number.isFinite(want) && want > 0 ? want : ceilingSol;
+      chosenSol = Math.min(ceilingSol, Math.max(testSol, chosenSol));
+    } else {
+      json(res, 400, { error: "action must be keep or increase" });
+      return;
+    }
+    const answered = answerSizeAsk(ctx.store, askId, { status, chosenSol });
+    if (!answered) {
+      json(res, 409, { error: "size ask already answered" });
+      return;
+    }
+    ctx.crew.start("grok", `${status} ${answered.ticker} at ${chosenSol} SOL`);
+    const result = await ctx.buy({ mint: answered.mint, sol: chosenSol, sizeAskId: answered.id });
+    ctx.crew.idle("grok", result.message);
+    json(res, 200, {
+      ok: result.ok,
+      answered: true,
+      ask: publicSizeAsk(answered, ctx.policy),
+      chosenSol,
+      message: result.message,
+    });
     return;
   }
 

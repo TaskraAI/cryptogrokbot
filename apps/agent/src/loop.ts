@@ -41,6 +41,7 @@ export class AgentRuntime {
   fallback?: Connection;
   keypair?: ReturnType<typeof loadKeypair>;
   crew = new CrewBoard();
+  private notifiedSizeAsks = new Set<number>();
 
   constructor(
     public cfg: AppConfig,
@@ -171,10 +172,7 @@ export class AgentRuntime {
         ...this.enterContext(guardrails, extraRules, sourcesCfg, [hit], buySellRatio(pair)),
         token: pairToMetrics(pair),
       });
-      logs.push(msg);
-      if (msg.startsWith("bought")) {
-        await notify(this.cfg.telegramToken, this.cfg.telegramChatId, msg);
-      }
+      await this.afterEnter(msg, logs);
     }
   }
 
@@ -201,10 +199,7 @@ export class AgentRuntime {
         ...this.enterContext(guardrails, extraRules, sourcesCfg, mintHits, buySellRatio(pair)),
         token: metrics,
       });
-      logs.push(msg);
-      if (msg.startsWith("bought")) {
-        await notify(this.cfg.telegramToken, this.cfg.telegramChatId, msg);
-      }
+      await this.afterEnter(msg, logs);
     }
   }
 
@@ -230,8 +225,26 @@ export class AgentRuntime {
         ...this.enterContext(guardrails, extraRules, sourcesCfg, hits, buySellRatio(pair)),
         token: pairToMetrics(pair),
       });
-      logs.push(msg);
+      await this.afterEnter(msg, logs);
     }
+  }
+
+  private async afterEnter(msg: string, logs: string[]): Promise<void> {
+    logs.push(msg);
+    if (msg.startsWith("bought")) {
+      await notify(this.cfg.telegramToken, this.cfg.telegramChatId, msg);
+      return;
+    }
+    if (!msg.startsWith("ask ")) return;
+    const id = Number(/ask #(\d+)/.exec(msg)?.[1]);
+    this.crew.blocked("grok", msg);
+    if (!id || this.notifiedSizeAsks.has(id)) return;
+    this.notifiedSizeAsks.add(id);
+    await notify(
+      this.cfg.telegramToken,
+      this.cfg.telegramChatId,
+      `Grok asks before investing:\n${msg}\nAnswer on cryptogrokbot.com Home or tell Grok Bot: keep test size, increase 0.02, or increase 0.05.`,
+    );
   }
 
   private enterContext(

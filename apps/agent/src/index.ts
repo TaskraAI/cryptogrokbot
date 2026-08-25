@@ -56,6 +56,7 @@ async function main(): Promise<void> {
         mint: opts.mint,
         sol: opts.sol,
         force: opts.force,
+        sizeAskId: opts.sizeAskId,
         extraRulesPath: cfg.rulesPath,
         dayKey: dayKey(Date.now(), policy.timezone),
         connection: runtime.connection,

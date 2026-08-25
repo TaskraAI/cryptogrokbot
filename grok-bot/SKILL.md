@@ -45,4 +45,4 @@ Paste new rows under `rules:` (id, type, value, enabled, when, note).
 - Fast JSON: `GROK_MODEL=grok-4-fast`
 - Deep dive: `/research <mint>` uses `grok-4.20-multi-agent` + X/web search
 
-Never raise size or disable hard stops from Grok output unless Taskra explicitly raises buy limits (current test ticket: 0.01 SOL in `config/policy.json`). If Taskra tells Grok Bot in the app to change the desk, implement that.
+Never raise size or disable hard stops from Grok output unless Taskra explicitly raises buy limits (current test ticket: 0.01 SOL in `config/policy.json`). If sentiment is high, ask Taskra in the Grok Bot app whether to keep 0.01 or increase (ceiling 0.05) **before investing**. If they tell Grok Bot in the app to change the desk, implement that.

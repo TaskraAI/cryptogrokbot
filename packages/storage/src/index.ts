@@ -156,6 +156,19 @@ function migrate(db: DatabaseSync): void {
       summary TEXT NOT NULL,
       details_json TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS size_asks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      at INTEGER NOT NULL,
+      mint TEXT NOT NULL,
+      ticker TEXT NOT NULL,
+      sentiment REAL NOT NULL,
+      test_sol REAL NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      chosen_sol REAL,
+      answered_at INTEGER,
+      note TEXT NOT NULL DEFAULT ''
+    );
   `);
   seedStarterTodos(db);
 }
@@ -639,4 +652,83 @@ export function listUngradedClosed(store: Store, limit = 20): PositionRow[] {
       .prepare("SELECT * FROM positions WHERE status = 'closed' AND (grade IS NULL OR grade = '') ORDER BY id DESC LIMIT ?")
       .all(limit),
   );
+}
+
+export type SizeAskStatus = "pending" | "keep" | "increase" | "filled" | "expired";
+
+export interface SizeAskRow {
+  id: number;
+  at: number;
+  mint: string;
+  ticker: string;
+  sentiment: number;
+  test_sol: number;
+  status: SizeAskStatus;
+  chosen_sol: number | null;
+  answered_at: number | null;
+  note: string;
+}
+
+const SIZE_ASK_TTL_MS = 45 * 60 * 1000;
+
+export function expireOldSizeAsks(store: Store, now = Date.now()): void {
+  store.db
+    .prepare("UPDATE size_asks SET status = 'expired' WHERE status = 'pending' AND at < ?")
+    .run(now - SIZE_ASK_TTL_MS);
+}
+
+export function listPendingSizeAsks(store: Store): SizeAskRow[] {
+  expireOldSizeAsks(store);
+  return asRows<SizeAskRow[]>(
+    store.db.prepare("SELECT * FROM size_asks WHERE status = 'pending' ORDER BY id DESC").all(),
+  );
+}
+
+export function getSizeAsk(store: Store, id: number): SizeAskRow | undefined {
+  return store.db.prepare("SELECT * FROM size_asks WHERE id = ?").get(id) as SizeAskRow | undefined;
+}
+
+export function latestOpenSizeAsk(store: Store, mint: string): SizeAskRow | undefined {
+  expireOldSizeAsks(store);
+  return store.db
+    .prepare(
+      "SELECT * FROM size_asks WHERE mint = ? AND status IN ('pending','keep','increase') ORDER BY id DESC LIMIT 1",
+    )
+    .get(mint) as SizeAskRow | undefined;
+}
+
+export function insertSizeAsk(
+  store: Store,
+  row: { mint: string; ticker: string; sentiment: number; testSol: number; note: string },
+): SizeAskRow {
+  const result = store.db
+    .prepare(
+      "INSERT INTO size_asks (at, mint, ticker, sentiment, test_sol, status, note) VALUES (?, ?, ?, ?, ?, 'pending', ?)",
+    )
+    .run(Date.now(), row.mint, row.ticker, row.sentiment, row.testSol, row.note);
+  return getSizeAsk(store, Number(result.lastInsertRowid))!;
+}
+
+export function answerSizeAsk(
+  store: Store,
+  id: number,
+  answer: { status: "keep" | "increase"; chosenSol: number },
+): SizeAskRow | undefined {
+  const result = store.db
+    .prepare("UPDATE size_asks SET status = ?, chosen_sol = ?, answered_at = ? WHERE id = ? AND status = 'pending'")
+    .run(answer.status, answer.chosenSol, Date.now(), id);
+  if (!result.changes) return undefined;
+  return getSizeAsk(store, id);
+}
+
+export function markSizeAskFilled(store: Store, id: number): void {
+  store.db.prepare("UPDATE size_asks SET status = 'filled' WHERE id = ?").run(id);
+}
+
+export function closeSizeAsksForMint(store: Store, mint: string): void {
+  store.db
+    .prepare(
+      "UPDATE size_asks SET status = 'filled' WHERE mint = ? AND status IN ('pending','keep','increase')",
+    )
+    .run(mint);
 }
