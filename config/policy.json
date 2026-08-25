@@ -25,5 +25,6 @@
   "runnerTrailPct": 20,
   "minLiquidityUsd": 5000,
   "compoundWins": false,
-  "compoundWinsFraction": 0.25
+  "compoundWinsFraction": 0.25,
+  "fadeSellFraction": 0.5
 }

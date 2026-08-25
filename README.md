@@ -12,6 +12,8 @@ Personal agent that watches sources you list, trades a **dedicated hot wallet** 
 - **Live buys** only when `MODE=LIVE` **and** `MASTER_ENABLED=true`
 - **Telegram cockpit** — `/status` `/positions` `/tape` `/review` `/grade` `/lesson` `/never` `/kill`
 - **Learning** — journal, grades, lessons, `/never` guardrails, nightly pattern stats
+- **Grok crew** — Scout, Sentinel, Grok, Scholar run **in parallel**; watch `/crew` or `http://127.0.0.1:8787/`
+- **Extra rules** — `config/rules.yaml` (toggle with `/rules` `/rule on|off`)
 
 ## Quick start
 
@@ -49,6 +51,15 @@ Keep `MODE=PAPER` until you have graded a week of shadow trades.
 | `/grade <id> win\|meh\|fail [note]` | train the journal |
 | `/lesson <text>` `/never <rule>` `/guardrails` `/unguard <id>` | lessons + hard denies |
 | `/kill` `/resume CONFIRM` `/sellall CONFIRM` | halt entries / flatten |
+| `/crew` | live Grok crew (Scout / Sentinel / Grok / Scholar) |
+| `/rules` `/rule on\|off <id>` | extra rules in `config/rules.yaml` |
+| `/research <mint>` | Grok multi-agent research (needs `XAI_API_KEY`) |
+
+Set `XAI_API_KEY` and open `http://127.0.0.1:8787/` while `npm run agent` is running to see agents work at the same time.
+
+## Extra rules
+
+Add more in [`config/rules.yaml`](config/rules.yaml) without shipping code. Types include age, holders, 5m volume, mcap floor/ceiling, buy/sell ratio, session hours, loss streak, keywords, copy/fade wallets. `/rule off skip-fresh-snipe` disables one immediately.
 
 ## Layout
 

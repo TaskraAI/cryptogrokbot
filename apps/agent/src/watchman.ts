@@ -120,6 +120,9 @@ export async function managePosition(opts: {
       markSolPerToken,
       principalRemainingSol: Math.max(0, pos.principalSol - pos.principalRecoveredSol),
     });
+  } else if (action.type === "sell_runner") {
+    const frac = Math.min(1, Math.max(0, opts.policy.fadeSellFraction ?? 1));
+    tokensToSell = pos.tokensHeld * (action.reason === "climax" ? 1 : frac);
   }
 
   const solEstimate = tokensToSell * markSolPerToken;
@@ -169,6 +172,16 @@ export async function managePosition(opts: {
       runner: recovered + 1e-9 >= pos.principalSol ? 1 : 0,
     });
     return `returned principal #${pos.id} +${result.sol.toFixed(4)} SOL remaining tokens=${remaining}`;
+  }
+
+  const remainingAfter = Math.max(0, pos.tokensHeld - tokensToSell);
+  if (action.type === "sell_runner" && remainingAfter > 1e-6) {
+    updatePosition(opts.store, pos.id, {
+      ...patch,
+      tokens_held: remainingAfter,
+      runner: 1,
+    });
+    return `trimmed runner #${pos.id} ${action.reason} sold=${result.sol.toFixed(4)} SOL left=${remainingAfter}`;
   }
 
   const soldSol = result.sol;

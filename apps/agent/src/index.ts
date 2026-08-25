@@ -3,6 +3,7 @@ import { openStore, setFlag } from "@night/storage";
 import { createTelegramBot } from "@night/telegram";
 import { loadAppConfig, loadPolicy } from "./config.ts";
 import { AgentRuntime } from "./loop.ts";
+import { startCrewServer } from "./board.ts";
 
 async function main(): Promise<void> {
   const cfg = loadAppConfig();
@@ -10,6 +11,7 @@ async function main(): Promise<void> {
   const store = openStore(cfg.databasePath);
   setFlag(store, "master", String(cfg.masterEnabled));
   const runtime = new AgentRuntime(cfg, policy, store);
+  startCrewServer(runtime.crew, cfg.crewPort);
 
   console.log(
     `Night agent starting mode=${cfg.mode} master=${cfg.masterEnabled} db=${cfg.databasePath}`,
@@ -21,8 +23,10 @@ async function main(): Promise<void> {
       store,
       policy: () => runtime.policy,
       flags: () => runtime.currentFlags(),
-      paths: { lessons: cfg.lessonsPath, guardrails: cfg.guardrailsPath },
+      paths: { lessons: cfg.lessonsPath, guardrails: cfg.guardrailsPath, rules: cfg.rulesPath },
       onSellAll: () => runtime.sellAll(),
+      onResearch: (mint) => runtime.research(mint),
+      crew: () => runtime.crew,
       dayKey: () => new Date().toISOString().slice(0, 10),
     });
     bot.start({

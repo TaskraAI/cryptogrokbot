@@ -34,6 +34,7 @@ export interface Policy {
   minLiquidityUsd: number;
   compoundWins: boolean;
   compoundWinsFraction: number;
+  fadeSellFraction: number;
 }
 
 export const DEFAULT_POLICY: Policy = {
@@ -64,6 +65,7 @@ export const DEFAULT_POLICY: Policy = {
   minLiquidityUsd: 5000,
   compoundWins: false,
   compoundWinsFraction: 0.25,
+  fadeSellFraction: 1,
 };
 
 export interface MarketSnapshot {

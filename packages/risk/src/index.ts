@@ -10,6 +10,17 @@ export {
   parseNeverRule,
   type Guardrail,
 } from "./guardrails.ts";
+export {
+  loadExtraRules,
+  saveExtraRules,
+  setExtraRuleEnabled,
+  addExtraRule,
+  evaluateExtraRules,
+  consecutiveLosses,
+  inHours,
+  type ExtraRule,
+  type ExtraRuleType,
+} from "./extra-rules.ts";
 
 export interface EntryGate {
   ok: boolean;

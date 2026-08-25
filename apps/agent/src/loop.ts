@@ -1,9 +1,9 @@
 import { Connection } from "@solana/web3.js";
 import { dayKey, type Mode, type Policy, type RuntimeFlags, type SourceHit } from "@night/shared";
-import { loadGuardrails } from "@night/risk";
+import { consecutiveLosses, loadExtraRules, loadGuardrails } from "@night/risk";
 import { applyRealizedPnl } from "@night/risk";
 import { buildSnapshot } from "@night/tape";
-import { loadSources, ingestX, ingestRssSites, isMuted, hitsForMint } from "@night/social";
+import { loadSources, ingestX, ingestRssSites, isMuted, hitsForMint, type SourcesConfig } from "@night/social";
 import {
   buySellRatio,
   fetchDexSearch,
@@ -25,8 +25,9 @@ import {
   upsertBudget,
   type Store,
 } from "@night/storage";
-import { applyNightlyLearning, askLlm, lessonPrompt, loadLessons, similarFewShots, tagMistake } from "@night/learning";
+import { applyNightlyLearning, askGrokResearch, askLlm, lessonPrompt, loadLessons, similarFewShots, tagMistake } from "@night/learning";
 import { notify } from "@night/telegram";
+import { CrewBoard } from "@night/crew";
 import type { AppConfig } from "./config.ts";
 import { tryEnter } from "./entries.ts";
 import { managePosition, rowToPosition } from "./watchman.ts";
@@ -38,6 +39,7 @@ export class AgentRuntime {
   connection?: Connection;
   fallback?: Connection;
   keypair?: ReturnType<typeof loadKeypair>;
+  crew = new CrewBoard();
 
   constructor(
     public cfg: AppConfig,
@@ -67,26 +69,62 @@ export class AgentRuntime {
 
   async tick(): Promise<string[]> {
     const logs: string[] = [];
+    this.crew.start("chief", "dispatching scout + sentinel + scholar");
     await this.refreshHealth();
     const sources = loadSources(this.cfg.sourcesPath);
     const guardrails = loadGuardrails(this.cfg.guardrailsPath);
+    const extraRules = loadExtraRules(this.cfg.rulesPath);
     const now = Date.now();
 
-    if (now - this.lastSocial > 60_000) {
+    const scoutLogs: string[] = [];
+    const sentinelLogs: string[] = [];
+    const scholarLogs: string[] = [];
+
+    const scout =
+      now - this.lastSocial > 60_000
+        ? this.runScout(sources, guardrails, extraRules, scoutLogs)
+        : Promise.resolve();
+    const sentinel = this.watchOpen(sentinelLogs);
+    const scholar = this.runScholar(scholarLogs);
+
+    await Promise.all([scout, sentinel, scholar]);
+    logs.push(...scoutLogs, ...sentinelLogs, ...scholarLogs);
+    this.crew.idle("chief", `tick done lines=${logs.length}`);
+    return logs;
+  }
+
+  private async runScout(
+    sources: SourcesConfig,
+    guardrails: ReturnType<typeof loadGuardrails>,
+    extraRules: ReturnType<typeof loadExtraRules>,
+    logs: string[],
+  ): Promise<void> {
+    this.crew.start("scout", "polling X / RSS / Pump / Dex");
+    try {
+      const now = Date.now();
       const socialHits = [
         ...(await ingestX({ sources, bearer: this.cfg.xBearer, now })),
         ...(await ingestRssSites({ sources, now })),
       ];
       this.lastSocial = now;
-      logs.push(`social hits ${socialHits.length}`);
-      await this.considerEntries(socialHits, guardrails, logs);
-      await this.considerPumpAndDex(socialHits, guardrails, logs);
+      logs.push(`scout: social hits ${socialHits.length}`);
+      await this.considerEntries(socialHits, guardrails, extraRules, sources, logs);
+      await this.considerPumpAndDex(socialHits, guardrails, extraRules, sources, logs);
+      this.crew.idle("scout", `${socialHits.length} hits processed`);
+    } catch (err) {
+      this.crew.error("scout", err instanceof Error ? err.message : "scout failed");
     }
+  }
 
-    await this.watchOpen(logs);
-    await this.shadowMark(logs);
-    this.maybeNightly();
-    return logs;
+  private async runScholar(logs: string[]): Promise<void> {
+    this.crew.start("scholar", "shadow marks + nightly stats");
+    try {
+      await this.shadowMark(logs);
+      this.maybeNightly();
+      this.crew.idle("scholar", "journal up to date");
+    } catch (err) {
+      this.crew.error("scholar", err instanceof Error ? err.message : "scholar failed");
+    }
   }
 
   private async refreshHealth(): Promise<void> {
@@ -98,12 +136,14 @@ export class AgentRuntime {
   private async considerEntries(
     hits: SourceHit[],
     guardrails: ReturnType<typeof loadGuardrails>,
+    extraRules: ReturnType<typeof loadExtraRules>,
+    sourcesCfg: SourcesConfig,
     logs: string[],
   ): Promise<void> {
     const byMint = new Map<string, SourceHit[]>();
     for (const hit of hits) {
       if (!hit.mint) continue;
-      if (isMuted(loadSources(this.cfg.sourcesPath).mute, hit)) continue;
+      if (isMuted(sourcesCfg.mute, hit)) continue;
       const list = byMint.get(hit.mint) ?? [];
       list.push(hit);
       byMint.set(hit.mint, list);
@@ -113,16 +153,8 @@ export class AgentRuntime {
       if (!pair) continue;
       const metrics = pairToMetrics(pair);
       const msg = await tryEnter({
-        store: this.store,
-        policy: this.policy,
-        flags: this.currentFlags(),
+        ...this.enterContext(guardrails, extraRules, sourcesCfg, mintHits, buySellRatio(pair)),
         token: metrics,
-        sources: mintHits,
-        guardrails,
-        dayKey: dayKey(Date.now(), this.policy.timezone),
-        connection: this.connection,
-        keypair: this.keypair,
-        pumpApiKey: this.cfg.pumpApiKey,
       });
       logs.push(msg);
       if (msg.startsWith("bought")) {
@@ -134,6 +166,8 @@ export class AgentRuntime {
   private async considerPumpAndDex(
     socialHits: SourceHit[],
     guardrails: ReturnType<typeof loadGuardrails>,
+    extraRules: ReturnType<typeof loadExtraRules>,
+    sourcesCfg: SourcesConfig,
     logs: string[],
   ): Promise<void> {
     const pump = await fetchPumpNewTokens();
@@ -148,22 +182,42 @@ export class AgentRuntime {
       const pair = await fetchDexToken(mint);
       if (!pair) continue;
       const msg = await tryEnter({
-        store: this.store,
-        policy: this.policy,
-        flags: this.currentFlags(),
+        ...this.enterContext(guardrails, extraRules, sourcesCfg, hits, buySellRatio(pair)),
         token: pairToMetrics(pair),
-        sources: hits,
-        guardrails,
-        dayKey: dayKey(Date.now(), this.policy.timezone),
-        connection: this.connection,
-        keypair: this.keypair,
-        pumpApiKey: this.cfg.pumpApiKey,
       });
       logs.push(msg);
     }
   }
 
+  private enterContext(
+    guardrails: ReturnType<typeof loadGuardrails>,
+    extraRules: ReturnType<typeof loadExtraRules>,
+    sourcesCfg: SourcesConfig,
+    mintHits: SourceHit[],
+    ratio: number,
+  ) {
+    const closed = listAllClosed(this.store);
+    const nets = closed.slice(0, 12).map((r) => r.net_sol ?? 0);
+    return {
+      store: this.store,
+      policy: this.policy,
+      flags: this.currentFlags(),
+      sources: mintHits,
+      guardrails,
+      extraRules,
+      copyWallets: sourcesCfg.wallets.filter((w) => w.action === "copy").map((w) => w.address),
+      fadeWallets: sourcesCfg.wallets.filter((w) => w.action === "fade").map((w) => w.address),
+      consecutiveLosses: consecutiveLosses(nets),
+      buySellRatio: ratio,
+      dayKey: dayKey(Date.now(), this.policy.timezone),
+      connection: this.connection,
+      keypair: this.keypair,
+      pumpApiKey: this.cfg.pumpApiKey,
+    };
+  }
+
   private async watchOpen(logs: string[]): Promise<void> {
+    this.crew.start("sentinel", "watching open bags");
     const open = listOpenPositions(this.store);
     const sourcesCfg = loadSources(this.cfg.sourcesPath);
     const recentHits = recentSourceHits(this.store, Date.now() - 2 * 3600_000).map((h) => ({
@@ -178,6 +232,13 @@ export class AgentRuntime {
     }));
     const lessons = loadLessons(this.cfg.lessonsPath);
     const closed = listAllClosed(this.store);
+
+    if (!open.length) {
+      this.crew.idle("sentinel", "no open positions");
+      this.crew.idle("grok", "waiting for a runner");
+      void sourcesCfg;
+      return;
+    }
 
     for (const row of open) {
       const pair = await fetchDexToken(row.mint);
@@ -199,9 +260,11 @@ export class AgentRuntime {
         social: { hits: recentHits.filter((h) => !h.mint || h.mint === row.mint) },
       });
       const few = similarFewShots(closed, row.last_pattern ?? "chop");
+      this.crew.start("grok", `thesis ${row.ticker}`);
       const llm = await askLlm({
         apiKey: this.cfg.openaiKey,
-        model: this.cfg.openaiModel,
+        xaiKey: this.cfg.xaiKey,
+        model: this.cfg.xaiKey ? this.cfg.grokModel : this.cfg.openaiModel,
         timeoutMs: this.cfg.llmTimeoutMs,
         system: lessonPrompt(lessons, few),
         user: JSON.stringify({
@@ -210,6 +273,7 @@ export class AgentRuntime {
           principalRecovered: row.principal_recovered_sol >= row.principal_sol,
         }),
       });
+      this.crew.idle("grok", llm ? `${llm.action ?? "hold"} ${(llm.confidence ?? 0).toFixed(2)}` : "no Grok key / timeout");
       const conn = this.flags.rpcHealthy ? this.connection : this.fallback;
       const msg = await managePosition({
         store: this.store,
@@ -224,20 +288,21 @@ export class AgentRuntime {
         pumpApiKey: this.cfg.pumpApiKey,
       });
       logs.push(msg);
-      if (msg.startsWith("closed") || msg.startsWith("returned")) {
+      if (msg.startsWith("closed") || msg.startsWith("returned") || msg.startsWith("trimmed")) {
         await notify(
           this.cfg.telegramToken,
           this.cfg.telegramChatId,
           `${msg}\nGrade with /grade ${row.id} win|meh|fail`,
         );
         if (msg.startsWith("closed")) {
-          const updated = listOpenPositions(this.store);
-          void updated;
           const b = getBudget(this.store, dayKey(Date.now(), this.policy.timezone));
-          const closedRow = { ...row, net_sol: undefined as number | undefined };
-          void closedRow;
           const netMatch = /net=([-\d.]+)/.exec(msg);
           if (netMatch) {
+            const net = Number(netMatch[1]);
+            let extra = b.extra_budget_sol;
+            if (this.policy.compoundWins && net > 0) {
+              extra += net * this.policy.compoundWinsFraction;
+            }
             const next = applyRealizedPnl(
               {
                 dayKey: b.day_key,
@@ -245,9 +310,9 @@ export class AgentRuntime {
                 trades: b.trades,
                 realizedLossSol: b.realized_loss_sol,
                 lastEntryAt: b.last_entry_at,
-                extraBudgetSol: b.extra_budget_sol,
+                extraBudgetSol: extra,
               },
-              Number(netMatch[1]),
+              net,
             );
             upsertBudget(this.store, {
               day_key: next.dayKey,
@@ -260,8 +325,20 @@ export class AgentRuntime {
           }
         }
       }
-      void sourcesCfg;
     }
+    this.crew.idle("sentinel", `${open.length} bags checked`);
+  }
+
+  async research(mint: string): Promise<string> {
+    this.crew.start("grok", `multi-agent research ${mint.slice(0, 8)}…`);
+    const pair = await fetchDexToken(mint);
+    const text = await askGrokResearch({
+      xaiKey: this.cfg.xaiKey,
+      mint,
+      ticker: pair?.baseToken.symbol,
+    });
+    this.crew.idle("grok", "research done");
+    return text ?? "Set XAI_API_KEY to run Grok multi-agent research.";
   }
 
   async sellAll(): Promise<string> {

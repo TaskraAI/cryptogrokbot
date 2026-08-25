@@ -14,7 +14,10 @@ export interface AppConfig {
   pumpApiKey: string;
   openaiKey: string;
   openaiModel: string;
+  xaiKey: string;
+  grokModel: string;
   llmTimeoutMs: number;
+  crewPort: number;
   databasePath: string;
   configDir: string;
   policyPath: string;
@@ -22,6 +25,7 @@ export interface AppConfig {
   guardrailsPath: string;
   lessonsPath: string;
   patternStatsPath: string;
+  rulesPath: string;
 }
 
 export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -38,7 +42,10 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     pumpApiKey: env.PUMPPORTAL_API_KEY ?? "",
     openaiKey: env.OPENAI_API_KEY ?? "",
     openaiModel: env.OPENAI_MODEL ?? "gpt-4.1-mini",
+    xaiKey: env.XAI_API_KEY ?? env.GROK_API_KEY ?? "",
+    grokModel: env.GROK_MODEL ?? "grok-4-fast",
     llmTimeoutMs: Number(env.LLM_TIMEOUT_MS ?? 4000),
+    crewPort: Number(env.CREW_PORT ?? 8787),
     databasePath: resolve(env.DATABASE_PATH ?? "./data/night-agent.db"),
     configDir,
     policyPath: resolve(configDir, "policy.json"),
@@ -46,6 +53,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     guardrailsPath: resolve(configDir, "guardrails.yaml"),
     lessonsPath: resolve(configDir, "lessons.md"),
     patternStatsPath: resolve(configDir, "pattern-stats.json"),
+    rulesPath: resolve(configDir, "rules.yaml"),
   };
 }
 

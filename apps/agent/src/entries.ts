@@ -1,5 +1,5 @@
 import type { Policy, RuntimeFlags, SourceHit, TokenMetrics } from "@night/shared";
-import { applyEntryToBudget, canEnter, scoreCandidate, type Guardrail } from "@night/risk";
+import { applyEntryToBudget, canEnter, evaluateExtraRules, scoreCandidate, type ExtraRule, type Guardrail } from "@night/risk";
 import { executeBuy } from "@night/execution";
 import { simulateSell } from "@night/signals";
 import {
@@ -22,6 +22,11 @@ export async function tryEnter(opts: {
   token: TokenMetrics;
   sources: SourceHit[];
   guardrails: Guardrail[];
+  extraRules?: ExtraRule[];
+  copyWallets?: string[];
+  fadeWallets?: string[];
+  consecutiveLosses?: number;
+  buySellRatio?: number;
   dayKey: string;
   connection?: Connection;
   keypair?: Keypair;
@@ -78,6 +83,29 @@ export async function tryEnter(opts: {
       payload: scored.checks,
     });
     return `blocked ${opts.token.ticker}: ${scored.blockedReason}`;
+  }
+
+  if (opts.extraRules?.length) {
+    const extra = evaluateExtraRules(opts.extraRules, {
+      token: opts.token,
+      sources: opts.sources,
+      now,
+      consecutiveLosses: opts.consecutiveLosses,
+      copyWallets: opts.copyWallets,
+      fadeWallets: opts.fadeWallets,
+      buySellRatio: opts.buySellRatio,
+    });
+    if (!extra.ok) {
+      insertDecision(opts.store, {
+        at: now,
+        kind: "block",
+        mint: opts.token.mint,
+        allowed: false,
+        reason: extra.reason,
+        score: scored.score,
+      });
+      return `blocked ${opts.token.ticker}: ${extra.reason}`;
+    }
   }
 
   if (opts.flags.mode === "LIVE") {

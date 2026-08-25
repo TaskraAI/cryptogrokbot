@@ -236,24 +236,30 @@ export function similarFewShots(rows: PositionRow[], pattern: string, limit = 8)
 
 export async function askLlm(opts: {
   apiKey?: string;
+  xaiKey?: string;
   model: string;
   timeoutMs: number;
   system: string;
   user: string;
 }): Promise<{ pattern?: string; action?: "hold" | "sell"; confidence?: number; reason?: string; thesis?: string } | null> {
-  if (!opts.apiKey) return null;
+  const xai = opts.xaiKey || (opts.apiKey?.startsWith("xai-") ? opts.apiKey : "");
+  const openai = xai ? "" : opts.apiKey;
+  if (!xai && !openai) return null;
+  const url = xai ? "https://api.x.ai/v1/chat/completions" : "https://api.openai.com/v1/chat/completions";
+  const key = xai || openai || "";
+  const model = xai && (opts.model.startsWith("gpt-") || !opts.model) ? "grok-4-fast" : opts.model;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), opts.timeoutMs);
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetch(url, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${opts.apiKey}`,
+        authorization: `Bearer ${key}`,
         "content-type": "application/json",
       },
       signal: ctrl.signal,
       body: JSON.stringify({
-        model: opts.model,
+        model,
         temperature: 0.2,
         response_format: { type: "json_object" },
         messages: [
@@ -269,6 +275,47 @@ export async function askLlm(opts: {
     return JSON.parse(content) as { pattern?: string; action?: "hold" | "sell"; confidence?: number; reason?: string; thesis?: string };
   } catch {
     return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+export async function askGrokResearch(opts: {
+  xaiKey?: string;
+  mint: string;
+  ticker?: string;
+  timeoutMs?: number;
+}): Promise<string | null> {
+  if (!opts.xaiKey) return null;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 45_000);
+  try {
+    const res = await fetch("https://api.x.ai/v1/responses", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${opts.xaiKey}`,
+        "content-type": "application/json",
+      },
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        model: "grok-4.20-multi-agent",
+        reasoning: { effort: "low" },
+        tools: [{ type: "web_search" }, { type: "x_search" }],
+        input: [
+          {
+            role: "user",
+            content: `You are the research desk for a Solana meme-coin night agent. Research mint ${opts.mint} ticker ${opts.ticker ?? ""}. Report: (1) social sentiment on X (2) likely rug/honeypot signs (3) whether a dip looks healthy vs dump. Be brief. Not financial advice.`,
+          },
+        ],
+      }),
+    });
+    if (!res.ok) return `Grok research HTTP ${res.status}`;
+    const body = (await res.json()) as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }> };
+    if (body.output_text) return body.output_text;
+    const text = body.output?.flatMap((o) => o.content ?? []).map((c) => c.text ?? "").join("\n");
+    return text || "Grok returned no text";
+  } catch (err) {
+    return err instanceof Error ? err.message : "Grok research failed";
   } finally {
     clearTimeout(t);
   }

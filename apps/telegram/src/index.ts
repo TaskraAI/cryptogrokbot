@@ -13,18 +13,28 @@ import {
   setFlag,
   type Store,
 } from "@night/storage";
-import { addGuardrail, loadGuardrails, parseNeverRule, removeGuardrail } from "@night/risk";
+import {
+  addGuardrail,
+  loadExtraRules,
+  loadGuardrails,
+  parseNeverRule,
+  removeGuardrail,
+  setExtraRuleEnabled,
+} from "@night/risk";
 import { appendLesson, buildReview, formatReview, loadLessons } from "@night/learning";
 import { listTape } from "@night/storage";
 import { gradePosition } from "@night/storage";
 import type { Grade } from "@night/shared";
+import type { CrewBoard } from "@night/crew";
 
 export interface TelegramContext {
   store: Store;
   policy: () => Policy;
   flags: () => RuntimeFlags;
-  paths: { lessons: string; guardrails: string };
+  paths: { lessons: string; guardrails: string; rules: string };
   onSellAll: () => Promise<string>;
+  onResearch?: (mint: string) => Promise<string>;
+  crew?: () => CrewBoard;
   dayKey: () => string;
 }
 
@@ -160,6 +170,42 @@ export function createTelegramBot(token: string, chatId: string, ctx: TelegramCo
     if (!allow(c, chatId)) return;
     await c.reply(JSON.stringify(ctx.policy(), null, 2).slice(0, 3500));
   });
+  bot.command("crew", async (c) => {
+    if (!allow(c, chatId)) return;
+    await c.reply(ctx.crew ? ctx.crew().formatText() : "crew board not attached");
+  });
+  bot.command("rules", async (c) => {
+    if (!allow(c, chatId)) return;
+    const rules = loadExtraRules(ctx.paths.rules);
+    await c.reply(
+      rules.length
+        ? rules.map((r) => `${r.enabled ? "ON " : "off"} ${r.id} ${r.type}=${r.value}${r.note ? ` — ${r.note}` : ""}`).join("\n")
+        : "no extra rules",
+    );
+  });
+  bot.command("rule", async (c) => {
+    if (!allow(c, chatId)) return;
+    const parts = (c.match || "").trim().split(/\s+/);
+    const cmd = parts[0]?.toLowerCase();
+    const id = parts[1];
+    if (!id || (cmd !== "on" && cmd !== "off")) {
+      await c.reply("usage: /rule on <id>  or  /rule off <id>\nsee /rules");
+      return;
+    }
+    const ok = setExtraRuleEnabled(ctx.paths.rules, id, cmd === "on");
+    await c.reply(ok ? `${id} ${cmd}` : `unknown rule ${id}`);
+  });
+  bot.command("research", async (c) => {
+    if (!allow(c, chatId)) return;
+    const mint = (c.match || "").trim();
+    if (!mint) {
+      await c.reply("usage: /research <mint>");
+      return;
+    }
+    await c.reply("Grok multi-agent research running…");
+    const text = ctx.onResearch ? await ctx.onResearch(mint) : "research not wired";
+    await c.reply(text.slice(0, 3900));
+  });
 
   bot.catch((err) => {
     console.error("telegram error", err);
@@ -189,7 +235,10 @@ export function statusText(ctx: TelegramContext): string {
     `rpc=${f.rpcHealthy} jupiter=${f.jupiterHealthy} tg=${f.telegramHealthy}`,
     `budget ${b.spent_sol.toFixed(3)}/${p.dailyBudgetSol} trades ${b.trades}/${p.maxTradesPerDay}`,
     `open ${listOpenPositions(ctx.store).length}/${p.maxOpenPositions}`,
-  ].join("\n");
+    ctx.crew ? ctx.crew().snapshot().map((x) => `${x.title}:${x.status}`).join(" ") : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export function positionsText(store: Store): string {
