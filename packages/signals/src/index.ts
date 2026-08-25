@@ -19,7 +19,9 @@ export interface DexPair {
 }
 
 export async function fetchDexToken(mint: string): Promise<DexPair | null> {
-  const res = await fetch(`${DEX}/latest/dex/tokens/${mint}`);
+  const res = await fetch(`${DEX}/latest/dex/tokens/${mint}`, {
+    headers: { accept: "application/json", "user-agent": "CryptoTrading/paper" },
+  });
   if (!res.ok) return null;
   const body = (await res.json()) as { pairs?: DexPair[] };
   const pairs = (body.pairs ?? []).filter((p) => p.chainId === "solana");
@@ -28,7 +30,9 @@ export async function fetchDexToken(mint: string): Promise<DexPair | null> {
 }
 
 export async function fetchDexSearch(q: string): Promise<DexPair[]> {
-  const res = await fetch(`${DEX}/latest/dex/search?q=${encodeURIComponent(q)}`);
+  const res = await fetch(`${DEX}/latest/dex/search?q=${encodeURIComponent(q)}`, {
+    headers: { accept: "application/json", "user-agent": "CryptoTrading/paper" },
+  });
   if (!res.ok) return [];
   const body = (await res.json()) as { pairs?: DexPair[] };
   return (body.pairs ?? []).filter((p) => p.chainId === "solana").slice(0, 20);

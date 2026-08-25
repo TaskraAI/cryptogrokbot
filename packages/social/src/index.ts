@@ -2,7 +2,15 @@ import { readFileSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 import type { SourceHit, SourceWeight } from "@night/shared";
 
+export interface WatchlistEntry {
+  mint: string;
+  ticker?: string;
+  weight?: SourceWeight;
+  notes?: string;
+}
+
 export interface SourcesConfig {
+  watchlist: WatchlistEntry[];
   x_accounts: Array<{ handle: string; weight: SourceWeight; notes?: string }>;
   x_queries: Array<{ query: string }>;
   telegram: Array<{ name: string; id_or_username: string; weight: SourceWeight }>;
@@ -15,6 +23,7 @@ export interface SourcesConfig {
 export function loadSources(path: string): SourcesConfig {
   const parsed = parseYaml(readFileSync(path, "utf8")) as Partial<SourcesConfig> | null;
   return {
+    watchlist: (parsed?.watchlist ?? []).filter((w) => Boolean(w?.mint)),
     x_accounts: parsed?.x_accounts ?? [],
     x_queries: parsed?.x_queries ?? [],
     telegram: parsed?.telegram ?? [],
@@ -165,4 +174,28 @@ export async function ingestRssSites(opts: { sources: SourcesConfig; now?: numbe
 
 export function hitsForMint(hits: SourceHit[], mint: string): SourceHit[] {
   return hits.filter((h) => h.mint === mint);
+}
+
+export function watchlistHits(sources: SourcesConfig, now = Date.now()): SourceHit[] {
+  return sources.watchlist.map((w) => ({
+    platform: "dexscreener" as const,
+    key: `watchlist:${(w.ticker || w.mint).toLowerCase()}`,
+    weight: w.weight ?? "trusted",
+    snippet: w.notes || `watchlist ${w.ticker ?? w.mint}`,
+    at: now,
+    mint: w.mint,
+    ticker: w.ticker,
+  }));
+}
+
+/** Social hits plus a synthetic trusted hit when the mint is on the user's watchlist. */
+export function hitsForCandidate(
+  socialHits: SourceHit[],
+  sources: SourcesConfig,
+  mint: string,
+  now = Date.now(),
+): SourceHit[] {
+  const social = hitsForMint(socialHits, mint);
+  const listed = watchlistHits(sources, now).filter((h) => h.mint === mint);
+  return [...social, ...listed];
 }

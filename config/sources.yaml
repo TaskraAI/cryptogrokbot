@@ -1,5 +1,35 @@
-# Fill this with accounts, channels, and sites you already trust.
-# The agent only watches what you list.
+# Starter watchlist — well-known, liquid Solana memes.
+# Edit this file. The night agent (MODE=PAPER by default) may paper-buy a mint
+# listed here when DexScreener or Pump.fun shows a live Solana market AND
+# scoring + config/rules.yaml pass. It will not send a real transaction unless
+# you set MODE=LIVE and MASTER_ENABLED=true in .env (do not do that yet).
+#
+# Add your own coins like this:
+#   - mint: "<Solana mint address>"
+#     ticker: TICKER
+#     weight: trusted    # trusted | watch  (use trusted so one listing is enough)
+#     notes: "why you listed it"
+#
+# Optional: X / Telegram / Discord / RSS below. Those need extra API tokens.
+# Watchlist mints do not need X_BEARER_TOKEN.
+
+watchlist:
+  - mint: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
+    ticker: BONK
+    weight: trusted
+    notes: "Bonk — large, liquid Solana meme"
+  - mint: EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm
+    ticker: WIF
+    weight: trusted
+    notes: "dogwifhat (WIF)"
+  - mint: 7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr
+    ticker: POPCAT
+    weight: trusted
+    notes: "POPCAT"
+  - mint: 6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN
+    ticker: TRUMP
+    weight: trusted
+    notes: "Official Trump (TRUMP)"
 
 x_accounts:
   # - handle: "@example"

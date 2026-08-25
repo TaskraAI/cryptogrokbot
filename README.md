@@ -4,28 +4,31 @@ Personal assistant for **discovering, buying, and selling Solana meme coins** yo
 
 ## Run it (paper)
 
-Node 22+. Secrets live in `.env` (gitignored). Never commit keys.
+Node 22+. Secrets live in `.env` (gitignored). Never commit keys.  
+Starter watchlist (BONK, WIF, POPCAT, TRUMP) is in [`config/sources.yaml`](config/sources.yaml) — add your own mints there.
 
 ```bash
 cp .env.example .env          # MODE=PAPER, MASTER_ENABLED=false
 npm install
 npm test
-npm run trade -- status
-npm run trade -- scan         # Pump.fun + DexScreener names; does not buy
-npm run trade -- quote <mint>
-npm run trade -- buy <mint>   # paper fill → data/night-agent.db
-npm run trade -- positions
-npm run trade -- sell <id>    # or sell <mint>
-```
-
-Example mint (BONK): `DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263`
-
-```bash
+npm run trade -- scan
 npm run trade -- buy DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 --sol 0.05
+npm run trade -- positions
 npm run trade -- sell 1
 ```
 
-`--sol` is capped by `config/policy.json` `maxSolPerTrade`. `--strict` also applies `config/rules.yaml`. `--force` skips scoring (**paper only**).
+Those are the commands used to prove the paper loop (BONK mint above). `--sol` is capped by `config/policy.json` `maxSolPerTrade`. `--strict` also applies `config/rules.yaml`. `--force` skips scoring (**paper only**).
+
+## Night auto-buys (still paper)
+
+`npm run agent -- --once` paper-enters a **watchlist** mint when DexScreener has a live Solana market and scoring + `config/rules.yaml` pass. No X API needed for the watchlist. Extra rules can skip a name on a quiet 5m (e.g. `min-vol-5m`); the next listed name can still fill. Cooldown is 180s between entries.
+
+```bash
+MODE=PAPER MASTER_ENABLED=false npm run agent -- --once
+npm run agent              # loop; crew board http://127.0.0.1:8787/
+```
+
+Default policy (`config/policy.json`): 0.5 SOL/day, 5 trades, 0.1 SOL each, −25% hard stop, return principal at 1x, 15% dip + sentiment ≥ 0.4 holds the runner.
 
 ## Paper vs live
 
@@ -59,17 +62,6 @@ Telegram `/kill` turns master off (new buys stop; exits still run). `/resume CON
 | `X_BEARER_TOKEN` | no | official X timelines for the night agent |
 | `PUMPPORTAL_API_KEY` | live curve buys | PumpPortal `trade-local` |
 | `XAI_API_KEY` | no | Grok thesis / `/research` |
-
-## Night agent (optional auto loop)
-
-The scanner only **auto-buys** when a mint from *your* `config/sources.yaml` also shows up on Pump/Dex **and** scoring + extra rules pass. Empty sources → discovery only, no auto entries. That is intentional.
-
-```bash
-npm run agent -- --once    # one 15s-style tick
-npm run agent              # loop; crew board http://127.0.0.1:8787/
-```
-
-Default policy (`config/policy.json`): 0.5 SOL/day, 5 trades, 0.1 SOL each, −25% hard stop, return principal at 1x, 15% dip + sentiment ≥ 0.4 holds the runner.
 
 ## Safety
 

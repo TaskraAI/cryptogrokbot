@@ -39,7 +39,7 @@ pgrep -af "apps/agent" || true
 - Browser: five cards with last action timestamps
 - JSON: `curl -s http://127.0.0.1:8787/crew.json`
 
-Empty sources.yaml → Scout has nothing to hunt. That is still a successful demo; add handles later.
+Empty `x_accounts` is fine. Paper auto-entry uses the `watchlist:` mints in `config/sources.yaml`.
 
 ## xAI API vs Grok Bot login
 

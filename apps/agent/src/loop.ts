@@ -3,7 +3,7 @@ import { dayKey, type Mode, type Policy, type RuntimeFlags, type SourceHit } fro
 import { consecutiveLosses, loadExtraRules, loadGuardrails } from "@night/risk";
 import { applyRealizedPnl } from "@night/risk";
 import { buildSnapshot } from "@night/tape";
-import { loadSources, ingestX, ingestRssSites, isMuted, hitsForMint, type SourcesConfig } from "@night/social";
+import { loadSources, ingestX, ingestRssSites, isMuted, hitsForCandidate, watchlistHits, type SourcesConfig } from "@night/social";
 import {
   buySellRatio,
   fetchDexSearch,
@@ -107,7 +107,8 @@ export class AgentRuntime {
         ...(await ingestRssSites({ sources, now })),
       ];
       this.lastSocial = now;
-      logs.push(`scout: social hits ${socialHits.length}`);
+      logs.push(`scout: social hits ${socialHits.length} watchlist ${sources.watchlist.length}`);
+      await this.considerWatchlist(guardrails, extraRules, sources, logs);
       await this.considerEntries(socialHits, guardrails, extraRules, sources, logs);
       await this.considerPumpAndDex(socialHits, guardrails, extraRules, sources, logs);
       this.crew.idle("scout", `${socialHits.length} hits processed`);
@@ -131,6 +132,31 @@ export class AgentRuntime {
     this.flags.rpcHealthy = await heliusHealth(this.cfg.heliusRpc);
     const px = await jupiterPrice("So11111111111111111111111111111111111111112");
     this.flags.jupiterHealthy = px != null;
+  }
+
+  private async considerWatchlist(
+    guardrails: ReturnType<typeof loadGuardrails>,
+    extraRules: ReturnType<typeof loadExtraRules>,
+    sourcesCfg: SourcesConfig,
+    logs: string[],
+  ): Promise<void> {
+    const now = Date.now();
+    for (const hit of watchlistHits(sourcesCfg, now)) {
+      if (!hit.mint || isMuted(sourcesCfg.mute, hit)) continue;
+      const pair = await fetchDexToken(hit.mint);
+      if (!pair) {
+        logs.push(`watchlist ${hit.ticker ?? hit.mint.slice(0, 8)}: no DexScreener market`);
+        continue;
+      }
+      const msg = await tryEnter({
+        ...this.enterContext(guardrails, extraRules, sourcesCfg, [hit], buySellRatio(pair)),
+        token: pairToMetrics(pair),
+      });
+      logs.push(msg);
+      if (msg.startsWith("bought")) {
+        await notify(this.cfg.telegramToken, this.cfg.telegramChatId, msg);
+      }
+    }
   }
 
   private async considerEntries(
@@ -177,7 +203,7 @@ export class AgentRuntime {
       ...trending.map((p) => p.baseToken.address),
     ];
     for (const mint of [...new Set(candidates)].slice(0, 8)) {
-      const hits = hitsForMint(socialHits, mint);
+      const hits = hitsForCandidate(socialHits, sourcesCfg, mint);
       if (hits.length === 0) continue;
       const pair = await fetchDexToken(mint);
       if (!pair) continue;
