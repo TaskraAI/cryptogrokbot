@@ -95,7 +95,7 @@ export const DESKS: DeskDef[] = [
       { key: "token", label: "Project", placeholder: "name" },
       { key: "ticker", label: "Ticker", placeholder: "TICKER" },
       { key: "mcap", label: "Market cap (if known)", placeholder: "$12M" },
-      { key: "investment", label: "Possible size", placeholder: "0.1 SOL paper" },
+      { key: "investment", label: "Possible size", placeholder: "0.01 SOL" },
     ],
   },
   {
@@ -134,7 +134,7 @@ export const DESKS: DeskDef[] = [
       { key: "token", label: "Token", placeholder: "name" },
       { key: "ticker", label: "Ticker", placeholder: "TICKER" },
       { key: "price", label: "Current price", placeholder: "optional" },
-      { key: "investment", label: "Size", placeholder: "0.05 SOL" },
+      { key: "investment", label: "Size", placeholder: "0.01 SOL" },
       { key: "objective", label: "Objective", type: "select", options: ["2x", "5x", "10x", "100x"] },
     ],
   },

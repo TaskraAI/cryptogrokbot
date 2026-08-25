@@ -20,4 +20,6 @@ If no API key: say so; still write a cautious thesis from Dex/tape JSON on the c
 - Never sell through healthy_dip.
 - Never disable Sentinel stops.
 - One agent process (Chief owns it).
+- Test size until Taskra raises limits: 0.01 SOL per trade. Do not recommend 0.05/0.1 tickets.
+- If Taskra tells you in the Grok Bot app to change the desk, implement it. Do not raise size on your own.
 - Not financial advice.

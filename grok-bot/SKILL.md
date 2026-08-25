@@ -45,4 +45,4 @@ Paste new rows under `rules:` (id, type, value, enabled, when, note).
 - Fast JSON: `GROK_MODEL=grok-4-fast`
 - Deep dive: `/research <mint>` uses `grok-4.20-multi-agent` + X/web search
 
-Never raise size or disable hard stops from Grok output. Paper mode until `MODE=LIVE` and `MASTER_ENABLED=true`.
+Never raise size or disable hard stops from Grok output unless Taskra explicitly raises buy limits (current test ticket: 0.01 SOL in `config/policy.json`). If Taskra tells Grok Bot in the app to change the desk, implement that.

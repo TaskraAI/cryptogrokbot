@@ -33,3 +33,5 @@ Newest lessons are injected into the LLM prompt first.
 - 2026-08-25T22:32:08.103Z LIVE RULES (user, via Chief): hot wallet AqjSSUeqsEatVjwYVVRjyxSyM5DKxPPeLqqF7yAgmPRW reported 0.509 SOL. LIVE still fail-closed until WALLET_SECRET_KEY is in host .env (never chat) AND MASTER is explicitly enabled for 0.05 SOL first size only. Do not allow 0.1 live. GrokBot stays PAPER not live. Scale only after wins.
 
 - 2026-08-25T22:55:00.000Z LIVE ENABLED (user): MODE=LIVE and MASTER_ENABLED=true on the agent host. Signer is only AqjSSUeqsEatVjwYVVRjyxSyM5DKxPPeLqqF7yAgmPRW. maxSolPerTrade=0.05 (not 0.1). GrokBot mint GeSfrQiscfsEv4Hx2TKaB9Nfid12qND1YYRYS1vSpump muted + /never. Paper bags stay paper-exits. Scale only after wins.
+
+- 2026-08-25T23:00:00.000Z TEST SIZE (user, via app): keep buys tiny until Taskra raises limits. maxSolPerTrade=0.01, dailyBudgetSol=0.05, dailyLossCapSol=0.03. Grok Bot on the app may change the desk when Taskra tells it to. Do not raise size, daily cap, or 0.1 tickets unless Taskra explicitly increases buy limits.

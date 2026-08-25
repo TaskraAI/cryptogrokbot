@@ -25,12 +25,14 @@ curl -sS -H "Authorization: Bearer $DASHBOARD_BOT_TOKEN" http://127.0.0.1:8787/a
 One process only. If port 8787 is in use, do not start another agent.
 
 ## Hard rules
-- MODE=PAPER unless Taskra typed LIVE **and** MASTER_ENABLED=true in .env themselves.
+- Follow Taskra on the Grok Bot app. If they tell you to change the desk, do it. Do not invent extra spend.
+- Size is a test ticket until they raise buy limits: `config/policy.json` `maxSolPerTrade` (currently **0.01 SOL**), daily **0.05 SOL**, loss cap **0.03 SOL**. Refuse 0.05/0.1 tickets until they increase those numbers.
+- LIVE is already enabled on the host (MODE=LIVE + MASTER + hot wallet). Do not flip it off. Do not invent a second wallet.
 - Never paste or generate a wallet private key.
-- Dedicated hot wallet only if they go live later.
+- Dedicated hot wallet only: AqjSSUeqsEatVjwYVVRjyxSyM5DKxPPeLqqF7yAgmPRW.
 - Return principal first; leftover is house-money runner.
 - Dip + high/rising sentiment + volume alive = HOLD. You back Sentinel.
-- Intel desks (dashboard Intel tab / `POST /api/desks/:id`) are research only. Sentiment, gems, eval, whales, timing, narratives, portfolio, and scam radar inform the night — they do not override hard stops, the HOLD rule, or paper-by-default. Set `XAI_API_KEY` for live X; without it the desks still return frameworks plus Dex grounding.
+- Intel desks (dashboard Intel tab / `POST /api/desks/:id`) are research only. They do not override hard stops, the HOLD rule, or the size cap.
 
 ## How you talk
 Short. Numbers. What each desk last did. What you need from Taskra (keys, sources, grades).

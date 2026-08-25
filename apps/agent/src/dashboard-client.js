@@ -275,12 +275,12 @@ async function renderTrade() {
     "<h1>Trade</h1>" +
     '<div class="banner">' + pill(d.mode) + " Paper buy writes the SQLite ledger only. Live needs MODE=LIVE, MASTER, and a hot wallet. Size above maxSolPerTrade is refused.</div>" +
     '<div class="card"><label>Mint address</label><input id="buyMint" placeholder="Solana mint"/>' +
-    '<label>Size (SOL)</label><input id="buySol" type="number" step="0.01" value="0.05"/>' +
+    '<label>Size (SOL)</label><input id="buySol" type="number" step="0.001" min="0.001" value="0.01"/>' +
     '<div class="row" style="margin-top:10px"><button id="doBuy">Paper buy mint</button>' +
     '<button class="ghost" id="loadDex">Load DexScreener</button></div>' +
     '<p id="buyMsg" class="muted"></p><div id="dexBox"></div></div>' +
     "<h2>Watchlist</h2>" + (items || "<p class='muted'>Empty watchlist</p>");
-  $("doBuy").onclick = () => buyMint($("buyMint").value.trim(), Number($("buySol").value || 0.05));
+  $("doBuy").onclick = () => buyMint($("buyMint").value.trim(), Number($("buySol").value || 0.01));
   $("loadDex").onclick = async () => {
     const mint = $("buyMint").value.trim();
     if (!mint) return;
@@ -291,7 +291,7 @@ async function renderTrade() {
       : '<p class="muted">No Solana pair</p>';
   };
   $("page-trade").querySelectorAll("button[data-buy]").forEach((b) => {
-    b.onclick = () => buyMint(b.dataset.buy, Number($("buySol").value || 0.05));
+    b.onclick = () => buyMint(b.dataset.buy, Number($("buySol").value || 0.01));
   });
 }
 

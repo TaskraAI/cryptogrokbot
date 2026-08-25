@@ -185,7 +185,7 @@ x_accounts:
 
 > @Chief run `MODE=PAPER npm run agent -- --once` and paste the last decisions from the log. Do not go LIVE.
 
-**Expect:** A scoring pass, possible paper fill if a candidate clears `config/policy.json` (0.5 SOL/day, 5 trades, 0.1 SOL, min score 60, etc.). Most first ticks do nothing if sources are empty — that is correct.
+**Expect:** A scoring pass, possible fill if a candidate clears `config/policy.json` (test size: 0.05 SOL/day, 5 trades, 0.01 SOL each, min score 60, etc.). Most first ticks do nothing if sources are empty — that is correct.
 
 ### 5. Research a mint (Grok)
 

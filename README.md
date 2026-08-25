@@ -60,7 +60,7 @@ MODE=PAPER MASTER_ENABLED=false npm run agent -- --once
 npm run agent              # loop + dashboard http://127.0.0.1:8787/
 ```
 
-Default policy (`config/policy.json`): 0.5 SOL/day, 5 trades, 0.1 SOL each, −25% hard stop, return principal at 1x, 15% dip + sentiment ≥ 0.4 holds the runner.
+Default policy (`config/policy.json`): **0.05 SOL/day**, 5 trades, **0.01 SOL each** (test size until buy limits are raised), −25% hard stop, return principal at 1x, 15% dip + sentiment ≥ 0.4 holds the runner.
 
 ## Paper vs live
 
