@@ -20,8 +20,17 @@ export interface AuditorResult {
   at: number;
 }
 
-const SECRET_LINE =
-  /(?:WALLET_SECRET_KEY|CLOUDFLARE_API_TOKEN|CF_R2_SECRET_ACCESS_KEY|CF_R2_ACCESS_KEY_ID|DASHBOARD_PASSWORD|TELEGRAM_BOT_TOKEN|XAI_API_KEY|OPENAI_API_KEY|PUMPPORTAL_API_KEY)\s*=\s*\S+/;
+function assignmentLooksSecret(text: string): boolean {
+  const re =
+    /(?:WALLET_SECRET_KEY|CLOUDFLARE_API_TOKEN|CF_R2_SECRET_ACCESS_KEY|CF_R2_ACCESS_KEY_ID|DASHBOARD_PASSWORD|TELEGRAM_BOT_TOKEN|XAI_API_KEY|OPENAI_API_KEY|PUMPPORTAL_API_KEY)\s*=\s*(\S+)/g;
+  for (const m of text.matchAll(re)) {
+    const v = (m[1] ?? "").replace(/^["']|["']$/g, "");
+    if (!v || v.startsWith("#") || v === "false" || v === "PAPER" || v === "true") continue;
+    if (v.length >= 8) return true;
+  }
+  return false;
+}
+
 const SECRET_BLOB = /\b(cfat_[A-Za-z0-9]+|BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY)\b/;
 
 function trackedFiles(repoRoot: string): string[] {
@@ -80,7 +89,7 @@ function checkNoSecretsInGit(repoRoot: string): AuditorCheck {
       continue;
     }
     if (text.includes("\u0000")) continue;
-    if (SECRET_LINE.test(text) || SECRET_BLOB.test(text)) {
+    if (assignmentLooksSecret(text) || SECRET_BLOB.test(text)) {
       if (rel === ".env.example") continue;
       hits.push(rel);
     }

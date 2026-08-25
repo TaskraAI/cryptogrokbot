@@ -192,7 +192,10 @@ describe("auditor scan records", () => {
     const store = openStore(join(dir, "a.db"));
     expect(listTodos(store).length).toBeGreaterThanOrEqual(6);
     const result = await runAuditorScan({ store, repoRoot: process.cwd(), includeSubprocess: false });
-    expect(result.checks.some((c) => c.id === "paper-default")).toBe(true);
+    expect(result.checks.find((c) => c.id === "paper-default")?.ok).toBe(true);
+    expect(result.checks.find((c) => c.id === "no-secrets-in-git")?.ok).toBe(true);
+    expect(result.checks.find((c) => c.id === "live-fail-closed")?.ok).toBe(true);
+    expect(result.ok).toBe(true);
     const last = lastAuditorScan(store);
     expect(last).toBeTruthy();
     expect(last!.summary).toBe(result.summary);
