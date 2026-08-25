@@ -15,7 +15,7 @@ cp -n .env.example .env   # then Taskra must add keys; do not invent them
 MODE=PAPER npm run agent
 ```
 
-Crew board: `http://127.0.0.1:8787/` (or `https://dash.cryptogrokbot.com/` when the tunnel is up). Login is email + password + email code. Taskra invites you from Home → **Invite Grok Bot**. Then open the invite URL, or:
+Crew board: `http://127.0.0.1:8787/` (or **https://cryptogrokbot.com/** when the tunnel is up). `dash` / `app` / `www` redirect there. Login is email + password + email code. Taskra invites you from Home → **Invite Grok Bot**. Then open the invite URL, or:
 
 ```bash
 # after Taskra pastes the token (never invent one)

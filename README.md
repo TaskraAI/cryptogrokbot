@@ -36,27 +36,19 @@ Starter watchlist (BONK, WIF, POPCAT, TRUMP) is in [`config/sources.yaml`](confi
 
 ## cryptogrokbot.com
 
-Nameservers are on Cloudflare and the zone is **active**. Public NS lookups (1.1.1.1 / 8.8.8.8) return `kanye.ns.cloudflare.com` and `stella.ns.cloudflare.com`.
+The dashboard canonical URL is **https://cryptogrokbot.com/**.
 
-The dashboard process is still `npm run agent` on port **8787** (login required). This cloud VM is **not** a 24/7 VPS, so a hostname pointed here will go dark when the VM stops.
+`www`, `dash`, and `app` redirect there (301). Nameservers are on Cloudflare (`kanye.ns.cloudflare.com` / `stella.ns.cloudflare.com`). A Worker (`workers/cryptogrokbot.js`) fronts the origin; `npm run agent` on port **8787** plus a Cloudflare Tunnel must be running or the site returns 502.
 
-**API token cannot list or edit DNS records** (Cloudflare returns authentication error on DNS read/write). Apex and `www` still have leftover Namecheap parking / URL-forward records, so `http://cryptogrokbot.com` redirects to a parked page and HTTPS on apex/`www` has no cert yet.
-
-A named Cloudflare Tunnel `cryptogrokbot-dashboard` exists on the account. After you delete the parking records in the Cloudflare DNS UI, add proxied CNAMEs:
-
-- `cryptogrokbot.com` → `1a38795c-af25-4f8c-8dd1-7167da5b673c.cfargotunnel.com`
-- `www` → the same target
-
-Optional: `dash.cryptogrokbot.com` / `app.cryptogrokbot.com` were bound as Worker hostnames (no parking records there). They only serve the desk while `npm run agent` plus a tunnel origin are running.
+This cloud VM is **not** a 24/7 VPS — run the agent + tunnel on a durable host.
 
 On the durable host:
 
-1. Delete parking/URL-forward records for `@` and `www`.
-2. Add the CNAMEs above (or grant the API token **Zone.DNS Edit** and we can do it next time).
-3. Run `npm run agent` and `cloudflared tunnel run` with the named tunnel.
-4. Set `DASHBOARD_SECURE_COOKIE=true` behind HTTPS. Set `DASHBOARD_EMAIL` and `DASHBOARD_PASSWORD` in `.env` on that host only. Restart the agent. Login uses email verification (not authenticator). Invite Grok Bot from the Home Access card.
+1. Run `npm run agent` and `cloudflared tunnel run` with the named tunnel `cryptogrokbot-dashboard`.
+2. Set `DASHBOARD_SECURE_COOKIE=true` behind HTTPS. Set `DASHBOARD_EMAIL` and `DASHBOARD_PASSWORD` in `.env` on that host only.
+3. Login uses email verification. Invite Grok Bot from the Home Access card.
 
-`CLOUDFLARE_API_TOKEN` is used only to look up the zone / manage the tunnel. Never commit it. Placeholders are in `.env.example`.
+`CLOUDFLARE_API_TOKEN` is used to look up the zone / manage the tunnel and Worker. Never commit it. Placeholders are in `.env.example`.
 
 ## Night auto-buys (still paper)
 

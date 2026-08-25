@@ -100,15 +100,43 @@ function authed(req: IncomingMessage, ctx: DashboardContext): boolean {
 }
 
 function publicOrigin(req: IncomingMessage, cfg: AppConfig): string {
-  const xfProto = String(req.headers["x-forwarded-proto"] ?? "").split(",")[0]?.trim();
-  const proto = xfProto || (cfg.dashboardSecureCookie ? "https" : "http");
-  const host =
-    String(req.headers["x-forwarded-host"] ?? "")
-      .split(",")[0]
-      ?.trim() ||
-    String(req.headers.host ?? "").trim() ||
-    cfg.dashboardHost;
-  return `${proto}://${host}`;
+  const host = incomingHost(req);
+  if (!host || host === "127.0.0.1" || host === "localhost") {
+    const xfProto = String(req.headers["x-forwarded-proto"] ?? "").split(",")[0]?.trim();
+    const proto = xfProto || "http";
+    const raw = String(req.headers.host ?? cfg.dashboardHost);
+    return `${proto}://${raw}`;
+  }
+  return `https://${canonicalHost(cfg)}`;
+}
+
+function canonicalHost(cfg: AppConfig): string {
+  return (cfg.dashboardHost || "cryptogrokbot.com").replace(/^https?:\/\//, "").split("/")[0]!.toLowerCase();
+}
+
+function incomingHost(req: IncomingMessage): string {
+  const raw = String(req.headers["x-forwarded-host"] ?? req.headers.host ?? "");
+  return raw.split(",")[0]?.trim().toLowerCase().split(":")[0] ?? "";
+}
+
+const ALIAS_HOSTS = new Set(["www.cryptogrokbot.com", "dash.cryptogrokbot.com", "app.cryptogrokbot.com"]);
+
+function redirectAliasHost(
+  ctx: DashboardContext,
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+): boolean {
+  if (url.pathname === "/health") return false;
+  const host = incomingHost(req);
+  if (!host || host === "127.0.0.1" || host === "localhost") return false;
+  const canon = canonicalHost(ctx.cfg);
+  if (host === canon) return false;
+  if (!ALIAS_HOSTS.has(host) && host !== `www.${canon}`) return false;
+  const loc = `https://${canon}${url.pathname}${url.search}`;
+  res.writeHead(301, { location: loc, "cache-control": "no-store" });
+  res.end();
+  return true;
 }
 
 async function deliverCode(ctx: DashboardContext, to: string, code: string) {
@@ -183,6 +211,8 @@ export async function handleDashboardRequest(
   const path = url.pathname;
   const method = (req.method ?? "GET").toUpperCase();
   const mutating = !["GET", "HEAD", "OPTIONS"].includes(method);
+
+  if (redirectAliasHost(ctx, req, res, url)) return;
 
   if (path === "/health" && method === "GET") {
     json(res, 200, { ok: true, service: "cryptogrokbot-dashboard" });

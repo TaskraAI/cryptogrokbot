@@ -189,6 +189,25 @@ describe("dashboard auth and paper API", () => {
     expect(html).toContain('value="ops@taskra.ai"');
   });
 
+  it("redirects dash/app/www hosts to cryptogrokbot.com", async () => {
+    const { server, url } = await startCtx(tmp());
+    servers.push(server);
+    for (const host of ["dash.cryptogrokbot.com", "app.cryptogrokbot.com", "www.cryptogrokbot.com"]) {
+      const res = await fetch(`${url}/login?x=1`, {
+        redirect: "manual",
+        headers: { "x-forwarded-host": host, "x-forwarded-proto": "https" },
+      });
+      expect(res.status).toBe(301);
+      expect(res.headers.get("location")).toBe("https://cryptogrokbot.com/login?x=1");
+    }
+    const local = await fetch(`${url}/`, { redirect: "manual" });
+    expect(local.status).toBe(200);
+    const health = await fetch(`${url}/health`, {
+      headers: { "x-forwarded-host": "dash.cryptogrokbot.com" },
+    });
+    expect(health.status).toBe(200);
+  });
+
   it("rejects login with the wrong email", async () => {
     const { server, url } = await startCtx(tmp());
     servers.push(server);
