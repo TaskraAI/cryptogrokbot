@@ -9,4 +9,6 @@ coverage
 .turbo
 *.log
 .dashboard-password
+.dashboard-email
+.dashboard-totp
 wallet-secrets.json

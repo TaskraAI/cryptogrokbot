@@ -21,14 +21,23 @@ import { fetchDexToken } from "@night/signals";
 import type { TradeOutcome } from "./trade.ts";
 import { dashboardHtml } from "./dashboard-html.ts";
 import {
+  clearPendingCookieHeader,
   clearSessionCookieHeader,
+  emailsEqual,
+  loadTotpSecret,
   parseCookies,
   passwordsEqual,
+  PENDING_COOKIE,
+  pendingCookieHeader,
+  saveTotpSecret,
   SESSION_COOKIE,
   sessionCookieHeader,
+  signPending,
   signSession,
+  verifyPending,
   verifySession,
 } from "./auth.ts";
+import { generateTotpSecret, otpauthUrl, verifyTotp } from "./totp.ts";
 import { addWallet, listPublicWallets, removeWallet } from "./wallets.ts";
 import { auditorPulseDetail, runAuditorScan } from "./auditor.ts";
 import type { AppConfig } from "./config.ts";
@@ -40,6 +49,8 @@ export interface DashboardContext {
   policy: Policy;
   flags: () => RuntimeFlags;
   password: string;
+  email: string;
+  totpFile: string;
   buy: (opts: { mint: string; sol?: number; force?: boolean }) => Promise<TradeOutcome>;
   sell: (idOrMint: string) => Promise<TradeOutcome>;
   repoRoot?: string;
@@ -48,8 +59,12 @@ export interface DashboardContext {
 const JSON_H = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 const HTML_H = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" };
 
-function json(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, JSON_H);
+function json(res: ServerResponse, status: number, body: unknown, cookies?: string[]): void {
+  if (cookies?.length) {
+    res.writeHead(status, { ...JSON_H, "set-cookie": cookies });
+  } else {
+    res.writeHead(status, JSON_H);
+  }
   res.end(JSON.stringify(body));
 }
 
@@ -145,26 +160,107 @@ export async function handleDashboardRequest(
       json(res, 400, { error: "invalid json" });
       return;
     }
-    if (!passwordsEqual(str(body.password), ctx.password)) {
+    const email = str(body.email);
+    const password = str(body.password);
+    const code = str(body.code);
+    const secure = isSecure(req, ctx.cfg);
+    if (!emailsEqual(email, ctx.email) || !passwordsEqual(password, ctx.password)) {
       json(res, 401, { error: "unauthorized" });
       return;
     }
-    const token = signSession(ctx.password);
-    res.writeHead(200, {
-      ...JSON_H,
-      "set-cookie": sessionCookieHeader(token, isSecure(req, ctx.cfg)),
-    });
-    res.end(JSON.stringify({ ok: true }));
+    const totpSecret = loadTotpSecret(ctx.totpFile);
+    if (!totpSecret) {
+      const pendingSecret = generateTotpSecret();
+      const token = signPending(ctx.password, "enroll", pendingSecret);
+      json(
+        res,
+        200,
+        {
+          ok: false,
+          step: "enroll",
+          email: ctx.email,
+          secret: pendingSecret,
+          otpauth: otpauthUrl({ email: ctx.email, secret: pendingSecret }),
+        },
+        [pendingCookieHeader(token, secure), clearSessionCookieHeader(secure)],
+      );
+      return;
+    }
+    if (!code) {
+      const token = signPending(ctx.password, "totp");
+      json(res, 200, { ok: false, step: "totp" }, [
+        pendingCookieHeader(token, secure),
+        clearSessionCookieHeader(secure),
+      ]);
+      return;
+    }
+    if (!verifyTotp(totpSecret, code)) {
+      json(res, 401, { error: "invalid 2fa code" });
+      return;
+    }
+    const session = signSession(ctx.password);
+    json(res, 200, { ok: true }, [sessionCookieHeader(session, secure), clearPendingCookieHeader(secure)]);
+    return;
+  }
+
+  if (path === "/api/2fa/enroll" && method === "POST") {
+    let body: Record<string, unknown> = {};
+    try {
+      body = await readJson(req);
+    } catch {
+      json(res, 400, { error: "invalid json" });
+      return;
+    }
+    const pending = parseCookies(req.headers.cookie)[PENDING_COOKIE] ?? "";
+    const checked = verifyPending(pending, ctx.password, "enroll");
+    if (!checked.ok || !checked.extra) {
+      json(res, 401, { error: "2fa setup expired — log in again" });
+      return;
+    }
+    if (loadTotpSecret(ctx.totpFile)) {
+      json(res, 409, { error: "2fa already enrolled" });
+      return;
+    }
+    if (!verifyTotp(checked.extra, str(body.code))) {
+      json(res, 401, { error: "invalid 2fa code" });
+      return;
+    }
+    saveTotpSecret(ctx.totpFile, checked.extra);
+    const secure = isSecure(req, ctx.cfg);
+    const session = signSession(ctx.password);
+    json(res, 200, { ok: true }, [sessionCookieHeader(session, secure), clearPendingCookieHeader(secure)]);
+    return;
+  }
+
+  if (path === "/api/2fa/verify" && method === "POST") {
+    let body: Record<string, unknown> = {};
+    try {
+      body = await readJson(req);
+    } catch {
+      json(res, 400, { error: "invalid json" });
+      return;
+    }
+    const pending = parseCookies(req.headers.cookie)[PENDING_COOKIE] ?? "";
+    const checked = verifyPending(pending, ctx.password, "totp");
+    if (!checked.ok) {
+      json(res, 401, { error: "2fa expired — log in again" });
+      return;
+    }
+    const totpSecret = loadTotpSecret(ctx.totpFile);
+    if (!totpSecret || !verifyTotp(totpSecret, str(body.code))) {
+      json(res, 401, { error: "invalid 2fa code" });
+      return;
+    }
+    const secure = isSecure(req, ctx.cfg);
+    const session = signSession(ctx.password);
+    json(res, 200, { ok: true }, [sessionCookieHeader(session, secure), clearPendingCookieHeader(secure)]);
     return;
   }
 
   if (path === "/api/logout" && method === "POST") {
     await readBody(req).catch(() => "");
-    res.writeHead(200, {
-      ...JSON_H,
-      "set-cookie": clearSessionCookieHeader(isSecure(req, ctx.cfg)),
-    });
-    res.end(JSON.stringify({ ok: true }));
+    const secure = isSecure(req, ctx.cfg);
+    json(res, 200, { ok: true }, [clearSessionCookieHeader(secure), clearPendingCookieHeader(secure)]);
     return;
   }
 
@@ -208,6 +304,8 @@ async function routeAuthed(
       mode: flags.mode,
       masterEnabled: flags.masterEnabled,
       host: ctx.cfg.dashboardHost,
+      email: ctx.email,
+      twoFactor: true,
     });
     return;
   }

@@ -6,7 +6,7 @@ import { createTelegramBot } from "@night/telegram";
 import { loadAppConfig, loadPolicy } from "./config.ts";
 import { AgentRuntime } from "./loop.ts";
 import { pulseAuditorFromStore, startCrewServer, type DashboardContext } from "./board.ts";
-import { resolveDashboardPassword } from "./auth.ts";
+import { loadTotpSecret, resolveDashboardEmail, resolveDashboardPassword } from "./auth.ts";
 import { buyChosenMint, sellChosen } from "./trade.ts";
 import { probeCloudflare, formatCloudflareProbe } from "./cloudflare.ts";
 import { runAuditorScan } from "./auditor.ts";
@@ -22,6 +22,11 @@ async function main(): Promise<void> {
     envPassword: cfg.dashboardPassword,
     filePath: cfg.dashboardPasswordFile,
   });
+  const em = resolveDashboardEmail({
+    envEmail: cfg.dashboardEmail,
+    filePath: cfg.dashboardEmailFile,
+    fallback: "hello@taskra.ai",
+  });
   if (pw.generated) {
     console.log(`Dashboard password (generated once, gitignored ${cfg.dashboardPasswordFile}): ${pw.password}`);
   } else if (pw.source === "file") {
@@ -29,6 +34,13 @@ async function main(): Promise<void> {
   } else {
     console.log("Dashboard login: DASHBOARD_PASSWORD is set (not printed)");
   }
+  console.log(`Dashboard login email: ${em.email}`);
+  const totpOn = Boolean(loadTotpSecret(cfg.dashboardTotpFile));
+  console.log(
+    totpOn
+      ? "Dashboard 2FA: enrolled (Authenticator)"
+      : "Dashboard 2FA: not enrolled — first login will show a setup code",
+  );
 
   const dash: DashboardContext = {
     store,
@@ -37,6 +49,8 @@ async function main(): Promise<void> {
     policy,
     flags: () => runtime.currentFlags(),
     password: pw.password,
+    email: em.email,
+    totpFile: cfg.dashboardTotpFile,
     repoRoot: resolve("."),
     buy: (opts) =>
       buyChosenMint({

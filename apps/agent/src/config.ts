@@ -22,6 +22,9 @@ export interface AppConfig {
   dashboardHost: string;
   dashboardPassword: string;
   dashboardPasswordFile: string;
+  dashboardEmail: string;
+  dashboardEmailFile: string;
+  dashboardTotpFile: string;
   dashboardSecureCookie: boolean;
   walletSecretsPath: string;
   databasePath: string;
@@ -56,6 +59,9 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     dashboardHost: env.DASHBOARD_HOST ?? "cryptogrokbot.com",
     dashboardPassword: env.DASHBOARD_PASSWORD ?? "",
     dashboardPasswordFile: resolve(env.DASHBOARD_PASSWORD_FILE ?? "./data/.dashboard-password"),
+    dashboardEmail: env.DASHBOARD_EMAIL ?? "",
+    dashboardEmailFile: resolve(env.DASHBOARD_EMAIL_FILE ?? "./data/.dashboard-email"),
+    dashboardTotpFile: resolve(env.DASHBOARD_TOTP_FILE ?? "./data/.dashboard-totp"),
     dashboardSecureCookie: env.DASHBOARD_SECURE_COOKIE === "true",
     walletSecretsPath: resolve(env.WALLET_SECRETS_PATH ?? "./data/wallet-secrets.json"),
     databasePath: resolve(env.DATABASE_PATH ?? "./data/night-agent.db"),

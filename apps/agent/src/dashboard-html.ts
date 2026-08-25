@@ -78,10 +78,31 @@ export function dashboardHtml(): string {
 <div id="login" class="login hidden">
   <h1>CryptoGrokBot</h1>
   <p class="muted">cryptogrokbot.com · paper by default · not financial advice</p>
-  <label>Dashboard password</label>
-  <input id="pw" type="password" autocomplete="current-password" />
-  <p id="loginErr" class="bad"></p>
-  <button id="loginBtn" style="width:100%;margin-top:12px">Log in</button>
+  <div id="loginStepCreds">
+    <label>Email</label>
+    <input id="email" type="email" autocomplete="username" inputmode="email" />
+    <label>Password</label>
+    <input id="pw" type="password" autocomplete="current-password" />
+    <p id="loginErr" class="bad"></p>
+    <button id="loginBtn" style="width:100%;margin-top:12px">Continue</button>
+  </div>
+  <div id="loginStepTotp" class="hidden">
+    <p class="muted">Enter the 6-digit code from your authenticator app.</p>
+    <label>2FA code</label>
+    <input id="totp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
+    <p id="totpErr" class="bad"></p>
+    <button id="totpBtn" style="width:100%;margin-top:12px">Verify</button>
+    <button id="totpBack" class="ghost" style="width:100%;margin-top:8px">Back</button>
+  </div>
+  <div id="loginStepEnroll" class="hidden">
+    <p>Add this account in <b>Google Authenticator</b>, <b>Authy</b>, or iOS Passwords, then enter the first code.</p>
+    <p><a id="otpauthLink" href="#">Open authenticator</a></p>
+    <p class="mint" id="totpSecret"></p>
+    <label>First 2FA code</label>
+    <input id="enrollCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
+    <p id="enrollErr" class="bad"></p>
+    <button id="enrollBtn" style="width:100%;margin-top:12px">Enable 2FA and log in</button>
+  </div>
 </div>
 <div id="app" class="hidden">
   <div class="wrap">
@@ -136,15 +157,63 @@ document.querySelectorAll(".nav button").forEach((b) => b.addEventListener("clic
 
 $("loginBtn").addEventListener("click", login);
 $("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
+$("email").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
+$("totpBtn").addEventListener("click", verifyTotpStep);
+$("totp").addEventListener("keydown", (e) => { if (e.key === "Enter") verifyTotpStep(); });
+$("totpBack").addEventListener("click", () => showLoginStep("creds"));
+$("enrollBtn").addEventListener("click", enrollTotp);
+$("enrollCode").addEventListener("keydown", (e) => { if (e.key === "Enter") enrollTotp(); });
+
+function showLoginStep(step) {
+  $("loginStepCreds").classList.toggle("hidden", step !== "creds");
+  $("loginStepTotp").classList.toggle("hidden", step !== "totp");
+  $("loginStepEnroll").classList.toggle("hidden", step !== "enroll");
+}
 
 async function login() {
   $("loginErr").textContent = "";
   try {
-    await api("/api/login", { method: "POST", body: JSON.stringify({ password: $("pw").value }) });
+    const data = await api("/api/login", {
+      method: "POST",
+      body: JSON.stringify({ email: $("email").value, password: $("pw").value }),
+    });
     $("pw").value = "";
+    if (data.step === "enroll") {
+      $("otpauthLink").href = data.otpauth;
+      $("totpSecret").textContent = data.secret;
+      showLoginStep("enroll");
+      return;
+    }
+    if (data.step === "totp") {
+      showLoginStep("totp");
+      $("totp").focus();
+      return;
+    }
     showApp();
   } catch (e) {
     $("loginErr").textContent = e.message || "login failed";
+  }
+}
+
+async function verifyTotpStep() {
+  $("totpErr").textContent = "";
+  try {
+    await api("/api/2fa/verify", { method: "POST", body: JSON.stringify({ code: $("totp").value }) });
+    $("totp").value = "";
+    showApp();
+  } catch (e) {
+    $("totpErr").textContent = e.message || "2fa failed";
+  }
+}
+
+async function enrollTotp() {
+  $("enrollErr").textContent = "";
+  try {
+    await api("/api/2fa/enroll", { method: "POST", body: JSON.stringify({ code: $("enrollCode").value }) });
+    $("enrollCode").value = "";
+    showApp();
+  } catch (e) {
+    $("enrollErr").textContent = e.message || "2fa setup failed";
   }
 }
 
@@ -157,6 +226,7 @@ async function showApp() {
 function showLogin() {
   $("app").classList.add("hidden");
   $("login").classList.remove("hidden");
+  showLoginStep("creds");
 }
 
 function esc(s) {
