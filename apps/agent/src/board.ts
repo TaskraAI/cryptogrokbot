@@ -81,10 +81,13 @@ function json(res: ServerResponse, status: number, body: unknown, cookies?: stri
   res.end(JSON.stringify(body));
 }
 
-function isSecure(req: IncomingMessage, cfg: AppConfig): boolean {
-  if (cfg.dashboardSecureCookie) return true;
-  const proto = String(req.headers["x-forwarded-proto"] ?? "").split(",")[0]?.trim();
-  return proto === "https";
+function isSecure(req: IncomingMessage, _cfg: AppConfig): boolean {
+  // Only mark cookies Secure when the request is actually HTTPS. Forcing
+  // Secure because DASHBOARD_BIND is public (or DASHBOARD_SECURE_COOKIE=true)
+  // makes browsers drop the cookie on plain HTTP, so login never sticks.
+  if (req.socket && (req.socket as { encrypted?: boolean }).encrypted) return true;
+  const xf = String(req.headers["x-forwarded-proto"] ?? "").split(",")[0]?.trim().toLowerCase();
+  return xf === "https";
 }
 
 function authed(req: IncomingMessage, ctx: DashboardContext): boolean {
@@ -188,7 +191,7 @@ export async function handleDashboardRequest(
 
   if ((path === "/" || path === "/login" || path === "/index.html") && method === "GET") {
     res.writeHead(200, HTML_H);
-    res.end(dashboardHtml());
+    res.end(dashboardHtml({ ownerEmail: ctx.email }));
     return;
   }
 

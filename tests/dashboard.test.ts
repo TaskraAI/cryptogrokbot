@@ -168,9 +168,21 @@ describe("dashboard auth and paper API", () => {
     expect(html).toContain("Invite Grok Bot");
     expect(html).toContain("Join with invite");
     expect(html).toContain("Log in");
+    expect(html).toContain('<form id="loginStepCreds">');
+    expect(html).toContain('<form id="loginStepEmail"');
+    expect(html).toContain('type="submit"');
+    expect(html).toContain('id="login" class="login"');
+    expect(html).not.toContain('id="login" class="login hidden"');
     expect(html).not.toContain("not financial advice");
     expect(html).not.toContain("Dashboard password");
     expect(html).not.toContain("Google Authenticator");
+  });
+
+  it("prefills the configured owner email on the login form", async () => {
+    const { server, url } = await startCtx(tmp(), "test-dashboard-pass", "ops@taskra.ai");
+    servers.push(server);
+    const html = await (await fetch(`${url}/`)).text();
+    expect(html).toContain('value="ops@taskra.ai"');
   });
 
   it("rejects login with the wrong email", async () => {
@@ -232,6 +244,47 @@ describe("dashboard auth and paper API", () => {
     const meBody = (await me.json()) as { email?: string; twoFactor?: string };
     expect(meBody.email).toBe("hello@taskra.ai");
     expect(meBody.twoFactor).toBe("email");
+  });
+
+  it("does not set Secure on HTTP cookies even when dashboardSecureCookie is true", async () => {
+    const { server, url, ctx } = await startCtx(tmp(), "pw-http");
+    servers.push(server);
+    ctx.cfg.dashboardSecureCookie = true;
+    const first = await fetch(`${url}/api/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "hello@taskra.ai", password: "pw-http" }),
+    });
+    expect(first.status).toBe(200);
+    const cookies =
+      typeof first.headers.getSetCookie === "function"
+        ? first.headers.getSetCookie()
+        : [first.headers.get("set-cookie") ?? ""];
+    expect(cookies.join("\n")).toMatch(/cg_pending=/);
+    for (const cookie of cookies.filter(Boolean)) {
+      const attrs = cookie.split(";").slice(1).join(";").toLowerCase();
+      expect(attrs).not.toContain("secure");
+    }
+  });
+
+  it("sets Secure cookies when the request is HTTPS via x-forwarded-proto", async () => {
+    const { server, url } = await startCtx(tmp(), "pw-https");
+    servers.push(server);
+    const first = await fetch(`${url}/api/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-proto": "https",
+      },
+      body: JSON.stringify({ email: "hello@taskra.ai", password: "pw-https" }),
+    });
+    expect(first.status).toBe(200);
+    const raw =
+      typeof first.headers.getSetCookie === "function"
+        ? first.headers.getSetCookie().join("\n")
+        : (first.headers.get("set-cookie") ?? "");
+    expect(raw).toMatch(/cg_pending=/);
+    expect(raw).toMatch(/Secure/);
   });
 
   it("invites Grok Bot and lets the token open the dashboard", async () => {

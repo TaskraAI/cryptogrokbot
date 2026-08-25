@@ -1,4 +1,9 @@
-export function dashboardHtml(): string {
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+export function dashboardHtml(opts?: { ownerEmail?: string }): string {
+  const ownerEmail = escapeAttr(opts?.ownerEmail?.trim() || "hello@taskra.ai");
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -72,34 +77,35 @@ export function dashboardHtml(): string {
       font-size: 13px; margin: 8px 0 12px; }
     label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 6px; }
     .pulse-age { font-size: 12px; color: var(--muted); }
+    .login form { margin: 0; }
   </style>
 </head>
 <body>
-<div id="login" class="login hidden">
+<div id="login" class="login">
   <h1>CryptoGrokBot</h1>
   <p class="muted">cryptogrokbot.com</p>
-  <div id="loginStepCreds">
+  <form id="loginStepCreds">
     <label for="email">Email</label>
-    <input id="email" type="email" autocomplete="username" inputmode="email" value="hello@taskra.ai" />
+    <input id="email" name="email" type="email" autocomplete="username" inputmode="email" value="${ownerEmail}" />
     <label for="pw">Password</label>
-    <input id="pw" type="password" autocomplete="current-password" />
+    <input id="pw" name="password" type="password" autocomplete="current-password" />
     <p id="loginErr" class="bad"></p>
-    <button id="loginBtn" style="width:100%;margin-top:12px">Log in</button>
+    <button id="loginBtn" type="submit" style="width:100%;margin-top:12px">Log in</button>
     <p class="muted" style="margin-top:20px">Grok Bot invite</p>
     <label for="inviteToken">Invite token or URL</label>
-    <input id="inviteToken" autocomplete="off" placeholder="cgbot_… or https://…/invite/…" />
+    <input id="inviteToken" name="invite" autocomplete="off" placeholder="cgbot_… or https://…/invite/…" />
     <p id="inviteErr" class="bad"></p>
-    <button id="inviteBtn" class="ghost" style="width:100%;margin-top:8px">Join with invite</button>
-  </div>
-  <div id="loginStepEmail" class="hidden">
+    <button id="inviteBtn" type="button" class="ghost" style="width:100%;margin-top:8px">Join with invite</button>
+  </form>
+  <form id="loginStepEmail" class="hidden">
     <p class="muted">Enter the 6-digit code sent to <b id="emailTo"></b>.</p>
     <p class="mint hidden" id="devCodeBox"></p>
     <label for="emailCode">Email code</label>
-    <input id="emailCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
+    <input id="emailCode" name="emailCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
     <p id="emailErr" class="bad"></p>
-    <button id="emailBtn" style="width:100%;margin-top:12px">Verify email</button>
-    <button id="emailBack" class="ghost" style="width:100%;margin-top:8px">Back</button>
-  </div>
+    <button id="emailBtn" type="submit" style="width:100%;margin-top:12px">Verify email</button>
+    <button id="emailBack" type="button" class="ghost" style="width:100%;margin-top:8px">Back</button>
+  </form>
 </div>
 <div id="app" class="hidden">
   <div class="wrap">
@@ -152,13 +158,13 @@ function go(name) {
 
 document.querySelectorAll(".nav button").forEach((b) => b.addEventListener("click", () => go(b.dataset.page)));
 
-$("loginBtn").addEventListener("click", login);
-$("pw").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
-$("email").addEventListener("keydown", (e) => { if (e.key === "Enter") login(); });
-$("emailBtn").addEventListener("click", verifyEmailStep);
-$("emailCode").addEventListener("keydown", (e) => { if (e.key === "Enter") verifyEmailStep(); });
+$("loginStepCreds").addEventListener("submit", (e) => { e.preventDefault(); login(); });
+$("loginStepEmail").addEventListener("submit", (e) => { e.preventDefault(); verifyEmailStep(); });
 $("emailBack").addEventListener("click", () => showLoginStep("creds"));
 $("inviteBtn").addEventListener("click", joinInvite);
+$("inviteToken").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); joinInvite(); }
+});
 
 function showLoginStep(step) {
   $("loginStepCreds").classList.toggle("hidden", step !== "creds");
