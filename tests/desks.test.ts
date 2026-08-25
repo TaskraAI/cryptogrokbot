@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -146,14 +146,14 @@ describe("intel desks", () => {
 
   it("embeds Intel on the dashboard shell", () => {
     const html = dashboardHtml();
+    const js = readFileSync(join(process.cwd(), "apps/agent/src/dashboard-client.js"), "utf8");
     expect(html).toContain('data-page="intel"');
     expect(html).toContain(">Intel<");
-    expect(html).toContain("Open Intel");
-    expect(html).toContain("/api/desks");
-    expect(html).toContain("X sentiment, gems, project eval");
-    const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-    expect(script).toBeTruthy();
-    expect(() => new Function(script!)).not.toThrow();
+    expect(html).toContain('src="/dashboard.js"');
+    expect(js).toContain("Open Intel");
+    expect(js).toContain("/api/desks");
+    expect(js).toContain("X sentiment, gems, project eval");
+    expect(() => new Function(js)).not.toThrow();
   });
 
   it("returns a numbered offline framework when no model keys are set", async () => {

@@ -5,6 +5,16 @@ const REDIRECT_HOSTS = new Set([
   "app.cryptogrokbot.com",
 ]);
 
+/** Patch origin HTML so a hung/broken login script cannot leave a blank page. */
+export function repairDashboardHtml(html) {
+  return html
+    .replaceAll('id="login" class="login hidden"', 'id="login" class="login"')
+    .replaceAll(
+      "raw.match(//invite/([^/?#]+)/)",
+      'raw.match(new RegExp("/invite/([^/?#]+)"))',
+    );
+}
+
 export default {
   async fetch(request, env) {
     const incoming = new URL(request.url);
@@ -28,7 +38,15 @@ export default {
       init.body = request.body;
     }
     try {
-      return await fetch(target, init);
+      const res = await fetch(target, init);
+      const ct = res.headers.get("content-type") || "";
+      if (request.method === "GET" && res.ok && ct.includes("text/html")) {
+        const html = repairDashboardHtml(await res.text());
+        const out = new Headers(res.headers);
+        out.delete("content-length");
+        return new Response(html, { status: res.status, statusText: res.statusText, headers: out });
+      }
+      return res;
     } catch {
       return new Response("origin unreachable", { status: 502, headers: { "content-type": "text/plain" } });
     }

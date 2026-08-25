@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { type Policy, type RuntimeFlags, type Grade } from "@night/shared";
 import { CrewBoard, CREW_META } from "@night/crew";
 import {
@@ -72,6 +75,11 @@ export interface DashboardContext {
 
 const JSON_H = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 const HTML_H = { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" };
+const JS_H = { "content-type": "application/javascript; charset=utf-8", "cache-control": "no-store" };
+const DASHBOARD_CLIENT_JS = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), "dashboard-client.js"),
+  "utf8",
+);
 
 function json(res: ServerResponse, status: number, body: unknown, cookies?: string[]): void {
   if (cookies?.length) {
@@ -215,14 +223,22 @@ export async function handleDashboardRequest(
 
   if (redirectAliasHost(ctx, req, res, url)) return;
 
-  if (path === "/health" && method === "GET") {
+  if (path === "/health" && (method === "GET" || method === "HEAD")) {
     json(res, 200, { ok: true, service: "cryptogrokbot-dashboard" });
     return;
   }
 
-  if ((path === "/" || path === "/login" || path === "/index.html") && method === "GET") {
+  if ((path === "/dashboard.js" || path === "/assets/dashboard.js") && (method === "GET" || method === "HEAD")) {
+    res.writeHead(200, JS_H);
+    if (method === "HEAD") res.end();
+    else res.end(DASHBOARD_CLIENT_JS);
+    return;
+  }
+
+  if ((path === "/" || path === "/login" || path === "/index.html") && (method === "GET" || method === "HEAD")) {
     res.writeHead(200, HTML_H);
-    res.end(dashboardHtml({ ownerEmail: ctx.email }));
+    if (method === "HEAD") res.end();
+    else res.end(dashboardHtml({ ownerEmail: ctx.email }));
     return;
   }
 
