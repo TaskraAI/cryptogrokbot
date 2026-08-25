@@ -1,4 +1,4 @@
-export type CrewId = "chief" | "scout" | "sentinel" | "grok" | "scholar";
+export type CrewId = "chief" | "scout" | "sentinel" | "grok" | "scholar" | "auditor";
 
 export type CrewStatus = "idle" | "running" | "blocked" | "error";
 
@@ -17,6 +17,7 @@ export const CREW_META: Record<CrewId, { title: string; job: string }> = {
   sentinel: { title: "Sentinel", job: "tape, exits, dip-hold" },
   grok: { title: "Grok", job: "thesis + runner gray-zone (xAI)" },
   scholar: { title: "Scholar", job: "journal, mistakes, extra rules" },
+  auditor: { title: "Auditor", job: "bug scan, typecheck, paper/live fail-closed" },
 };
 
 export class CrewBoard {

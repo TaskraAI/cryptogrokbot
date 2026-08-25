@@ -14,7 +14,7 @@ Official docs: [Grok Bot overview](https://docs.x.ai/grok-bot/overview) · [Agen
 
 ## What you should see
 
-Five named teammates in the sidebar, plus one **group chat**:
+Five named teammates in the sidebar, plus one **group chat** (six desks if you add Auditor):
 
 | Bot | Job you watch |
 |-----|----------------|
@@ -23,6 +23,7 @@ Five named teammates in the sidebar, plus one **group chat**:
 | **Sentinel** | Tape: dip+sentiment = HOLD; fade/dump = sell |
 | **Grok** | Thesis + xAI research (needs `XAI_API_KEY` in `.env` on the computer) |
 | **Scholar** | `/review`, grades, extra rules |
+| **Auditor** | Bug scan, paper default, secrets off git |
 
 The Node process they start prints a live board at `http://127.0.0.1:8787/` **on Grok Bot’s computer** (not your laptop). Ask any bot: *open the crew board in the browser*.
 

@@ -124,7 +124,40 @@ function migrate(db: DatabaseSync): void {
       text TEXT NOT NULL,
       consumed INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS wallets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      label TEXT NOT NULL,
+      public_key TEXT NOT NULL DEFAULT '',
+      has_secret INTEGER NOT NULL DEFAULT 0,
+      assigned_desk TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS todos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      done INTEGER NOT NULL DEFAULT 0,
+      sort INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS feedback (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      at INTEGER NOT NULL,
+      text TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'improve'
+    );
+
+    CREATE TABLE IF NOT EXISTS auditor_scans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      at INTEGER NOT NULL,
+      ok INTEGER NOT NULL,
+      summary TEXT NOT NULL,
+      details_json TEXT NOT NULL
+    );
   `);
+  seedStarterTodos(db);
 }
 
 export function setFlag(store: Store, key: string, value: string): void {
@@ -467,4 +500,143 @@ export function recentDecisions(store: Store, mint: string, limit = 15) {
       payload_json: string | null;
     }>
   >(store.db.prepare("SELECT * FROM decisions WHERE mint = ? ORDER BY id DESC LIMIT ?").all(mint, limit));
+}
+
+const STARTER_TODOS = [
+  "Connect the GitHub plugin / sign in so this repo can open PRs",
+  "Paper-buy a watchlist mint from Trade (MODE stays PAPER)",
+  "Grade a paper fill win / meh / fail on Improve",
+  "Toggle extra rules on Improve and leave a lesson",
+  "Add a hot-wallet public key (secret stays on the server)",
+  "Run the Auditor bug scan from Crew or Home",
+  "Set DASHBOARD_PASSWORD in .env so login is not a generated file",
+  "Read paper vs live before ever setting MASTER_ENABLED=true",
+];
+
+function seedStarterTodos(db: DatabaseSync): void {
+  const row = db.prepare("SELECT COUNT(*) AS c FROM todos").get() as { c: number };
+  if (row.c > 0) return;
+  const ins = db.prepare("INSERT INTO todos (title, done, sort, created_at) VALUES (?, 0, ?, ?)");
+  const now = Date.now();
+  STARTER_TODOS.forEach((title, i) => ins.run(title, i, now));
+}
+
+export interface WalletRow {
+  id: number;
+  label: string;
+  public_key: string;
+  has_secret: number;
+  assigned_desk: string;
+  created_at: number;
+}
+
+export function listWallets(store: Store): WalletRow[] {
+  return asRows<WalletRow[]>(store.db.prepare("SELECT * FROM wallets ORDER BY id").all());
+}
+
+export function insertWallet(
+  store: Store,
+  w: { label: string; publicKey: string; hasSecret: boolean; assignedDesk: string },
+): WalletRow {
+  const result = store.db
+    .prepare("INSERT INTO wallets (label, public_key, has_secret, assigned_desk, created_at) VALUES (?, ?, ?, ?, ?)")
+    .run(w.label, w.publicKey, w.hasSecret ? 1 : 0, w.assignedDesk, Date.now());
+  const id = Number(result.lastInsertRowid);
+  return getWallet(store, id)!;
+}
+
+export function getWallet(store: Store, id: number): WalletRow | undefined {
+  return store.db.prepare("SELECT * FROM wallets WHERE id = ?").get(id) as WalletRow | undefined;
+}
+
+export function updateWalletSecretFlag(store: Store, id: number, hasSecret: boolean): void {
+  store.db.prepare("UPDATE wallets SET has_secret = ? WHERE id = ?").run(hasSecret ? 1 : 0, id);
+}
+
+export function deleteWallet(store: Store, id: number): boolean {
+  const r = store.db.prepare("DELETE FROM wallets WHERE id = ?").run(id);
+  return r.changes > 0;
+}
+
+export interface TodoRow {
+  id: number;
+  title: string;
+  done: number;
+  sort: number;
+  created_at: number;
+}
+
+export function listTodos(store: Store): TodoRow[] {
+  return asRows<TodoRow[]>(store.db.prepare("SELECT * FROM todos ORDER BY sort, id").all());
+}
+
+export function insertTodo(store: Store, title: string): TodoRow {
+  const sortRow = store.db.prepare("SELECT COALESCE(MAX(sort), -1) AS m FROM todos").get() as { m: number };
+  const result = store.db
+    .prepare("INSERT INTO todos (title, done, sort, created_at) VALUES (?, 0, ?, ?)")
+    .run(title, sortRow.m + 1, Date.now());
+  return store.db.prepare("SELECT * FROM todos WHERE id = ?").get(Number(result.lastInsertRowid)) as unknown as TodoRow;
+}
+
+export function setTodoDone(store: Store, id: number, done: boolean): TodoRow | undefined {
+  store.db.prepare("UPDATE todos SET done = ? WHERE id = ?").run(done ? 1 : 0, id);
+  return store.db.prepare("SELECT * FROM todos WHERE id = ?").get(id) as unknown as TodoRow | undefined;
+}
+
+export function deleteTodo(store: Store, id: number): boolean {
+  return store.db.prepare("DELETE FROM todos WHERE id = ?").run(id).changes > 0;
+}
+
+export interface FeedbackRow {
+  id: number;
+  at: number;
+  text: string;
+  kind: string;
+}
+
+export function listFeedback(store: Store, limit = 40): FeedbackRow[] {
+  return asRows<FeedbackRow[]>(store.db.prepare("SELECT * FROM feedback ORDER BY id DESC LIMIT ?").all(limit));
+}
+
+export function insertFeedback(store: Store, text: string, kind = "improve"): FeedbackRow {
+  const result = store.db.prepare("INSERT INTO feedback (at, text, kind) VALUES (?, ?, ?)").run(Date.now(), text, kind);
+  return store.db.prepare("SELECT * FROM feedback WHERE id = ?").get(Number(result.lastInsertRowid)) as unknown as FeedbackRow;
+}
+
+export interface AuditorScanRow {
+  id: number;
+  at: number;
+  ok: number;
+  summary: string;
+  details_json: string;
+}
+
+export function insertAuditorScan(
+  store: Store,
+  scan: { ok: boolean; summary: string; details: unknown },
+): AuditorScanRow {
+  store.db
+    .prepare("INSERT INTO auditor_scans (at, ok, summary, details_json) VALUES (?, ?, ?, ?)")
+    .run(Date.now(), scan.ok ? 1 : 0, scan.summary, JSON.stringify(scan.details));
+  return lastAuditorScan(store)!;
+}
+
+export function lastAuditorScan(store: Store): AuditorScanRow | undefined {
+  return store.db.prepare("SELECT * FROM auditor_scans ORDER BY id DESC LIMIT 1").get() as AuditorScanRow | undefined;
+}
+
+export function listAuditorScans(store: Store, limit = 10): AuditorScanRow[] {
+  return asRows<AuditorScanRow[]>(store.db.prepare("SELECT * FROM auditor_scans ORDER BY id DESC LIMIT ?").all(limit));
+}
+
+export function listRecentPositions(store: Store, limit = 40): PositionRow[] {
+  return asRows<PositionRow[]>(store.db.prepare("SELECT * FROM positions ORDER BY id DESC LIMIT ?").all(limit));
+}
+
+export function listUngradedClosed(store: Store, limit = 20): PositionRow[] {
+  return asRows<PositionRow[]>(
+    store.db
+      .prepare("SELECT * FROM positions WHERE status = 'closed' AND (grade IS NULL OR grade = '') ORDER BY id DESC LIMIT ?")
+      .all(limit),
+  );
 }

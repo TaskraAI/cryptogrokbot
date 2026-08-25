@@ -13,6 +13,8 @@ describe("crew board", () => {
     const text = board.formatText();
     expect(text).toMatch(/Scout/);
     expect(text).toMatch(/Sentinel/);
+    expect(text).toMatch(/Auditor/);
+    expect(board.snapshot().map((p) => p.id)).toContain("auditor");
     expect(crewHtml(board)).toMatch(/Night Agent crew/);
   });
 });

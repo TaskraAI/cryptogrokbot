@@ -29,6 +29,7 @@ import { applyNightlyLearning, askGrokResearch, askLlm, lessonPrompt, loadLesson
 import { notify } from "@night/telegram";
 import { CrewBoard } from "@night/crew";
 import type { AppConfig } from "./config.ts";
+import { auditorPulseDetail } from "./auditor.ts";
 import { tryEnter } from "./entries.ts";
 import { managePosition, rowToPosition } from "./watchman.ts";
 
@@ -69,7 +70,7 @@ export class AgentRuntime {
 
   async tick(): Promise<string[]> {
     const logs: string[] = [];
-    this.crew.start("chief", "dispatching scout + sentinel + scholar");
+    this.crew.start("chief", "dispatching scout + sentinel + scholar + auditor");
     await this.refreshHealth();
     const sources = loadSources(this.cfg.sourcesPath);
     const guardrails = loadGuardrails(this.cfg.guardrailsPath);
@@ -89,6 +90,7 @@ export class AgentRuntime {
 
     await Promise.all([scout, sentinel, scholar]);
     logs.push(...scoutLogs, ...sentinelLogs, ...scholarLogs);
+    this.crew.idle("auditor", auditorPulseDetail(this.store));
     this.crew.idle("chief", `tick done lines=${logs.length}`);
     return logs;
   }
