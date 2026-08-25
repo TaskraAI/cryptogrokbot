@@ -362,9 +362,9 @@ describe("dashboard auth and paper API", () => {
 
   it("refuses LIVE /api/sell when master is off and still paper-sells in PAPER", async () => {
     const dir = tmp();
-    const { server, url, store, flags } = await startCtx(dir, "sell-gate-pass");
+    const { server, url, store, flags, codes } = await startCtx(dir, "sell-gate-pass");
     servers.push(server);
-    const cookie = await completeLogin(url, "sell-gate-pass");
+    const cookie = await completeLogin(url, "sell-gate-pass", "hello@taskra.ai", codes);
     const mint = "SellGateMint1111111111111111111111111111111";
     const buy = await fetch(`${url}/api/buy`, {
       method: "POST",

@@ -24,6 +24,7 @@ export interface AppConfig {
   dashboardPasswordFile: string;
   dashboardEmail: string;
   dashboardEmailFile: string;
+  dashboardTotpFile: string;
   dashboardAccessFile: string;
   dashboardSecureCookie: boolean;
   allowExtraBudget: boolean;
