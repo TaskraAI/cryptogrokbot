@@ -142,6 +142,21 @@ describe("dashboard auth and paper API", () => {
     expect(res.status).toBe(401);
   });
 
+  it("serves an email + password + 2FA login page", async () => {
+    const { server, url } = await startCtx(tmp());
+    servers.push(server);
+    const res = await fetch(`${url}/`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).toContain('id="email"');
+    expect(html).toContain('value="hello@taskra.ai"');
+    expect(html).toContain('id="pw"');
+    expect(html).toContain("2FA code");
+    expect(html).toContain("Log in");
+    expect(html).not.toContain("not financial advice");
+    expect(html).not.toContain("Dashboard password");
+  });
+
   it("rejects login with the wrong email", async () => {
     const { server, url } = await startCtx(tmp());
     servers.push(server);
@@ -151,6 +166,7 @@ describe("dashboard auth and paper API", () => {
       body: JSON.stringify({ email: "not-you@example.com", password: "test-dashboard-pass" }),
     });
     expect(res.status).toBe(401);
+    expect(((await res.json()) as { error?: string }).error).toBe("Wrong email or password");
   });
 
   it("rejects login with the wrong password", async () => {
@@ -162,6 +178,7 @@ describe("dashboard auth and paper API", () => {
       body: JSON.stringify({ email: "hello@taskra.ai", password: "not-the-password" }),
     });
     expect(res.status).toBe(401);
+    expect(((await res.json()) as { error?: string }).error).toBe("Wrong email or password");
   });
 
   it("first login returns enroll step, then enroll with valid TOTP sets session", async () => {

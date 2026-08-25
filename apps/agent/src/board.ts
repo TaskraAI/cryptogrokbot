@@ -164,8 +164,9 @@ export async function handleDashboardRequest(
     const password = str(body.password);
     const code = str(body.code);
     const secure = isSecure(req, ctx.cfg);
-    if (!emailsEqual(email, ctx.email) || !passwordsEqual(password, ctx.password)) {
-      json(res, 401, { error: "unauthorized" });
+    const loginEmail = email || ctx.email;
+    if (!emailsEqual(loginEmail, ctx.email) || !passwordsEqual(password, ctx.password)) {
+      json(res, 401, { error: "Wrong email or password" });
       return;
     }
     const totpSecret = loadTotpSecret(ctx.totpFile);

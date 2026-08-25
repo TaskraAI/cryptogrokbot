@@ -77,18 +77,18 @@ export function dashboardHtml(): string {
 <body>
 <div id="login" class="login hidden">
   <h1>CryptoGrokBot</h1>
-  <p class="muted">cryptogrokbot.com · paper by default · not financial advice</p>
+  <p class="muted">cryptogrokbot.com</p>
   <div id="loginStepCreds">
-    <label>Email</label>
-    <input id="email" type="email" autocomplete="username" inputmode="email" />
-    <label>Password</label>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" inputmode="email" value="hello@taskra.ai" />
+    <label for="pw">Password</label>
     <input id="pw" type="password" autocomplete="current-password" />
     <p id="loginErr" class="bad"></p>
-    <button id="loginBtn" style="width:100%;margin-top:12px">Continue</button>
+    <button id="loginBtn" style="width:100%;margin-top:12px">Log in</button>
   </div>
   <div id="loginStepTotp" class="hidden">
     <p class="muted">Enter the 6-digit code from your authenticator app.</p>
-    <label>2FA code</label>
+    <label for="totp">2FA code</label>
     <input id="totp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
     <p id="totpErr" class="bad"></p>
     <button id="totpBtn" style="width:100%;margin-top:12px">Verify</button>
@@ -98,7 +98,7 @@ export function dashboardHtml(): string {
     <p>Add this account in <b>Google Authenticator</b>, <b>Authy</b>, or iOS Passwords, then enter the first code.</p>
     <p><a id="otpauthLink" href="#">Open authenticator</a></p>
     <p class="mint" id="totpSecret"></p>
-    <label>First 2FA code</label>
+    <label for="enrollCode">First 2FA code</label>
     <input id="enrollCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
     <p id="enrollErr" class="bad"></p>
     <button id="enrollBtn" style="width:100%;margin-top:12px">Enable 2FA and log in</button>
