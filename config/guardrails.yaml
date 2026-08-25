@@ -1,0 +1,10 @@
+# Hard denies. Sentiment cannot override these.
+# Add via Telegram /never or edit this file.
+
+rules: []
+  # - id: never-example
+  #   type: source        # source | mint | ticker | keyword | creator_pct | pattern
+  #   value: "@shadykol"
+  #   origin: manual      # manual | learned
+  #   createdAt: 0
+  #   note: ""

@@ -1,0 +1,34 @@
+# Fill this with accounts, channels, and sites you already trust.
+# The agent only watches what you list.
+
+x_accounts:
+  # - handle: "@example"
+  #   weight: trusted   # trusted | watch
+  #   notes: ""
+
+x_queries:
+  # - query: "pumpfun CA"
+
+telegram:
+  # - name: alpha
+  #   id_or_username: "@yourchannel"
+  #   weight: watch
+
+discord:
+  # - server: your-server
+  #   channel: calls
+  #   weight: watch
+
+sites:
+  # - url: https://api.dexscreener.com/latest/dex/search?q=solana
+  #   type: dexscreener
+  #   notes: trending
+
+wallets:
+  # - address: ""
+  #   action: copy   # copy | ignore | fade
+  #   notes: ""
+
+mute: []
+  # - type: mint      # mint | ticker | handle | keyword
+  #   value: ""

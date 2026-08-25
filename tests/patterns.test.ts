@@ -1,0 +1,135 @@
+import { describe, expect, it } from "vitest";
+import { classifyPattern, decideExit, mergeLlmAction } from "@night/patterns";
+import { policy, position, snap } from "./fixtures.ts";
+
+describe("classifyPattern", () => {
+  it("labels a dip with high sentiment and live volume as healthy_dip", () => {
+    const p = classifyPattern(
+      snap({
+        pctFromPeak: -18,
+        pctFromEntry: 40,
+        sentiment: 0.6,
+        mentionVelocity: 5,
+        mentionVelocityBaseline: 3,
+        volume5m: 4000,
+        volumeBaseline5m: 4000,
+        buySellRatio: 0.6,
+        trustedSourcesStillPosting: 2,
+        uniqueRecentSources: 2,
+      }),
+      policy,
+    );
+    expect(p).toBe("healthy_dip");
+  });
+
+  it("labels collapsing sentiment and dying volume as fade", () => {
+    const p = classifyPattern(
+      snap({
+        pctFromPeak: -20,
+        sentiment: 0.05,
+        mentionVelocity: 0,
+        mentionVelocityBaseline: 5,
+        volume5m: 100,
+        volumeBaseline5m: 4000,
+        buySellRatio: 0.5,
+      }),
+      policy,
+    );
+    expect(p).toBe("fade");
+  });
+
+  it("labels creator dump / sell-side spike as dump not a dip", () => {
+    const p = classifyPattern(
+      snap({
+        pctFromPeak: -22,
+        sentiment: 0.8,
+        buySellRatio: 0.2,
+        volumeDeltaPct: 90,
+        creatorPct: 2,
+      }),
+      policy,
+    );
+    expect(p).toBe("dump");
+  });
+});
+
+describe("decideExit", () => {
+  it("hard-stops a full bag that never returned principal", () => {
+    const action = decideExit({
+      position: position({ principalRecoveredSol: 0, everGreen: false }),
+      snap: snap({ pctFromEntry: -30, pctFromPeak: -30, priceUsd: 0.7 }),
+      pattern: "fade",
+      policy,
+    });
+    expect(action).toEqual({ type: "flatten", reason: "hard_stop" });
+  });
+
+  it("returns principal when the bag can pay back the initial SOL", () => {
+    const action = decideExit({
+      position: position({
+        principalSol: 0.1,
+        principalRecoveredSol: 0,
+        tokensHeld: 100_000,
+        tokensInitial: 100_000,
+        entryPriceUsd: 1,
+        everGreen: true,
+      }),
+      snap: snap({ priceUsd: 2.2, pctFromEntry: 120, pctFromPeak: 0 }),
+      pattern: "chop",
+      policy,
+    });
+    expect(action.type).toBe("return_principal");
+  });
+
+  it("holds a runner on healthy_dip instead of selling", () => {
+    const action = decideExit({
+      position: position({
+        principalRecoveredSol: 0.1,
+        runner: true,
+        everGreen: true,
+        peakPriceUsd: 3,
+      }),
+      snap: snap({
+        priceUsd: 2.4,
+        pctFromEntry: 140,
+        pctFromPeak: -20,
+        sentiment: 0.7,
+      }),
+      pattern: "healthy_dip",
+      policy,
+    });
+    expect(action).toEqual({ type: "hold", reason: "healthy_dip_hold" });
+  });
+
+  it("sells the runner on fade", () => {
+    const action = decideExit({
+      position: position({ principalRecoveredSol: 0.1, runner: true, everGreen: true }),
+      snap: snap({ priceUsd: 1.5, pctFromEntry: 50, pctFromPeak: -20 }),
+      pattern: "fade",
+      policy,
+    });
+    expect(action).toEqual({ type: "sell_runner", reason: "fade" });
+  });
+
+  it("time-stops a bag that never went green", () => {
+    const action = decideExit({
+      position: position({
+        openedAt: Date.now() - 61 * 60_000,
+        everGreen: false,
+        principalRecoveredSol: 0,
+      }),
+      snap: snap({ pctFromEntry: -5, priceUsd: 0.95 }),
+      pattern: "chop",
+      policy,
+    });
+    expect(action.type).toBe("flatten");
+    expect(action.reason).toBe("time_stop");
+  });
+
+  it("does not let the LLM sell through a healthy dip or cancel a flatten", () => {
+    const hold = mergeLlmAction({ type: "hold", reason: "healthy_dip_hold" }, { action: "sell", confidence: 0.99 });
+    expect(hold.reason).toBe("healthy_dip_hold");
+    const stop = mergeLlmAction({ type: "flatten", reason: "hard_stop" }, { action: "hold", confidence: 0.99 });
+    expect(stop.reason).toBe("hard_stop");
+  });
+});

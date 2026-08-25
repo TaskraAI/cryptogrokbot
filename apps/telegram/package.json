@@ -1,0 +1,13 @@
+{
+  "name": "@night/telegram",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@night/learning": "*",
+    "@night/shared": "*",
+    "@night/storage": "*",
+    "grammy": "^1.35.0"
+  }
+}

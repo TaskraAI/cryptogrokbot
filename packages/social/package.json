@@ -1,0 +1,11 @@
+{
+  "name": "@night/social",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@night/shared": "*",
+    "yaml": "^2.7.0"
+  }
+}
