@@ -33,17 +33,27 @@ Starter watchlist (BONK, WIF, POPCAT, TRUMP) is in [`config/sources.yaml`](confi
 
 ## cryptogrokbot.com
 
-The dashboard is served by `npm run agent` on port **8787** (bind `0.0.0.0` by default, login required). This cloud VM is **not** a 24/7 VPS, so a public hostname cannot stay bound here.
+Nameservers are on Cloudflare and the zone is **active**. Public NS lookups (1.1.1.1 / 8.8.8.8) return `kanye.ns.cloudflare.com` and `stella.ns.cloudflare.com`.
 
-Remaining DNS / host steps (do these on a machine that stays on):
+The dashboard process is still `npm run agent` on port **8787** (login required). This cloud VM is **not** a 24/7 VPS, so a hostname pointed here will go dark when the VM stops.
 
-1. Zone `cryptogrokbot.com` is on the Cloudflare account (status may be **pending** until nameservers change).
-2. At Namecheap (current registrar NS), set nameservers to the Cloudflare pair shown in the Cloudflare dashboard (currently `kanye.ns.cloudflare.com` and `stella.ns.cloudflare.com`).
-3. After the zone is **active**, add DNS. Preferred durable path: install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/) on the host that runs `npm run agent`, create a tunnel to `http://127.0.0.1:8787`, and CNAME `cryptogrokbot.com` (and `www`) to that tunnel hostname. A Worker/Pages reverse-proxy also works once the tunnel origin exists.
+**API token cannot list or edit DNS records** (Cloudflare returns authentication error on DNS read/write). Apex and `www` still have leftover Namecheap parking / URL-forward records, so `http://cryptogrokbot.com` redirects to a parked page and HTTPS on apex/`www` has no cert yet.
+
+A named Cloudflare Tunnel `cryptogrokbot-dashboard` exists on the account. After you delete the parking records in the Cloudflare DNS UI, add proxied CNAMEs:
+
+- `cryptogrokbot.com` → `1a38795c-af25-4f8c-8dd1-7167da5b673c.cfargotunnel.com`
+- `www` → the same target
+
+Optional: `dash.cryptogrokbot.com` / `app.cryptogrokbot.com` were bound as Worker hostnames (no parking records there). They only serve the desk while `npm run agent` plus a tunnel origin are running.
+
+On the durable host:
+
+1. Delete parking/URL-forward records for `@` and `www`.
+2. Add the CNAMEs above (or grant the API token **Zone.DNS Edit** and we can do it next time).
+3. Run `npm run agent` and `cloudflared tunnel run` with the named tunnel.
 4. Set `DASHBOARD_SECURE_COOKIE=true` behind HTTPS. Keep `DASHBOARD_PASSWORD` in `.env` on that host only.
-5. Optional: enable R2 in the Cloudflare dashboard and set `CF_R2_*` if you want static copies of the dashboard shell. The live API still needs the Node agent.
 
-`CLOUDFLARE_API_TOKEN` is used only at process start to look up the zone. Never commit it. Placeholders are in `.env.example`.
+`CLOUDFLARE_API_TOKEN` is used only to look up the zone / manage the tunnel. Never commit it. Placeholders are in `.env.example`.
 
 ## Night auto-buys (still paper)
 
