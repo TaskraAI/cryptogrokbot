@@ -13,10 +13,10 @@ npx tsx apps/telegram/src/index.ts   # not required
 ```
 
 Prefer: running agent + Taskra's Telegram `/research <mint>` if bot token exists.
-Intel tab on cryptogrokbot.com (`POST /api/desks/:id`) is the same Grok research path for X sentiment, gems, eval, whales, timing, narratives, portfolio, scam radar, **and Polymarket**.
-If no API key: say so; still write a cautious thesis from Dex/tape/Polymarket JSON on the computer, no fake citations.
+Intel tab on cryptogrokbot.com (`POST /api/desks/:id`) is the same Grok research path for X sentiment, gems, eval, whales, timing, narratives, portfolio, and scam radar.
+If no API key: say so; still write a cautious thesis from Dex/tape JSON on the computer, no fake citations.
 
-Polymarket: `GET /api/polymarket?q=…` then `POST /api/desks/polymarket`. Log paper ideas with `POST /api/challenge/ideas`. Do not place live CLOB bets. The rung challenge is $100 → $5k → $10k → $1M — do not promise it.
+The rung challenge is $100 → $5k → $10k → $1M on **crypto only**. Do not promise it. Do not research Polymarket until Taskra enables it.
 
 ## Constraints
 - Never sell through healthy_dip.

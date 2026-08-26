@@ -130,12 +130,20 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
   const chal = JSON.parse(readFileSync(resolve(repoRoot, "config/challenge.json"), "utf8")) as {
     startUsd?: number;
     goalUsd?: number;
+    polymarketEnabled?: boolean;
+    venues?: { id?: string }[];
   };
   const pm = readFileSync(resolve(repoRoot, "apps/agent/src/polymarket.ts"), "utf8");
+  const chalSrc = readFileSync(resolve(repoRoot, "apps/agent/src/challenge.ts"), "utf8");
   const chalOk =
     chal.startUsd === 100 &&
     chal.goalUsd === 1_000_000 &&
+    chal.polymarketEnabled === false &&
+    Array.isArray(chal.venues) &&
+    chal.venues.every((v) => v.id !== "polymarket") &&
     board.includes("/api/challenge") &&
+    board.includes("Polymarket is off until Taskra enables it") &&
+    chalSrc.includes("Do not research or trade Polymarket until Taskra says it is time.") &&
     pm.includes("gamma-api.polymarket.com") &&
     !pm.includes("clob.polymarket.com") &&
     !pm.includes("/order");

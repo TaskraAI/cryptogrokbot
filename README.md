@@ -2,7 +2,7 @@
 
 Personal assistant for **discovering, buying, and selling Solana meme coins** you choose. Paper (dry-run) is the default. Nothing spends real SOL unless you opt in. This is not financial advice. Meme coins rug.
 
-Mobile dashboard (intended host: **cryptogrokbot.com**): login, crew pulses, paper buys with DexScreener, wallets, P&L, **Intel** (nine Grok desks including Polymarket), **Rung challenge** ($100 → $5k → $10k → $1M), todos, lessons, Auditor bug scan.
+Mobile dashboard (intended host: **cryptogrokbot.com**): login, crew pulses, paper buys with DexScreener, wallets, P&L, **Intel** (eight Grok desks), **Rung challenge** ($100 → $5k → $10k → $1M, crypto only), todos, lessons, Auditor bug scan.
 
 ## Run the dashboard (paper)
 
@@ -21,8 +21,8 @@ Open the URL on your phone or desktop. Log in with **email + password + email ve
 - Password: `DASHBOARD_PASSWORD`, or a one-time generated value in `data/.dashboard-password`
 - Email code: after password, a 6-digit code is sent to that inbox (`RESEND_API_KEY` optional). If email sending is not configured, the code is printed in the agent log and shown on the login screen.
 - Grok Bot: after you log in, Home → **Invite Grok Bot** gives a URL/token. The bot opens `/invite/<token>` or pastes the token on the login screen. Bearer `Authorization: Bearer cgbot_…` also works for `/api/*`.
-- Intel: after login, open **Intel** (or Home → Open Intel). Nine desks — X sentiment, early gems, project eval, whales, entry/exit timing, narratives, portfolio, scam radar, Polymarket. Set `XAI_API_KEY` for live Grok + X search; without it each desk still returns a grounded framework. Research only — they do not override hard stops or the HOLD rule.
-- Rung challenge: Home card + `GET /api/challenge`. $100 → $5,000 → $10,000 then ~2x to $1,000,000 via Solana (Grok Bot Bearer only) and Polymarket **paper** ideas (`GET /api/polymarket`). Not a promise. Live size stays at `maxSolPerTrade`.
+- Intel: after login, open **Intel** (or Home → Open Intel). Eight desks — X sentiment, early gems, project eval, whales, entry/exit timing, narratives, portfolio, scam radar. Set `XAI_API_KEY` for live Grok + X search; without it each desk still returns a grounded framework. Research only — they do not override hard stops or the HOLD rule.
+- Rung challenge: Home card + `GET /api/challenge`. $100 → $5,000 → $10,000 then ~2x to $1,000,000 on **Solana only** (Grok Bot Bearer). Polymarket stays off until enabled. Not a promise. Live size stays at `maxSolPerTrade`.
 
 ```bash
 # CLI still works (same paper ledger)

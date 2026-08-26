@@ -42,7 +42,7 @@ Newest lessons are injected into the LLM prompt first.
 
 - 2026-08-26T00:58:00.000Z MASTER KILL + GROKBOT-ONLY ORDERS (user): MASTER off. Auto Scout/Sentinel must not send live buy/sell. Dashboard Home has Kill MASTER / Resume CONFIRM (env `MASTER_ENABLED=false` also kills on boot; boot must not revive a kill). Only Grok Bot Bearer (`cgbot_…`) can place buy/sell (paper and live). Owner cookie 403. Grok Bot explicit live orders still work while MASTER is off. Do not raise live size. GrokBot impersonator mint stays muted / never live.
 
-- 2026-08-26T16:14:00.000Z RUNG CHALLENGE (user): $100 → $5,000 → $10,000 then ~2x rungs to $1,000,000 via Solana + Polymarket. Grok Bot must follow GET /api/challenge playbook. First rung is 50x — do not promise it. Polymarket is research + paper ideas only (no live CLOB). Crypto orders stay Grok Bot Bearer only, MASTER off, 0.05 SOL cap. Do not YOLO the bankroll. Not financial advice.
+- 2026-08-26T16:59:00.000Z CRYPTO ONLY (user): rung challenge stays Solana-only for now. Do not research or trade Polymarket until Taskra says it is time. polymarketEnabled=false. Intel Polymarket desk hidden. Same size cap / MASTER off / Grok Bot Bearer orders.
 
 
 

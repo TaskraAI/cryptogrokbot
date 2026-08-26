@@ -263,7 +263,7 @@ Chief’s description forbids inventing LIVE/MASTER. If a Bot offers to go live,
 
 Paste `first-tasks/rung-challenge.md` to **Chief**. Attach `skills/challenge.md` on Chief and Grok.
 
-Expect: Home **Rung challenge** card, `GET /api/challenge` playbook, Intel **Polymarket** desk, paper ideas only. Grok Bot must say 50x is not a plan. Live crypto size stays 0.05 SOL. No live Polymarket bets until you explicitly fund that later.
+Expect: Home **Rung challenge** card, `GET /api/challenge` playbook. Crypto only. Grok Bot must say 50x is not a plan. Live crypto size stays 0.05 SOL. Polymarket stays off until you say otherwise.
 
 ## Quick map: who you talk to
 
@@ -272,7 +272,7 @@ Expect: Home **Rung challenge** card, `GET /api/challenge` playbook, Intel **Pol
 | Start/stop paper agent, board, clone, `.env` | `@Chief` |
 | Handles, CAs, empty sources | `@Scout` |
 | Hold vs sell, tape, stops | `@Sentinel` |
-| Thesis / research / Polymarket paper ideas | `@Grok` |
+| Thesis / research | `@Grok` |
 | Rung challenge, bankroll, kill switch | `@Chief` |
 | Grades, lessons, `rules.yaml` | `@Scholar` |
 | See handoffs | Night desk **group** |

@@ -47,4 +47,4 @@ Paste new rows under `rules:` (id, type, value, enabled, when, note).
 
 Never raise size or disable hard stops from Grok output unless Taskra explicitly raises buy limits (current live cap: 0.05 SOL in `config/policy.json`). If sentiment is high, ask Taskra in the Grok Bot app whether to keep test size or increase (ceiling 0.05) **before investing**. If they tell Grok Bot in the app to change the desk, implement that.
 
-Rung challenge: `$100 → $5,000 → $10,000` then ~2x to `$1,000,000` via Solana + Polymarket research. Skill: [`skills/challenge.md`](skills/challenge.md). `GET /api/challenge` is the session brief. Do not promise 50x. Polymarket stays paper until Taskra funds live PM.
+Rung challenge: `$100 → $5,000 → $10,000` then ~2x to `$1,000,000` on **Solana only**. Skill: [`skills/challenge.md`](skills/challenge.md). `GET /api/challenge` is the session brief. Do not promise 50x. Do not research Polymarket until Taskra enables it.

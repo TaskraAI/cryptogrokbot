@@ -9,7 +9,7 @@ import { loadAppConfig } from "../apps/agent/src/config.ts";
 import { createDashboardServer, type DashboardContext } from "../apps/agent/src/board.ts";
 import { currentRung, loadChallenge, playbook, setBankrollUsd } from "../apps/agent/src/challenge.ts";
 import { formatPolymarketGrounding, searchPolymarket } from "../apps/agent/src/polymarket.ts";
-import { DESKS, buildDeskPrompt } from "../apps/agent/src/desks.ts";
+import { DESKS, POLYMARKET_DESK, listDesks } from "../apps/agent/src/desks.ts";
 
 function mem() {
   const dir = join(tmpdir(), `chal-${Date.now()}-${Math.random().toString(16).slice(2)}`);
@@ -25,7 +25,8 @@ describe("rung challenge", () => {
     expect(chal.rungsUsd[1]).toBe(5000);
     expect(chal.rungsUsd[2]).toBe(10000);
     expect(chal.goalUsd).toBe(1_000_000);
-    expect(chal.venues.map((v) => v.id)).toEqual(["solana", "polymarket"]);
+    expect(chal.venues.map((v) => v.id)).toEqual(["solana"]);
+    expect(chal.polymarketEnabled).toBe(false);
   });
 
   it("places bankroll on the 50x first rung then the 2x second rung", () => {
@@ -43,7 +44,7 @@ describe("rung challenge", () => {
     expect(done.done).toBe(true);
   });
 
-  it("playbook tells Grok Bot 50x is not a plan and forbids live Polymarket", () => {
+  it("playbook tells Grok Bot 50x is not a plan and keeps Polymarket off", () => {
     const chal = loadChallenge(join(process.cwd(), "config/challenge.json"));
     const book = playbook({
       challenge: chal,
@@ -53,10 +54,13 @@ describe("rung challenge", () => {
       mode: "LIVE",
     });
     expect(book.honesty).toMatch(/50x|not financial advice/i);
-    expect(book.never.join(" ")).toMatch(/CLOB/);
+    expect(book.honesty).toMatch(/Crypto only/);
+    expect(book.never.join(" ")).toMatch(/Do not research or trade Polymarket until Taskra says it is time/);
+    expect(book.never.join(" ")).not.toMatch(/CLOB/);
     expect(book.never.join(" ")).toMatch(/promise/);
     expect(book.tonight.join(" ")).toMatch(/Grok Bot Bearer/);
     expect(book.howToWork.join(" ")).toMatch(/\/api\/challenge/);
+    expect(book.venues.map((v) => v.id)).toEqual(["solana"]);
   });
 });
 
@@ -173,14 +177,39 @@ describe("challenge dashboard API", () => {
       rung: { from: number; to: number };
       playbook: { never: string[] };
       polymarketLive: boolean;
+      polymarketEnabled: boolean;
     };
     expect(body.bankrollUsd).toBe(100);
     expect(body.rung.from).toBe(100);
     expect(body.rung.to).toBe(5000);
     expect(body.polymarketLive).toBe(false);
-    expect(body.playbook.never.join(" ")).toMatch(/CLOB/);
+    expect(body.polymarketEnabled).toBe(false);
+    expect(body.playbook.never.join(" ")).toMatch(/Do not research or trade Polymarket until Taskra says it is time/);
 
     const idea = await fetch(`${url}/api/challenge/ideas`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie: jar },
+      body: JSON.stringify({
+        venue: "solana",
+        title: "Paper BONK clip inside 0.05 SOL",
+        side: "long",
+        sizeUsd: 8,
+        status: "paper",
+        note: "crypto only",
+      }),
+    });
+    expect(idea.status).toBe(200);
+    const saved = (await idea.json()) as { idea: { id: number; status: string; venue: string } };
+    expect(saved.idea.status).toBe("paper");
+    expect(saved.idea.venue).toBe("solana");
+    const patch = await fetch(`${url}/api/challenge/ideas/${saved.idea.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json", cookie: jar },
+      body: JSON.stringify({ status: "killed" }),
+    });
+    expect(patch.status).toBe(200);
+
+    const pmIdea = await fetch(`${url}/api/challenge/ideas`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie: jar },
       body: JSON.stringify({
@@ -190,18 +219,25 @@ describe("challenge dashboard API", () => {
         side: "No",
         sizeUsd: 10,
         status: "paper",
-        note: "paper only",
+        note: "should be refused",
       }),
     });
-    expect(idea.status).toBe(200);
-    const saved = (await idea.json()) as { idea: { id: number; status: string } };
-    expect(saved.idea.status).toBe("paper");
-    const patch = await fetch(`${url}/api/challenge/ideas/${saved.idea.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json", cookie: jar },
-      body: JSON.stringify({ status: "killed" }),
-    });
-    expect(patch.status).toBe(200);
+    expect(pmIdea.status).toBe(400);
+    expect(((await pmIdea.json()) as { error: string }).error).toMatch(/crypto only/i);
+
+    const pmApi = await fetch(`${url}/api/polymarket`, { headers: { cookie: jar } });
+    expect(pmApi.status).toBe(403);
+    expect(((await pmApi.json()) as { error: string; events: unknown[] }).events).toEqual([]);
+
+    const desks = await fetch(`${url}/api/desks`, { headers: { cookie: jar } });
+    expect(desks.status).toBe(200);
+    const deskIds = ((await desks.json()) as { desks: { id: string }[] }).desks.map((d) => d.id);
+    expect(deskIds).not.toContain("polymarket");
+    expect(deskIds).toHaveLength(8);
+    expect(listDesks().map((d) => d.id)).not.toContain("polymarket");
+    expect(POLYMARKET_DESK.id).toBe("polymarket");
+    expect(DESKS.find((d) => d.id === "polymarket")).toBeUndefined();
+
     setBankrollUsd(store, 120);
     const bank = await fetch(`${url}/api/challenge`, {
       method: "POST",
@@ -210,8 +246,5 @@ describe("challenge dashboard API", () => {
     });
     expect(bank.status).toBe(200);
     expect(((await bank.json()) as { bankrollUsd: number }).bankrollUsd).toBe(120);
-
-    const pmDesk = DESKS.find((d) => d.id === "polymarket")!;
-    expect(buildDeskPrompt(pmDesk, { query: "bitcoin" }, "grounded")).toMatch(/Watch \/ Paper \/ Avoid/);
   });
 });

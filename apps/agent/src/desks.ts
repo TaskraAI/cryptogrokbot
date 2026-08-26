@@ -203,37 +203,39 @@ export const DESKS: DeskDef[] = [
       { key: "year", label: "Year", type: "select", options: ["2026"] },
     ],
   },
-  {
-    id: "polymarket",
-    title: "Polymarket",
-    blurb: "Event markets for the rung challenge. Research only — paper ideas, no live CLOB bets.",
-    useXSearch: true,
-    sections: [
-      "Market question and exact resolution source",
-      "Current implied odds vs a base-rate / news view",
-      "Why the book might be wrong (or why it is efficient)",
-      "Max loss if you are wrong (defined risk)",
-      "Suggested paper size vs the current rung bankroll",
-      "When to kill the idea (invalidation)",
-      "Correlation with the Solana meme book (do not double the same bet)",
-      "Verdict: Watch / Paper / Avoid — never 'bet the rung'",
-    ],
-    fields: [
-      { key: "query", label: "Topic / market", placeholder: "bitcoin, election, Fed, sports" },
-      { key: "bias", label: "Lean", type: "select", options: ["no lean", "Yes", "No", "other outcome"] },
-      { key: "horizon", label: "Horizon", type: "select", options: ["hours", "days", "weeks"] },
-    ],
-  },
 ];
+
+/** Kept off the Intel board until Taskra sets challenge.polymarketEnabled. */
+export const POLYMARKET_DESK: DeskDef = {
+  id: "polymarket",
+  title: "Polymarket",
+  blurb: "Event markets for the rung challenge. Off until Taskra enables it.",
+  useXSearch: true,
+  sections: [
+    "Market question and exact resolution source",
+    "Current implied odds vs a base-rate / news view",
+    "Why the book might be wrong (or why it is efficient)",
+    "Max loss if you are wrong (defined risk)",
+    "Suggested paper size vs the current rung bankroll",
+    "When to kill the idea (invalidation)",
+    "Correlation with the Solana meme book (do not double the same bet)",
+    "Verdict: Watch / Paper / Avoid — never 'bet the rung'",
+  ],
+  fields: [
+    { key: "query", label: "Topic / market", placeholder: "bitcoin, election, Fed, sports" },
+    { key: "bias", label: "Lean", type: "select", options: ["no lean", "Yes", "No", "other outcome"] },
+    { key: "horizon", label: "Horizon", type: "select", options: ["hours", "days", "weeks"] },
+  ],
+};
 
 const lastRuns = new Map<string, DeskRun>();
 
-export function listDesks(): DeskDef[] {
-  return DESKS;
+export function listDesks(opts?: { includePolymarket?: boolean }): DeskDef[] {
+  return opts?.includePolymarket ? [...DESKS, POLYMARKET_DESK] : DESKS;
 }
 
-export function getDesk(id: string): DeskDef | undefined {
-  return DESKS.find((d) => d.id === id);
+export function getDesk(id: string, opts?: { includePolymarket?: boolean }): DeskDef | undefined {
+  return listDesks(opts).find((d) => d.id === id);
 }
 
 export function lastDeskRun(id: string): DeskRun | undefined {
@@ -257,7 +259,7 @@ function clip(v: string, n = 400): string {
 export function buildDeskPrompt(desk: DeskDef, fields: Record<string, string>, grounded: string): string {
   const f = (k: string, fallback = "") => clip(fields[k] || fallback);
   const numbered = desk.sections.map((s, i) => `${i + 1}. ${s}`).join("\n");
-  const rules = `You are CryptoGrokBot on cryptogrokbot.com — a personal Solana meme-coin night desk plus Polymarket research. Paper is default. Never recommend disabling hard stops. Dip + high/rising sentiment + volume alive = HOLD. Dedicated hot wallet only. Number every section. Be brutally honest. This is research, not financial advice. Year: 2026. Taskra's rung challenge is $100 → $5,000 → $10,000 then ~2x rungs to $1,000,000. Do not promise that path. Live crypto size stays at policy maxSolPerTrade. Do not place live Polymarket bets.`;
+  const rules = `You are CryptoGrokBot on cryptogrokbot.com — a personal Solana meme-coin night desk. Paper is default. Never recommend disabling hard stops. Dip + high/rising sentiment + volume alive = HOLD. Dedicated hot wallet only. Number every section. Be brutally honest. This is research, not financial advice. Year: 2026. Taskra's rung challenge is $100 → $5,000 → $10,000 then ~2x rungs to $1,000,000 on crypto only. Do not promise that path. Live crypto size stays at policy maxSolPerTrade. Do not research Polymarket until Taskra enables it.`;
 
   if (desk.id === "sentiment") {
     return `${rules}

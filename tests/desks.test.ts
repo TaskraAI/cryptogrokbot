@@ -8,7 +8,7 @@ import { CrewBoard } from "@night/crew";
 import { loadAppConfig } from "../apps/agent/src/config.ts";
 import { createDashboardServer, type DashboardContext } from "../apps/agent/src/board.ts";
 import { dashboardHtml } from "../apps/agent/src/dashboard-html.ts";
-import { buildDeskPrompt, DESKS, gatherDeskContext, runDeskAnalysis } from "../apps/agent/src/desks.ts";
+import { buildDeskPrompt, DESKS, POLYMARKET_DESK, gatherDeskContext, listDesks, runDeskAnalysis } from "../apps/agent/src/desks.ts";
 import { buyChosenMint, sellChosen } from "../apps/agent/src/trade.ts";
 import { token } from "./fixtures.ts";
 
@@ -131,7 +131,7 @@ describe("intel desks", () => {
     for (const s of servers) s.close();
   });
 
-  it("covers the nine Grok workflows with numbered sections", () => {
+  it("covers the eight Grok workflows with numbered sections", () => {
     expect(DESKS.map((d) => d.id)).toEqual([
       "sentiment",
       "gems",
@@ -141,13 +141,18 @@ describe("intel desks", () => {
       "narratives",
       "portfolio",
       "scams",
-      "polymarket",
     ]);
+    expect(listDesks().map((d) => d.id)).toEqual(DESKS.map((d) => d.id));
+    expect(DESKS.find((d) => d.id === "polymarket")).toBeUndefined();
+    expect(POLYMARKET_DESK.id).toBe("polymarket");
+    expect(listDesks({ includePolymarket: true }).map((d) => d.id)).toContain("polymarket");
     for (const desk of DESKS) {
       const prompt = buildDeskPrompt(desk, {}, "grounded");
       for (const section of desk.sections) {
         expect(prompt).toContain(section);
       }
+      expect(prompt).toMatch(/crypto only/i);
+      expect(prompt).toMatch(/Do not research Polymarket until Taskra enables it/);
     }
     const scams = DESKS.find((d) => d.id === "scams")!;
     expect(buildDeskPrompt(scams, { year: "2026" }, "")).toContain("Common scam tactics in 2026");
@@ -162,8 +167,10 @@ describe("intel desks", () => {
     expect(js).toContain("Open Intel");
     expect(js).toContain("/api/desks");
     expect(js).toContain("X sentiment, gems, project eval");
+    expect(js).toContain("Eight Grok desks");
     expect(js).toContain("Rung challenge");
     expect(js).toContain("/api/challenge");
+    expect(js).toContain("Polymarket stays off until you say it is time");
     expect(() => new Function(js)).not.toThrow();
   });
 
@@ -227,8 +234,16 @@ describe("intel desks", () => {
       desks: { id: string; title: string; useXSearch: boolean }[];
       grokReady: boolean;
     };
-    expect(body.desks).toHaveLength(9);
+    expect(body.desks).toHaveLength(8);
     expect(body.desks.map((d) => d.id)).toEqual(DESKS.map((d) => d.id));
+    expect(body.desks.map((d) => d.id)).not.toContain("polymarket");
+
+    const pmDesk = await fetch(`${url}/api/desks/polymarket`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: "{}",
+    });
+    expect(pmDesk.status).toBe(404);
     expect(body.desks.find((d) => d.id === "sentiment")?.useXSearch).toBe(true);
     expect(body.desks.find((d) => d.id === "timing")?.useXSearch).toBe(false);
     expect(body.grokReady).toBe(false);

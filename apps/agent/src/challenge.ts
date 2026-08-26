@@ -11,6 +11,7 @@ export type ChallengeConfig = {
   rungsUsd: number[];
   venues: ChallengeVenue[];
   disclaimer: string;
+  polymarketEnabled: boolean;
 };
 
 export const DEFAULT_CHALLENGE: ChallengeConfig = {
@@ -18,11 +19,10 @@ export const DEFAULT_CHALLENGE: ChallengeConfig = {
   startUsd: 100,
   goalUsd: 1_000_000,
   rungsUsd: [100, 5000, 10000, 20000, 40000, 80000, 160000, 320000, 640000, 1_000_000],
-  venues: [
-    { id: "solana", label: "Solana memes (CryptoGrokBot)", weight: 0.6 },
-    { id: "polymarket", label: "Polymarket events", weight: 0.4 },
-  ],
-  disclaimer: "Not financial advice. Most 50x paths fail. Survive first. Grok Bot does not promise $1M.",
+  venues: [{ id: "solana", label: "Solana memes (CryptoGrokBot)", weight: 1 }],
+  disclaimer:
+    "Not financial advice. Most 50x paths fail. Survive first. Grok Bot does not promise $1M. Crypto only until Taskra enables Polymarket.",
+  polymarketEnabled: false,
 };
 
 export const BANKROLL_FLAG = "challenge_bankroll_usd";
@@ -39,6 +39,7 @@ export function loadChallenge(path: string): ChallengeConfig {
       rungsUsd: sorted.length >= 2 ? sorted : DEFAULT_CHALLENGE.rungsUsd,
       venues: Array.isArray(raw.venues) && raw.venues.length ? raw.venues : DEFAULT_CHALLENGE.venues,
       disclaimer: String(raw.disclaimer || DEFAULT_CHALLENGE.disclaimer),
+      polymarketEnabled: raw.polymarketEnabled === true,
     };
   } catch {
     return { ...DEFAULT_CHALLENGE };
@@ -89,17 +90,15 @@ function rungJobs(rung: ReturnType<typeof currentRung>): string[] {
   if (rung.multiple >= 10) {
     return [
       "This rung is a 50x. Treat it as research + survival, not a daily compounding plan.",
-      "Crypto: at most one tiny ticket inside maxSolPerTrade. Ask Taskra before any live spend. MASTER stays off.",
-      "Polymarket: research live markets, log paper ideas only. Do not place CLOB bets (no live PM keys).",
-      "Never put more than ~10–20% of remaining bankroll on one idea, and never above the desk size cap.",
+      "Crypto only: at most one tiny ticket inside maxSolPerTrade. Ask Taskra before any live spend. MASTER stays off.",
+      "Never put more than ~10–20% of remaining bankroll on one mint, and never above the desk size cap.",
       "If declared bankroll drops under 50% of this rung start, pause 24h, grade the losses, no revenge trades.",
     ];
   }
   return [
-    `This rung is about ${rung.multiple.toFixed(2)}x (${fmtUsd(rung.from)} → ${fmtUsd(rung.to)}). Prefer defined-risk Polymarket ideas and fewer moon tickets.`,
+    `This rung is about ${rung.multiple.toFixed(2)}x (${fmtUsd(rung.from)} → ${fmtUsd(rung.to)}). Fewer moon tickets; return principal first.`,
     "Crypto: Grok Bot Bearer only. Keep MASTER off. Size stays at policy maxSolPerTrade until Taskra raises it.",
-    "Polymarket: paper journal until Taskra funds a PM account and we add live keys. Research mispriced events with a clear resolution source.",
-    "Return principal first on any winner. Do not disable stops to 'let it run to the next rung'.",
+    "Do not open Polymarket. Taskra will say when that venue is on.",
     "Update declared bankroll honestly after fills. Do not mark a rung done until the number is real.",
   ];
 }
@@ -125,20 +124,19 @@ export function playbook(opts: {
       `Mode=${opts.mode} MASTER=${opts.masterEnabled}. Auto live desk is off unless MASTER is on. Only Grok Bot Bearer may POST /api/buy and /api/sell.`,
       `Live crypto size cap ${opts.policy.maxSolPerTrade} SOL / day ${opts.policy.dailyBudgetSol} SOL / loss cap ${opts.policy.dailyLossCapSol} SOL. Do not raise these.`,
       ...rungJobs(rung),
-      "End of session: GET /api/challenge, list open bags, list paper PM ideas, ask Taskra one clear question.",
+      "End of session: GET /api/challenge, list open bags, ask Taskra one clear question.",
     ],
     never: [
       "Do not promise $1M or 50x. Say the odds are bad and the first rung is lottery-adjacent.",
       "Do not raise maxSolPerTrade, dailyBudgetSol, or resume MASTER unless Taskra types CONFIRM.",
-      "Do not place live Polymarket CLOB orders. Research + paper ideas only until live PM is explicitly wired.",
+      "Do not research or trade Polymarket until Taskra says it is time.",
       "Do not enable the GrokBot impersonator mint. Do not invent a second wallet or extra budget.",
-      "Do not YOLO the whole bankroll on one meme or one sports market.",
+      "Do not YOLO the whole bankroll on one meme.",
     ],
     howToWork: [
       "Start every session with GET /api/challenge (Bearer invite token).",
-      "Scan GET /api/polymarket (optional ?q=) then Intel desk `polymarket` for a brief.",
-      "For Solana names: Scout/watchlist + scam radar. High sentiment → ask Taskra before size.",
-      "Log PM ideas with POST /api/challenge/ideas. Update status won/lost/killed after resolution.",
+      "For Solana names: Scout/watchlist + scam radar + Intel desks. High sentiment → ask Taskra before size.",
+      "Log crypto ideas with POST /api/challenge/ideas venue=solana. Update status won/lost/killed after the fill.",
       "PATCH/POST bankrollUsd only with a number Taskra agrees is real.",
     ],
     venues: opts.challenge.venues,
@@ -174,6 +172,7 @@ export function challengePayload(opts: {
       mode: opts.mode,
     }),
     ideas: listChallengeIdeas(opts.store, 40).map(publicIdea),
+    polymarketEnabled: opts.challenge.polymarketEnabled === true,
     polymarketLive: false,
     cryptoOrders: "grokbot-bearer-only",
   };

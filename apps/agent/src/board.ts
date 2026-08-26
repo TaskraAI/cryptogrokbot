@@ -285,6 +285,10 @@ function challengeState(ctx: DashboardContext) {
   });
 }
 
+function polymarketOn(ctx: DashboardContext): boolean {
+  return loadChallenge(ctx.cfg.challengePath).polymarketEnabled === true;
+}
+
 export async function handleDashboardRequest(
   ctx: DashboardContext,
   req: IncomingMessage,
@@ -595,9 +599,13 @@ async function routeAuthed(
     }
     const body = await readJson(req);
     const title = str(body.title).trim();
-    const venue = str(body.venue).trim().toLowerCase() || "polymarket";
+    const venue = str(body.venue).trim().toLowerCase() || "solana";
     if (!title) {
       json(res, 400, { error: "title required" });
+      return;
+    }
+    if (venue === "polymarket" && !polymarketOn(ctx)) {
+      json(res, 400, { error: "Polymarket is off — crypto only until Taskra enables it" });
       return;
     }
     if (venue !== "solana" && venue !== "polymarket") {
@@ -652,6 +660,14 @@ async function routeAuthed(
   }
 
   if (path === "/api/polymarket" && method === "GET") {
+    if (!polymarketOn(ctx)) {
+      json(res, 403, {
+        error: "Polymarket is off until Taskra enables it. Stick to crypto.",
+        events: [],
+        liveTrading: false,
+      });
+      return;
+    }
     const q = url.searchParams.get("q") ?? "";
     try {
       const events = await searchPolymarket(q, 10);
@@ -899,7 +915,7 @@ async function routeAuthed(
 
   if (path === "/api/desks" && method === "GET") {
     json(res, 200, {
-      desks: listDesks().map((d) => ({
+      desks: listDesks({ includePolymarket: polymarketOn(ctx) }).map((d) => ({
         id: d.id,
         title: d.title,
         blurb: d.blurb,
@@ -914,7 +930,7 @@ async function routeAuthed(
 
   const deskOne = path.match(/^\/api\/desks\/([a-z]+)$/);
   if (deskOne && method === "GET") {
-    const desk = getDesk(deskOne[1]!);
+    const desk = getDesk(deskOne[1]!, { includePolymarket: polymarketOn(ctx) });
     if (!desk) {
       json(res, 404, { error: "unknown desk" });
       return;
@@ -929,7 +945,7 @@ async function routeAuthed(
 
   if (deskOne && method === "POST") {
     const id = deskOne[1]!;
-    if (!getDesk(id)) {
+    if (!getDesk(id, { includePolymarket: polymarketOn(ctx) })) {
       json(res, 404, { error: "unknown desk" });
       return;
     }

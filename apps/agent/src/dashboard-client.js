@@ -168,7 +168,7 @@ async function renderHome() {
         " SOL</b> · Live day <b>" + Number(d.budget.live.spentSol).toFixed(3) + "/" + Number(d.budget.live.cap) + " SOL</b></p>"
       : "") +
     "<p>Open positions: " + d.openCount + "</p></div>" +
-    '<div class="card"><h2 style="margin-top:0">Intel</h2><p class="muted">Nine Grok desks: X sentiment, gems, project eval, whales, timing, narratives, portfolio, scam radar, Polymarket.</p>' +
+    '<div class="card"><h2 style="margin-top:0">Intel</h2><p class="muted">Eight Grok desks: X sentiment, gems, project eval, whales, timing, narratives, portfolio, scam radar.</p>' +
     '<button id="goIntel" style="width:100%">Open Intel</button></div>' +
     '<div class="card" id="accessCard"><h2 style="margin-top:0">Access</h2>' +
     "<p class='muted'>Owner: " + esc(d.email || "") + " · email verification</p>" +
@@ -224,9 +224,9 @@ function challengeCardHtml(d) {
     " · declared <b>$" + Number(c.bankrollUsd || 0).toLocaleString() + "</b>" +
     " · " + Number(r.progressPct || 0).toFixed(0) + "% of this rung</p>" +
     "<p class='muted'>" + esc((c.playbook && c.playbook.honesty) || "") + "</p>" +
-    "<p class='muted'>Crypto via Grok Bot Bearer. Polymarket is research + paper ideas (no live CLOB).</p>" +
+    "<p class='muted'>Crypto via Grok Bot Bearer. Polymarket stays off until you say it is time.</p>" +
     "<ol style='padding-left:18px'>" + jobs + "</ol>" +
-    "<h2>Paper ideas</h2>" + (ideas || "<p class='muted'>None yet. Grok Bot logs them after research.</p>") +
+    "<h2>Ideas</h2>" + (ideas || "<p class='muted'>None yet. Grok Bot logs Solana ideas here.</p>") +
     '<label>Declared bankroll (USD)</label><div class="row"><input id="bankrollUsd" type="number" min="0" step="1" value="' +
     Number(c.bankrollUsd || 100) + '"/><button id="saveBankroll" class="ghost">Save</button></div>' +
     '<p id="challengeMsg" class="muted"></p></div>'
