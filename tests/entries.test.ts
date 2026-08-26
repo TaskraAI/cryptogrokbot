@@ -65,7 +65,7 @@ describe("paper entries", () => {
     expect(msg).toMatch(/MASTER_ENABLED/);
   });
 
-  it("lets an explicit Grok Bot live order past MASTER until wallet is missing", async () => {
+  it("lets an explicit Grok Bot live order past MASTER (score and sim still run)", async () => {
     const db = store();
     const msg = await tryEnter({
       store: db,
@@ -84,7 +84,8 @@ describe("paper entries", () => {
       grokBotOrder: true,
     });
     expect(msg).not.toMatch(/MASTER_ENABLED is off/);
-    expect(msg).toMatch(/WALLET_SECRET_KEY|wallet or RPC missing|buy failed/);
+    expect(msg).not.toMatch(/^bought/);
+    expect(msg).toMatch(/honeypot|WALLET_SECRET_KEY|wallet or RPC missing|buy failed/);
   });
 
   it("refuses a size above maxSolPerTrade instead of clipping", async () => {
