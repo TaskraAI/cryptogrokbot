@@ -64,21 +64,61 @@ describe("decideExit", () => {
     expect(action).toEqual({ type: "flatten", reason: "hard_stop" });
   });
 
-  it("returns principal when the bag can pay back the initial SOL", () => {
-    const action = decideExit({
-      position: position({
-        principalSol: 0.1,
-        principalRecoveredSol: 0,
-        tokensHeld: 100_000,
-        tokensInitial: 100_000,
-        entryPriceUsd: 1,
-        everGreen: true,
-      }),
+  it("returns principal at 2x, not 1x, and waits for a 5x gem", () => {
+    const bag = {
+      principalSol: 0.1,
+      principalRecoveredSol: 0,
+      tokensHeld: 100_000,
+      tokensInitial: 100_000,
+      entryPriceUsd: 1,
+      everGreen: true,
+    };
+    const early = decideExit({
+      position: position({ ...bag, costOutMultiple: 2 }),
+      snap: snap({ priceUsd: 1.2, pctFromEntry: 20, pctFromPeak: 0 }),
+      pattern: "chop",
+      policy,
+    });
+    expect(early).toEqual({ type: "hold", reason: "awaiting_principal" });
+    const ready = decideExit({
+      position: position({ ...bag, costOutMultiple: 2 }),
       snap: snap({ priceUsd: 2.2, pctFromEntry: 120, pctFromPeak: 0 }),
       pattern: "chop",
       policy,
     });
-    expect(action.type).toBe("return_principal");
+    expect(ready.type).toBe("return_principal");
+    const waitFive = decideExit({
+      position: position({ ...bag, costOutMultiple: 5 }),
+      snap: snap({ priceUsd: 2.2, pctFromEntry: 120, pctFromPeak: 0 }),
+      pattern: "chop",
+      policy,
+    });
+    expect(waitFive).toEqual({ type: "hold", reason: "awaiting_principal" });
+  });
+
+  it("holds a live moon bag through climax and skips the time flatten", () => {
+    const moon = position({
+      principalRecoveredSol: 0.1,
+      runner: true,
+      everGreen: true,
+      peakPriceUsd: 6,
+      openedAt: Date.now() - 10 * 60 * 60_000,
+      costOutMultiple: 3,
+    });
+    const climax = decideExit({
+      position: moon,
+      snap: snap({
+        priceUsd: 5,
+        pctFromEntry: 400,
+        pctFromPeak: -5,
+        sentiment: 0.7,
+        volume5m: 8000,
+        volumeBaseline5m: 4000,
+      }),
+      pattern: "climax",
+      policy,
+    });
+    expect(climax).toEqual({ type: "hold", reason: "moon_bag" });
   });
 
   it("holds a runner on healthy_dip instead of selling", () => {
@@ -126,9 +166,11 @@ describe("decideExit", () => {
     expect(action.reason).toBe("time_stop");
   });
 
-  it("does not let the LLM sell through a healthy dip or cancel a flatten", () => {
+  it("does not let the LLM sell through a healthy dip, moon bag, or cancel a flatten", () => {
     const hold = mergeLlmAction({ type: "hold", reason: "healthy_dip_hold" }, { action: "sell", confidence: 0.99 });
     expect(hold.reason).toBe("healthy_dip_hold");
+    const moon = mergeLlmAction({ type: "hold", reason: "moon_bag" }, { action: "sell", confidence: 0.99 });
+    expect(moon.reason).toBe("moon_bag");
     const stop = mergeLlmAction({ type: "flatten", reason: "hard_stop" }, { action: "hold", confidence: 0.99 });
     expect(stop.reason).toBe("hard_stop");
   });

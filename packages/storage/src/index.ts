@@ -185,14 +185,42 @@ function migrate(db: DatabaseSync): void {
       rung_from INTEGER NOT NULL DEFAULT 100,
       rung_to INTEGER NOT NULL DEFAULT 5000
     );
+
+    CREATE TABLE IF NOT EXISTS opportunities (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      at INTEGER NOT NULL,
+      mint TEXT NOT NULL,
+      ticker TEXT NOT NULL,
+      sentiment REAL NOT NULL DEFAULT 0,
+      score REAL NOT NULL DEFAULT 0,
+      volume5m REAL NOT NULL DEFAULT 0,
+      price_usd REAL NOT NULL DEFAULT 0,
+      cost_out_multiple REAL NOT NULL DEFAULT 2,
+      reason TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'open',
+      note TEXT NOT NULL DEFAULT '',
+      resolved_at INTEGER,
+      post_price_usd REAL,
+      multiple_seen REAL
+    );
   `);
   migrateBudgetByMode(db);
+  ensureColumn(db, "positions", "cost_out_multiple", "REAL NOT NULL DEFAULT 2");
   seedStarterTodos(db);
 }
 
-function budgetColumns(db: DatabaseSync): Set<string> {
-  const cols = db.prepare("PRAGMA table_info(budget)").all() as Array<{ name: string }>;
+function tableColumns(db: DatabaseSync, table: string): Set<string> {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
   return new Set(cols.map((c) => c.name));
+}
+
+function ensureColumn(db: DatabaseSync, table: string, name: string, ddl: string): void {
+  if (tableColumns(db, table).has(name)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${ddl}`);
+}
+
+function budgetColumns(db: DatabaseSync): Set<string> {
+  return tableColumns(db, "budget");
 }
 
 /** Old DBs had one ledger per day. Mixed spend was paper; LIVE must start at 0. */
@@ -242,6 +270,7 @@ export interface NewPosition {
   thesis?: string;
   score?: number;
   entryTx?: string;
+  costOutMultiple?: number;
 }
 
 export function insertPosition(store: Store, p: NewPosition): number {
@@ -250,8 +279,8 @@ export function insertPosition(store: Store, p: NewPosition): number {
       `INSERT INTO positions (
         mint, ticker, mode, opened_at, entry_price_usd, principal_sol,
         tokens_held, tokens_initial, sol_spent, peak_price_usd, sources_json,
-        entry_metrics_json, thesis, score, entry_tx
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        entry_metrics_json, thesis, score, entry_tx, cost_out_multiple
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       p.mint,
@@ -269,6 +298,7 @@ export function insertPosition(store: Store, p: NewPosition): number {
       p.thesis ?? null,
       p.score ?? null,
       p.entryTx ?? null,
+      p.costOutMultiple ?? 2,
     );
   return Number(result.lastInsertRowid);
 }
@@ -359,6 +389,7 @@ export interface PositionRow {
   healthy_dip_used: number;
   post_exit_price_usd: number | null;
   mistake: string | null;
+  cost_out_multiple: number;
 }
 
 export function updatePosition(store: Store, id: number, patch: Record<string, unknown>): void {
@@ -860,4 +891,119 @@ export function updateChallengeIdea(
   const size = patch.sizeUsd != null && Number.isFinite(patch.sizeUsd) ? Number(patch.sizeUsd) : row.size_usd;
   store.db.prepare("UPDATE challenge_ideas SET status = ?, note = ?, size_usd = ? WHERE id = ?").run(status, note, size, id);
   return getChallengeIdea(store, id);
+}
+
+export type OpportunityStatus = "open" | "filled" | "missed" | "skipped" | "expired";
+
+export interface OpportunityRow {
+  id: number;
+  at: number;
+  mint: string;
+  ticker: string;
+  sentiment: number;
+  score: number;
+  volume5m: number;
+  price_usd: number;
+  cost_out_multiple: number;
+  reason: string;
+  status: OpportunityStatus;
+  note: string;
+  resolved_at: number | null;
+  post_price_usd: number | null;
+  multiple_seen: number | null;
+}
+
+const OPPORTUNITY_TTL_MS = 6 * 3600_000;
+
+export function expireOldOpportunities(store: Store, now = Date.now()): void {
+  store.db
+    .prepare("UPDATE opportunities SET status = 'expired', resolved_at = ? WHERE status = 'open' AND at < ?")
+    .run(now, now - OPPORTUNITY_TTL_MS);
+}
+
+export function getOpportunity(store: Store, id: number): OpportunityRow | undefined {
+  return store.db.prepare("SELECT * FROM opportunities WHERE id = ?").get(id) as OpportunityRow | undefined;
+}
+
+export function latestOpenOpportunity(store: Store, mint: string): OpportunityRow | undefined {
+  expireOldOpportunities(store);
+  return store.db
+    .prepare("SELECT * FROM opportunities WHERE mint = ? AND status = 'open' ORDER BY id DESC LIMIT 1")
+    .get(mint) as OpportunityRow | undefined;
+}
+
+export function listOpenOpportunities(store: Store): OpportunityRow[] {
+  expireOldOpportunities(store);
+  return asRows<OpportunityRow[]>(
+    store.db.prepare("SELECT * FROM opportunities WHERE status = 'open' ORDER BY id DESC").all(),
+  );
+}
+
+export function listOpportunities(store: Store, limit = 40): OpportunityRow[] {
+  expireOldOpportunities(store);
+  return asRows<OpportunityRow[]>(
+    store.db.prepare("SELECT * FROM opportunities ORDER BY id DESC LIMIT ?").all(limit),
+  );
+}
+
+export function insertOpportunity(
+  store: Store,
+  row: {
+    mint: string;
+    ticker: string;
+    sentiment: number;
+    score: number;
+    volume5m: number;
+    priceUsd: number;
+    costOutMultiple: number;
+    reason: string;
+    note?: string;
+  },
+): OpportunityRow {
+  const existing = latestOpenOpportunity(store, row.mint);
+  if (existing) return existing;
+  const result = store.db
+    .prepare(
+      `INSERT INTO opportunities (
+        at, mint, ticker, sentiment, score, volume5m, price_usd, cost_out_multiple, reason, status, note
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?)`,
+    )
+    .run(
+      Date.now(),
+      row.mint,
+      row.ticker.slice(0, 32),
+      row.sentiment,
+      row.score,
+      row.volume5m,
+      row.priceUsd,
+      row.costOutMultiple,
+      row.reason.slice(0, 240),
+      (row.note ?? "").slice(0, 1000),
+    );
+  return getOpportunity(store, Number(result.lastInsertRowid))!;
+}
+
+export function markOpportunityFilled(store: Store, mint: string): void {
+  store.db
+    .prepare("UPDATE opportunities SET status = 'filled', resolved_at = ? WHERE mint = ? AND status = 'open'")
+    .run(Date.now(), mint);
+}
+
+export function markOpportunitySkipped(store: Store, id: number): OpportunityRow | undefined {
+  store.db
+    .prepare("UPDATE opportunities SET status = 'skipped', resolved_at = ? WHERE id = ? AND status = 'open'")
+    .run(Date.now(), id);
+  return getOpportunity(store, id);
+}
+
+export function markOpportunityMissed(
+  store: Store,
+  id: number,
+  opts: { postPriceUsd: number; multipleSeen: number; note?: string },
+): void {
+  store.db
+    .prepare(
+      "UPDATE opportunities SET status = 'missed', resolved_at = ?, post_price_usd = ?, multiple_seen = ?, note = ? WHERE id = ?",
+    )
+    .run(Date.now(), opts.postPriceUsd, opts.multipleSeen, (opts.note ?? "").slice(0, 1000), id);
 }

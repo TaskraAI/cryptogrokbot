@@ -53,6 +53,15 @@ export function decideExit(opts: {
   const pos = opts.position;
   const bagValueSol = pos.tokensHeld * solPerToken(opts.snap, pos);
   const recovered = pos.principalRecoveredSol >= pos.principalSol - 1e-9;
+  const costOut =
+    Number.isFinite(pos.costOutMultiple) && pos.costOutMultiple >= 1
+      ? pos.costOutMultiple
+      : opts.policy.returnPrincipalMultiple;
+  const volumeAlive =
+    opts.snap.volumeBaseline5m <= 0
+      ? opts.snap.volume5m > 0
+      : opts.snap.volume5m >= (opts.snap.volumeBaseline5m * opts.policy.volumeAlivePctOfBaseline) / 100;
+  const moonAlive = volumeAlive || opts.snap.sentiment >= opts.policy.highSentiment;
 
   if (opts.sellAll) return { type: "flatten", reason: "sellall" };
   if (opts.lpPulled) return { type: "flatten", reason: "rug" };
@@ -64,7 +73,7 @@ export function decideExit(opts: {
   }
   if (recovered && opts.position.peakPriceUsd > 0) {
     const trailPct = ((opts.snap.priceUsd - pos.peakPriceUsd) / pos.peakPriceUsd) * 100;
-    if (trailPct <= -opts.policy.runnerTrailPct && opts.pattern !== "healthy_dip") {
+    if (trailPct <= -opts.policy.runnerTrailPct && opts.pattern !== "healthy_dip" && !moonAlive) {
       return { type: "flatten", reason: "hard_stop" };
     }
   }
@@ -75,13 +84,12 @@ export function decideExit(opts: {
   }
 
   if (!recovered) {
-    const ready =
-      bagValueSol + pos.principalRecoveredSol >= pos.principalSol * opts.policy.returnPrincipalMultiple;
+    const ready = bagValueSol + pos.principalRecoveredSol >= pos.principalSol * costOut;
     if (ready) return { type: "return_principal", reason: "compound" };
     return { type: "hold", reason: "awaiting_principal" };
   }
 
-  if (ageMin >= opts.policy.maxRunnerHoldMinutes) {
+  if (ageMin >= opts.policy.maxRunnerHoldMinutes && !moonAlive) {
     return { type: "flatten", reason: "max_runner_hold" };
   }
 
@@ -96,8 +104,9 @@ export function decideExit(opts: {
   }
 
   if (opts.pattern === "fade") return { type: "sell_runner", reason: "fade" };
+  if (opts.pattern === "climax" && moonAlive) return { type: "hold", reason: "moon_bag" };
   if (opts.pattern === "climax") return { type: "sell_runner", reason: "climax" };
-  return { type: "hold", reason: "chop_hold" };
+  return { type: "hold", reason: moonAlive ? "moon_bag" : "chop_hold" };
 }
 
 function solPerToken(snap: MarketSnapshot, pos: PositionState): number {
@@ -127,6 +136,7 @@ export function mergeLlmAction(
 ): ExitAction {
   if (!llm) return deterministic;
   if (deterministic.reason === "healthy_dip_hold") return deterministic;
+  if (deterministic.reason === "moon_bag") return deterministic;
   if (deterministic.type === "flatten") return deterministic;
   if (deterministic.reason === "awaiting_principal") return deterministic;
   if (deterministic.type === "hold" && llm.action === "sell" && (llm.confidence ?? 0) >= 0.7) {

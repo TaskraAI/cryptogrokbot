@@ -159,6 +159,7 @@ async function renderHome() {
     " · auto live desk needs MASTER · only Grok Bot Bearer can buy/sell</div>" +
     masterCardHtml(d) +
     grokAsksHtml(d) +
+    gemsHtml(d) +
     challengeCardHtml(d) +
     '<div class="card"><h2 style="margin-top:0">P&amp;L</h2>' +
     "<p>Paper net <b>" + Number(d.pnl.paperNetSol).toFixed(4) + " SOL</b> · " + d.pnl.paperTrades + " closed</p>" +
@@ -204,6 +205,7 @@ async function renderHome() {
   bindMaster();
   bindChallenge();
   bindSizeAsks();
+  bindGems();
   await bindAccess();
 }
 
@@ -298,6 +300,51 @@ function bindMaster() {
       renderHome();
     };
   }
+}
+
+function gemsHtml(d) {
+  const rows = d.opportunities || [];
+  if (!rows.length) return "";
+  return rows.map((o) => {
+    const can = Boolean(d.canPlaceOrders);
+    return (
+      '<div class="card"><h2 style="margin-top:0">Gem — buy this</h2>' +
+      "<p><b>" + esc(o.ticker) + "</b> hype <b>" + Number(o.sentiment).toFixed(2) +
+      "</b> · score " + Number(o.score).toFixed(0) +
+      " · vol5m " + Number(o.volume5m).toLocaleString() +
+      " · cost-out <b>" + Number(o.costOutMultiple) + "x</b> then moon bag</p>" +
+      "<p class='muted'>" + esc(o.mint) + "</p>" +
+      "<p class='muted'>" + esc(o.note || "Grok Bot decides. Do not wait.") + "</p>" +
+      (can
+        ? '<div class="row"><button data-gem="' + o.id + '" data-action="buy">Buy ' + Number(o.sizeSol) + " SOL</button>" +
+          '<button class="ghost" data-gem="' + o.id + '" data-action="skip">Skip</button></div>'
+        : "<p>Tell Grok Bot: buy " + Number(o.sizeSol) + " SOL of " + esc(o.ticker) +
+          " (Bearer POST /api/buy). Dashboard login cannot place orders.</p>") +
+      '<p class="muted" data-gem-msg="' + o.id + '"></p></div>'
+    );
+  }).join("");
+}
+
+function bindGems() {
+  document.querySelectorAll("button[data-gem]").forEach((btn) => {
+    btn.onclick = async () => {
+      const id = btn.dataset.gem;
+      const action = btn.dataset.action;
+      const msg = document.querySelector('[data-gem-msg="' + id + '"]');
+      document.querySelectorAll("button[data-gem='" + id + "']").forEach((b) => { b.disabled = true; });
+      if (msg) msg.textContent = "sending…";
+      try {
+        const r = await api("/api/opportunities/" + id, {
+          method: "POST",
+          body: JSON.stringify({ action }),
+        });
+        if (msg) msg.textContent = r.message || (r.ok ? "done" : "answered");
+      } catch (e) {
+        if (msg) msg.textContent = e.message || "failed";
+      }
+      renderHome();
+    };
+  });
 }
 
 function grokAsksHtml(d) {

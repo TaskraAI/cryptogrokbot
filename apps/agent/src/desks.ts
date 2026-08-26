@@ -259,7 +259,7 @@ function clip(v: string, n = 400): string {
 export function buildDeskPrompt(desk: DeskDef, fields: Record<string, string>, grounded: string): string {
   const f = (k: string, fallback = "") => clip(fields[k] || fallback);
   const numbered = desk.sections.map((s, i) => `${i + 1}. ${s}`).join("\n");
-  const rules = `You are CryptoGrokBot on cryptogrokbot.com — a personal Solana meme-coin night desk. Paper is default. Never recommend disabling hard stops. Dip + high/rising sentiment + volume alive = HOLD. Dedicated hot wallet only. Number every section. Be brutally honest. This is research, not financial advice. Year: 2026. Taskra's rung challenge is $100 → $5,000 → $10,000 then ~2x rungs to $1,000,000 on crypto only. Do not promise that path. Live crypto size stays at policy maxSolPerTrade. Do not research Polymarket until Taskra enables it.`;
+  const rules = `You are CryptoGrokBot on cryptogrokbot.com — a personal Solana meme-coin night desk. Paper is default. Never recommend disabling hard stops. Dip + high/rising sentiment + volume alive = HOLD. Dedicated hot wallet only. Number every section. Be brutally honest. This is research, not financial advice. Year: 2026. Taskra's rung challenge is $100 → $5,000 → $10,000 then ~2x rungs to $1,000,000 on crypto only. Do not promise that path. Live crypto size stays at policy maxSolPerTrade. Grok Bot buys hype+volume without asking Taskra. Cost-out 2–5x then moon bag. Do not research Polymarket until Taskra enables it.`;
 
   if (desk.id === "sentiment") {
     return `${rules}
@@ -540,7 +540,7 @@ const FRAMEWORK_NOTES: Record<string, string[]> = {
   timing: [
     "Entries: only in desk-valid setups (score + rules). No FOMO mid-vertical.",
     "DCA: split the maxSolPerTrade budget, never extra budget unless ALLOW_EXTRA_BUDGET.",
-    "Take-profit: return principal at 1x first, then runner with trail. 100x is not a plan.",
+    "Take-profit: cost-out initial SOL at 2x–5x (stronger gems wait longer), then moon bag. 100x is the hunt, not a promise.",
     "Stop: desk hard stop is the floor. Tighter is allowed; looser is not.",
     "Watch: 5m volume, impact, LP, BTC beta if the book is risk-off.",
     "Sentiment: high/rising + healthy dip + volume alive = HOLD, not sell.",
@@ -561,10 +561,10 @@ const FRAMEWORK_NOTES: Record<string, string[]> = {
     "Allocation: this hot wallet is meme-risk, not a 60/40. Keep a boring stack elsewhere.",
     "Names: watchlist blue-chip memes vs high-risk new; never the whole budget in one mint.",
     "Blue vs degen: conservative 80/20, moderate 60/40, aggressive 40/60 — still cap per trade.",
-    "Rebalance: after a 1x principal return, or weekly, not every candle.",
-    "Take profits: principal first, then scale out into strength. Do not disable stops to 'let it run'.",
+    "Rebalance: after a 2–5x cost-out, or weekly, not every candle.",
+    "Take profits: recover the initial SOL, then hold the moon bag. Do not flatten a live runner to 'take it all'.",
     "Risk: daily budget, max trades, loss cap, cooldown. Hitting a cap stops buys, not paper exits.",
-    "Sizing: ≤ maxSolPerTrade unless Taskra confirms a high-sentiment one-shot up to sizeAskCeilingSol. Never auto-bump.",
+    "Sizing: ≤ maxSolPerTrade. Grok Bot buys hype+volume without asking. Never auto-bump past the cap.",
     "Review: after each session + a weekly grade of closed fills (win/meh/fail).",
   ],
   scams: [

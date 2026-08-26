@@ -135,6 +135,13 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
   };
   const pm = readFileSync(resolve(repoRoot, "apps/agent/src/polymarket.ts"), "utf8");
   const chalSrc = readFileSync(resolve(repoRoot, "apps/agent/src/challenge.ts"), "utf8");
+  const entries = readFileSync(resolve(repoRoot, "apps/agent/src/entries.ts"), "utf8");
+  const policyJson = JSON.parse(readFileSync(resolve(repoRoot, "config/policy.json"), "utf8")) as {
+    returnPrincipalMultiple?: number;
+    costOutMinMultiple?: number;
+    costOutMaxMultiple?: number;
+    maxSolPerTrade?: number;
+  };
   const chalOk =
     chal.startUsd === 100 &&
     chal.goalUsd === 1_000_000 &&
@@ -146,7 +153,14 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     chalSrc.includes("Do not research or trade Polymarket until Taskra says it is time.") &&
     pm.includes("gamma-api.polymarket.com") &&
     !pm.includes("clob.polymarket.com") &&
-    !pm.includes("/order");
+    !pm.includes("/order") &&
+    policyJson.returnPrincipalMultiple === 2 &&
+    policyJson.costOutMinMultiple === 2 &&
+    policyJson.costOutMaxMultiple === 5 &&
+    policyJson.maxSolPerTrade === 0.05 &&
+    entries.includes("insertOpportunity") &&
+    entries.includes("pickCostOutMultiple") &&
+    !entries.includes("Ask Taskra in the Grok Bot app before investing");
   const refuses =
     trade.includes("liveTxBlocked") &&
     trade.includes("MASTER_ENABLED is not true") &&
@@ -154,6 +168,7 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     trade.includes("grokBotOrder") &&
     board.includes("only Grok Bot can place buy/sell orders") &&
     board.includes("/api/master") &&
+    board.includes("/api/opportunities") &&
     exec.includes("refuseOversizeBuy") &&
     exec.includes("size") &&
     exec.includes("exceeds maxSolPerTrade") &&

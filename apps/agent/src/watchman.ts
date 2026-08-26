@@ -34,6 +34,7 @@ export function rowToPosition(row: PositionRow): PositionState {
     healthyDipSince: row.healthy_dip_since,
     status: row.status === "closed" ? "closed" : "open",
     sourcesJson: row.sources_json,
+    costOutMultiple: Number(row.cost_out_multiple) > 0 ? Number(row.cost_out_multiple) : 2,
   };
 }
 

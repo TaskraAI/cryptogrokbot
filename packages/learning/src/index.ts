@@ -157,6 +157,9 @@ export function tagMistake(opts: {
   if (opts.exitReason && ["fade", "climax", "sentiment"].includes(opts.exitReason) && opts.lastPattern === "healthy_dip" && opts.postExitPctChange >= 10) {
     return "sold_dip_that_bounced";
   }
+  if (opts.exitReason && ["fade", "climax", "sentiment", "max_runner_hold"].includes(opts.exitReason) && opts.postExitPctChange >= 20) {
+    return "sold_moon_bag_too_early";
+  }
   if (opts.lastPattern === "healthy_dip" && opts.exitReason === "hard_stop") {
     return "held_fake_sentiment_dump";
   }
@@ -411,7 +414,9 @@ export function lessonPrompt(lessons: string, few: PositionRow[]): string {
     .join("\n");
   return `You advise a Solana meme-coin night agent. Return JSON only.
 Rules: never disable hard stops or rugs. healthy_dip with high sentiment must HOLD.
-You cannot increase size or spend budget.
+After cost-out, leftover is a moon bag — HOLD through chop/climax if volume or hype is alive. Sell fade/dump.
+Cost-out is 2x–5x of principal (Grok Bot picks). Do not cash out at 1x.
+You cannot increase size or spend budget. Missing a 2x+ runner after a passing hype+volume screen is a mistake.
 
 Lessons:\n${lessons.slice(-4000)}\n
 Similar past trades:\n${shots || "none yet"}`;

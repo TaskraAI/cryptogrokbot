@@ -16,7 +16,12 @@ export interface Policy {
   dailyLossCapSol: number;
   cooldownSeconds: number;
   minIndependentSources: number;
+  /** Floor for cost-out. Grok Bot may wait up to costOutMaxMultiple on stronger gems. */
   returnPrincipalMultiple: number;
+  /** Take initial SOL back at this multiple (2x) on weaker names. */
+  costOutMinMultiple: number;
+  /** Strong hype+volume names wait until this multiple (5x) before cost-out. */
+  costOutMaxMultiple: number;
   sentimentPollSeconds: number;
   maxRunnerHoldMinutes: number;
   hardStopPct: number;
@@ -48,7 +53,9 @@ export const DEFAULT_POLICY: Policy = {
   dailyLossCapSol: 0.3,
   cooldownSeconds: 180,
   minIndependentSources: 2,
-  returnPrincipalMultiple: 1.0,
+  returnPrincipalMultiple: 2.0,
+  costOutMinMultiple: 2,
+  costOutMaxMultiple: 5,
   sentimentPollSeconds: 180,
   maxRunnerHoldMinutes: 480,
   hardStopPct: -25,
@@ -150,13 +157,14 @@ export type ExitReason =
   | "sentiment"
   | "healthy_dip_hold"
   | "chop_hold"
-  | "awaiting_principal";
+  | "awaiting_principal"
+  | "moon_bag";
 
 export type ExitAction =
   | { type: "flatten"; reason: Extract<ExitReason, "hard_stop" | "rug" | "time_stop" | "sellall" | "max_runner_hold" | "dump"> }
   | { type: "return_principal"; reason: "compound" }
   | { type: "sell_runner"; reason: Extract<ExitReason, "fade" | "climax" | "sentiment"> }
-  | { type: "hold"; reason: Extract<ExitReason, "healthy_dip_hold" | "chop_hold" | "awaiting_principal"> };
+  | { type: "hold"; reason: Extract<ExitReason, "healthy_dip_hold" | "chop_hold" | "awaiting_principal" | "moon_bag"> };
 
 export interface PositionState {
   id: number;
@@ -178,6 +186,8 @@ export interface PositionState {
   healthyDipSince: number | null;
   status: "open" | "closed";
   sourcesJson: string;
+  /** Per-bag cost-out target, usually 2–5. */
+  costOutMultiple: number;
 }
 
 export interface BudgetState {

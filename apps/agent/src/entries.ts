@@ -1,5 +1,5 @@
 import type { Policy, RuntimeFlags, SourceHit, TokenMetrics } from "@night/shared";
-import { applyEntryToBudget, canEnter, effectiveDailyBudgetSol, evaluateExtraRules, scoreCandidate, type ExtraRule, type Guardrail } from "@night/risk";
+import { applyEntryToBudget, canEnter, effectiveDailyBudgetSol, evaluateExtraRules, pickCostOutMultiple, scoreCandidate, type ExtraRule, type Guardrail } from "@night/risk";
 import { executeBuy } from "@night/execution";
 import { simulateSell } from "@night/signals";
 import { scoreSentiment } from "@night/tape";
@@ -9,11 +9,12 @@ import {
   getSizeAsk,
   insertDecision,
   insertFill,
+  insertOpportunity,
   insertPosition,
-  insertSizeAsk,
   insertSourceHit,
   latestOpenSizeAsk,
   listOpenPositions,
+  markOpportunityFilled,
   markSizeAskFilled,
   upsertBudget,
   type SizeAskRow,
@@ -93,33 +94,6 @@ export async function tryEnter(opts: {
   if (open.some((p) => p.mint === opts.token.mint)) {
     return `already in ${opts.token.ticker}`;
   }
-  const b = getBudget(opts.store, opts.dayKey, opts.flags.mode);
-  const budget: BudgetState = {
-    dayKey: b.day_key,
-    spentSol: b.spent_sol,
-    trades: b.trades,
-    realizedLossSol: b.realized_loss_sol,
-    lastEntryAt: b.last_entry_at,
-    extraBudgetSol: b.extra_budget_sol,
-  };
-  const gate = canEnter({
-    policy: opts.policy,
-    budget,
-    openPositions: listOpenPositions(opts.store, opts.flags.mode).length,
-    flags: opts.flags,
-    now,
-    allowExplicitLive: Boolean(opts.grokBotOrder),
-  });
-  if (!gate.ok) {
-    insertDecision(opts.store, {
-      at: now,
-      kind: "block",
-      mint: opts.token.mint,
-      allowed: false,
-      reason: gate.reason,
-    });
-    return `blocked ${opts.token.ticker}: ${gate.reason}`;
-  }
 
   if (opts.skipScore && opts.flags.mode === "LIVE") {
     return `blocked ${opts.token.ticker}: --force is paper-only`;
@@ -170,24 +144,18 @@ export async function tryEnter(opts: {
     }
   }
 
-  if (opts.flags.mode === "LIVE") {
-    const ok = await simulateSell(opts.token.mint, 1_000_000, Math.floor(opts.policy.slippagePctCap * 100));
-    if (!ok) {
-      insertDecision(opts.store, {
-        at: now,
-        kind: "block",
-        mint: opts.token.mint,
-        allowed: false,
-        reason: "pre-buy sell simulation failed",
-        score: scored.score,
-      });
-      return `blocked ${opts.token.ticker}: honeypot sim`;
-    }
-  }
-
+  const sentiment = scoreSentiment(opts.sources);
+  const uniqueSources = new Set(opts.sources.map((s) => `${s.platform}:${s.key.toLowerCase()}`)).size;
+  const costOutMultiple = pickCostOutMultiple({
+    policy: opts.policy,
+    sentiment,
+    score: scored.score,
+    volume5m: opts.token.volume5m,
+    liquidityUsd: opts.token.liquidityUsd,
+    uniqueSources,
+  });
   const testSol = opts.policy.maxSolPerTrade;
   const ceilingSol = opts.policy.sizeAskCeilingSol;
-  const sentiment = scoreSentiment(opts.sources);
   const userPickedSize = opts.sol != null && opts.sizeAskId == null;
   let ask = opts.sizeAskId != null ? getSizeAsk(opts.store, opts.sizeAskId) : latestOpenSizeAsk(opts.store, opts.token.mint);
 
@@ -209,61 +177,82 @@ export async function tryEnter(opts: {
     }
   }
 
-  if (ask?.status === "pending" && !userPickedSize) {
-    insertDecision(opts.store, {
-      at: now,
-      kind: "ask",
-      mint: opts.token.mint,
-      allowed: false,
-      reason: `waiting on size ask #${ask.id}`,
-      score: scored.score,
-      payload: { sentiment, askId: ask.id },
-    });
-    return sizeAskWaitMessage({
-      id: ask.id,
-      ticker: opts.token.ticker,
-      sentiment: ask.sentiment,
-      testSol,
-      ceilingSol,
-    });
-  }
-
-  const highSentiment = sentiment >= opts.policy.highSentiment;
-  const shouldAsk = !userPickedSize && !opts.skipScore && highSentiment;
-
-  if (shouldAsk && (!ask || ask.status === "pending")) {
-    if (!ask) {
-      ask = insertSizeAsk(opts.store, {
+  const b = getBudget(opts.store, opts.dayKey, opts.flags.mode);
+  const budget: BudgetState = {
+    dayKey: b.day_key,
+    spentSol: b.spent_sol,
+    trades: b.trades,
+    realizedLossSol: b.realized_loss_sol,
+    lastEntryAt: b.last_entry_at,
+    extraBudgetSol: b.extra_budget_sol,
+  };
+  const gate = canEnter({
+    policy: opts.policy,
+    budget,
+    openPositions: listOpenPositions(opts.store, opts.flags.mode).length,
+    flags: opts.flags,
+    now,
+    allowExplicitLive: Boolean(opts.grokBotOrder),
+  });
+  if (!gate.ok) {
+    if (gate.reason.includes("MASTER_ENABLED") && !opts.grokBotOrder) {
+      const opp = insertOpportunity(opts.store, {
         mint: opts.token.mint,
         ticker: opts.token.ticker,
         sentiment,
-        testSol,
-        note: `High sentiment ${sentiment.toFixed(2)}. Ask Taskra in the Grok Bot app before investing: keep ${testSol} SOL or increase up to ${ceilingSol}.`,
+        score: scored.score,
+        volume5m: opts.token.volume5m,
+        priceUsd: opts.token.priceUsd,
+        costOutMultiple,
+        reason: gate.reason,
+        note: `Hype ${sentiment.toFixed(2)} vol5m ${opts.token.volume5m}. Buy ${testSol} SOL, cost-out ${costOutMultiple}x, moon bag after.`,
       });
+      insertDecision(opts.store, {
+        at: now,
+        kind: "ask",
+        mint: opts.token.mint,
+        allowed: false,
+        reason: `opportunity #${opp.id} queued for Grok Bot`,
+        score: scored.score,
+        payload: { sentiment, opportunityId: opp.id, costOutMultiple },
+      });
+      return (
+        `opportunity #${opp.id} ${opts.token.ticker}: Grok Bot should buy ${testSol} SOL ` +
+        `(hype ${sentiment.toFixed(2)}, vol5m ${opts.token.volume5m}, cost-out ${costOutMultiple}x then moon bag). ` +
+        `Auto live blocked: ${gate.reason}`
+      );
     }
     insertDecision(opts.store, {
       at: now,
-      kind: "ask",
+      kind: "block",
       mint: opts.token.mint,
       allowed: false,
-      reason: `high sentiment ${sentiment.toFixed(2)}; waiting on size ask #${ask.id}`,
+      reason: gate.reason,
       score: scored.score,
-      payload: { sentiment, askId: ask.id },
     });
-    return sizeAskWaitMessage({
-      id: ask.id,
-      ticker: opts.token.ticker,
-      sentiment,
-      testSol,
-      ceilingSol,
-    });
+    return `blocked ${opts.token.ticker}: ${gate.reason}`;
+  }
+
+  if (opts.flags.mode === "LIVE") {
+    const ok = await simulateSell(opts.token.mint, 1_000_000, Math.floor(opts.policy.slippagePctCap * 100));
+    if (!ok) {
+      insertDecision(opts.store, {
+        at: now,
+        kind: "block",
+        mint: opts.token.mint,
+        allowed: false,
+        reason: "pre-buy sell simulation failed",
+        score: scored.score,
+      });
+      return `blocked ${opts.token.ticker}: honeypot sim`;
+    }
   }
 
   let requested: number;
   let cap = testSol;
   let fillAskId: number | undefined;
 
-  if (ask && (ask.status === "keep" || ask.status === "increase") && (shouldAsk || opts.sizeAskId != null)) {
+  if (ask && (ask.status === "keep" || ask.status === "increase") && opts.sizeAskId != null) {
     const ticket = ticketFromAsk(ask, testSol, ceilingSol);
     requested = ticket.sol;
     cap = ticket.cap;
@@ -271,6 +260,7 @@ export async function tryEnter(opts: {
   } else {
     requested = opts.sol ?? testSol;
     cap = testSol;
+    void userPickedSize;
   }
 
   if (!Number.isFinite(requested) || requested <= 0) {
@@ -329,9 +319,10 @@ export async function tryEnter(opts: {
     solSpent: result.sol,
     sourcesJson: JSON.stringify(opts.sources),
     entryMetricsJson: JSON.stringify(opts.token),
-    thesis: String(scored.checks.score ?? scored.score),
+    thesis: `score ${scored.checks.score ?? scored.score}; cost-out ${costOutMultiple}x then moon bag`,
     score: scored.score,
     entryTx: result.signature,
+    costOutMultiple,
   });
   insertFill(opts.store, {
     positionId: id,
@@ -368,13 +359,15 @@ export async function tryEnter(opts: {
   });
   if (fillAskId != null) markSizeAskFilled(opts.store, fillAskId);
   closeSizeAsksForMint(opts.store, opts.token.mint);
+  markOpportunityFilled(opts.store, opts.token.mint);
   insertDecision(opts.store, {
     at: now,
     kind: "entry",
     mint: opts.token.mint,
     allowed: true,
-    reason: `bought ${result.paper ? "paper" : "live"} ${result.sol} SOL`,
+    reason: `bought ${result.paper ? "paper" : "live"} ${result.sol} SOL cost-out ${costOutMultiple}x`,
     score: scored.score,
+    payload: { costOutMultiple, sentiment },
   });
   return `bought #${id} ${opts.token.ticker} ${result.sol} SOL ${result.paper ? "PAPER" : result.signature}`;
 }

@@ -9,7 +9,7 @@ Polymarket is **off** until I say otherwise. Do not scan it.
 This is not a promise. The first rung is 50x. Most 50x paths fail. Be honest.
 
 1. `GET /api/challenge` with the Bearer invite token (or curl 127.0.0.1:8787). Read `playbook.tonight`. Follow it.
-2. Crypto: MASTER stays off. Only you (Grok Bot Bearer) may buy/sell. Size stays at policy maxSolPerTrade (0.05 SOL). Ask me before any live spend.
+2. Crypto: MASTER stays off. Only you (Grok Bot Bearer) may buy/sell. Size stays at policy maxSolPerTrade (0.05 SOL). You decide: buy hype+volume, cost-out 2–5x, hold the moon bag. Do not wait to ask me.
 3. Do not raise limits. Do not YOLO the $100. Do not enable the GrokBot impersonator mint.
 4. End of session: rung, declared bankroll, open bags, one question for me.
 

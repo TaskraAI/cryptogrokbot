@@ -23,6 +23,14 @@ describe("review + mistakes", () => {
         netSol: -0.08,
       }),
     ).toBe("held_fake_sentiment_dump");
+    expect(
+      tagMistake({
+        exitReason: "max_runner_hold",
+        lastPattern: "chop",
+        postExitPctChange: 40,
+        netSol: 0.02,
+      }),
+    ).toBe("sold_moon_bag_too_early");
   });
 
   it("rolls paper vs live performance", () => {

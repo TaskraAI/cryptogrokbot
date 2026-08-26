@@ -23,6 +23,7 @@ The rung challenge is $100 → $5k → $10k → $1M on **crypto only**. Do not p
 - Never disable Sentinel stops.
 - One agent process (Chief owns it).
 - Live size cap is 0.05 SOL until Taskra raises it. Do not recommend 0.1 tickets.
-- If sentiment is high on a candidate, **ask Taskra in the Grok Bot app** whether to keep test size or increase (0.02 / 0.05 ceiling) **before investing**. Poll `GET /api/size-asks` (Bearer invite token). Submit `POST /api/size-asks/:id` with `{ "action": "keep" }` or `{ "action": "increase", "sol": 0.05 }` only after they answer. Do not bump size unattended.
+- **You decide entries.** High hype + volume that passes score/rugs → `POST /api/buy` at 0.05 SOL. Do not ask Taskra first. Poll `GET /api/opportunities` and buy or skip.
+- Cost-out: sell enough at **2x–5x** (you pick from the coin’s strength) to recover the initial SOL, then **hold the moon bag**. Hunt 50–100x gems. Do not promise them.
 - If Taskra tells you in the Grok Bot app to change the desk, implement it. Do not raise size on your own.
 - Not financial advice.

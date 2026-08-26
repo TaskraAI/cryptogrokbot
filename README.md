@@ -61,7 +61,7 @@ MODE=PAPER MASTER_ENABLED=false npm run agent -- --once
 npm run agent              # loop + dashboard http://127.0.0.1:8787/
 ```
 
-Default policy (`config/policy.json`): **0.05 SOL/day**, 5 trades, **0.05 SOL** live size cap (do not raise), −25% hard stop, return principal at 1x, 15% dip + sentiment ≥ 0.4 holds the runner.
+Default policy (`config/policy.json`): **0.05 SOL/day**, 5 trades, **0.05 SOL** live size cap (do not raise), −25% hard stop, cost-out at **2–5x** then moon bag, 15% dip + sentiment ≥ 0.4 holds the runner.
 
 ## Paper vs live
 
@@ -118,7 +118,7 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 - Dedicated hot wallet. Never point this at your main wallet.
 - Hitting `dailyBudgetSol`, `maxTradesPerDay`, or `dailyLossCapSol` **stops buys**, not paper exits. Auto live exits also stop when master is off. **Grok Bot Bearer** explicit orders can still live-trade while MASTER is off. **PAPER and LIVE each have their own daily ledger** — paper fills do not consume the live cap.
 - `extra_budget_sol` does **not** raise the daily cap unless `ALLOW_EXTRA_BUDGET=true`.
-- Per-trade size is refused inside `executeBuy` if it exceeds `maxSolPerTrade`. High sentiment does **not** auto-raise size: Grok Bot asks first (keep 0.01 or a one-shot increase up to `sizeAskCeilingSol`, currently 0.05).
+- Per-trade size is refused inside `executeBuy` if it exceeds `maxSolPerTrade`. High hype+volume **does** auto-buy at the cap (Grok Bot decides). Cost-out at 2–5x, then moon bag. Do not raise the 0.05 SOL cap.
 - Live buy runs a Jupiter sell-sim first. Freeze / guardrails / `/never` rules are hard denies.
 - LLM cannot disable a hard stop or sell through a `healthy_dip`.
 - Unauthenticated mutating API calls return 401. Owner session cannot buy/sell (403). Only Grok Bot Bearer places orders. The old open crew board is behind the same login.

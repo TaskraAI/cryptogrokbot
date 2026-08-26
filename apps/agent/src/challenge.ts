@@ -90,13 +90,13 @@ function rungJobs(rung: ReturnType<typeof currentRung>): string[] {
   if (rung.multiple >= 10) {
     return [
       "This rung is a 50x. Treat it as research + survival, not a daily compounding plan.",
-      "Crypto only: at most one tiny ticket inside maxSolPerTrade. Ask Taskra before any live spend. MASTER stays off.",
+      "Crypto only: buy hype+volume yourself at maxSolPerTrade. Grok Bot decides. Do not wait for Taskra. MASTER stays off.",
       "Never put more than ~10–20% of remaining bankroll on one mint, and never above the desk size cap.",
       "If declared bankroll drops under 50% of this rung start, pause 24h, grade the losses, no revenge trades.",
     ];
   }
   return [
-    `This rung is about ${rung.multiple.toFixed(2)}x (${fmtUsd(rung.from)} → ${fmtUsd(rung.to)}). Fewer moon tickets; return principal first.`,
+    `This rung is about ${rung.multiple.toFixed(2)}x (${fmtUsd(rung.from)} → ${fmtUsd(rung.to)}). Cash out cost at 2–5x (you pick), then hold the moon bag.`,
     "Crypto: Grok Bot Bearer only. Keep MASTER off. Size stays at policy maxSolPerTrade until Taskra raises it.",
     "Do not open Polymarket. Taskra will say when that venue is on.",
     "Update declared bankroll honestly after fills. Do not mark a rung done until the number is real.",
@@ -135,7 +135,7 @@ export function playbook(opts: {
     ],
     howToWork: [
       "Start every session with GET /api/challenge (Bearer invite token).",
-      "For Solana names: Scout/watchlist + scam radar + Intel desks. High sentiment → ask Taskra before size.",
+      "For Solana names: Scout + Intel. High hype+volume → BUY at maxSolPerTrade. Do not ask Taskra first. Poll GET /api/opportunities and POST /api/buy.",
       "Log crypto ideas with POST /api/challenge/ideas venue=solana. Update status won/lost/killed after the fill.",
       "PATCH/POST bankrollUsd only with a number Taskra agrees is real.",
     ],

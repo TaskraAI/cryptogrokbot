@@ -204,3 +204,36 @@ export function canReturnPrincipal(opts: {
   if (opts.recoveredSol + 1e-9 >= opts.principalSol) return false;
   return opts.bagValueSol + opts.recoveredSol >= opts.principalSol * opts.multiple;
 }
+
+/** Grok Bot picks 2x–5x cost-out from hype, volume, score, and book quality. */
+export function pickCostOutMultiple(opts: {
+  policy: Policy;
+  sentiment: number;
+  score: number;
+  volume5m: number;
+  liquidityUsd: number;
+  uniqueSources: number;
+}): number {
+  const min = Math.max(1, Number(opts.policy.costOutMinMultiple) || 2);
+  const max = Math.max(min, Number(opts.policy.costOutMaxMultiple) || 5);
+  let t = 0;
+  if (opts.sentiment >= opts.policy.highSentiment) t += 0.35;
+  if (opts.sentiment >= 0.65) t += 0.15;
+  if (opts.score >= 80) t += 0.2;
+  else if (opts.score >= 70) t += 0.1;
+  if (opts.volume5m >= 8000) t += 0.15;
+  else if (opts.volume5m >= 3000) t += 0.08;
+  if (opts.liquidityUsd >= 25_000) t += 0.1;
+  if (opts.uniqueSources >= 3) t += 0.1;
+  t = Math.min(1, Math.max(0, t));
+  if (t < 0.35) return min;
+  if (t < 0.55) return Math.min(max, min + 1);
+  if (t < 0.75) return Math.min(max, min + 2);
+  return max;
+}
+
+export function costOutMultipleForPosition(pos: { costOutMultiple?: number }, policy: Policy): number {
+  const n = Number(pos.costOutMultiple);
+  if (Number.isFinite(n) && n >= 1) return n;
+  return Number(policy.returnPrincipalMultiple) || policy.costOutMinMultiple || 2;
+}

@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_POLICY, dayKey } from "@night/shared";
-import { answerSizeAsk, getSizeAsk, latestOpenSizeAsk, listOpenPositions, listPendingSizeAsks, openStore } from "@night/storage";
+import { listOpenPositions, listPendingSizeAsks, openStore } from "@night/storage";
 import { scoreSentiment } from "@night/tape";
 import { tryEnter } from "../apps/agent/src/entries.ts";
 import { hit, quietHit, token } from "./fixtures.ts";
@@ -105,54 +105,14 @@ describe("paper entries", () => {
   });
 });
 
-describe("high-sentiment size ask", () => {
+describe("high-sentiment auto-buy", () => {
   it("scores the default bullish fixture above the high-sentiment gate", () => {
     expect(scoreSentiment([hit()])).toBeGreaterThanOrEqual(testPolicy.highSentiment);
     expect(scoreSentiment([quietHit()])).toBeLessThan(testPolicy.highSentiment);
   });
 
-  it("does not invest until Taskra answers the size ask", async () => {
+  it("buys hype+volume immediately instead of asking Taskra", async () => {
     const db = store();
-    const first = await tryEnter({
-      store: db,
-      policy: testPolicy,
-      flags: paperFlags,
-      token: token(),
-      sources: [hit()],
-      guardrails: [],
-      dayKey: dayKey(),
-    });
-    expect(first).toMatch(/^ask #/);
-    expect(first).toMatch(/Keep 0.01 SOL or increase up to 0.05/);
-    expect(listOpenPositions(db)).toHaveLength(0);
-    const pending = listPendingSizeAsks(db);
-    expect(pending).toHaveLength(1);
-    const second = await tryEnter({
-      store: db,
-      policy: testPolicy,
-      flags: paperFlags,
-      token: token(),
-      sources: [hit()],
-      guardrails: [],
-      dayKey: dayKey(),
-    });
-    expect(second).toMatch(new RegExp(`^ask #${pending[0]!.id}`));
-    expect(listPendingSizeAsks(db)).toHaveLength(1);
-  });
-
-  it("buys the test ticket after keep", async () => {
-    const db = store();
-    await tryEnter({
-      store: db,
-      policy: testPolicy,
-      flags: paperFlags,
-      token: token(),
-      sources: [hit()],
-      guardrails: [],
-      dayKey: dayKey(),
-    });
-    const ask = latestOpenSizeAsk(db, token().mint)!;
-    answerSizeAsk(db, ask.id, { status: "keep", chosenSol: 0.01 });
     const msg = await tryEnter({
       store: db,
       policy: testPolicy,
@@ -164,35 +124,9 @@ describe("high-sentiment size ask", () => {
     });
     expect(msg).toMatch(/^bought #/);
     expect(msg).toMatch(/0.01 SOL/);
-    expect(getSizeAsk(db, ask.id)?.status).toBe("filled");
-  });
-
-  it("buys a one-shot increase up to the ceiling, never 0.1", async () => {
-    const db = store();
-    await tryEnter({
-      store: db,
-      policy: testPolicy,
-      flags: paperFlags,
-      token: token(),
-      sources: [hit()],
-      guardrails: [],
-      dayKey: dayKey(),
-    });
-    const ask = latestOpenSizeAsk(db, token().mint)!;
-    answerSizeAsk(db, ask.id, { status: "increase", chosenSol: 0.1 });
-    const msg = await tryEnter({
-      store: db,
-      policy: testPolicy,
-      flags: paperFlags,
-      token: token(),
-      sources: [hit()],
-      guardrails: [],
-      dayKey: dayKey(),
-      sizeAskId: ask.id,
-    });
-    expect(msg).toMatch(/^bought #/);
-    expect(msg).toMatch(/0.05 SOL/);
-    expect(msg).not.toMatch(/0.1 SOL/);
+    expect(listOpenPositions(db)).toHaveLength(1);
+    expect(listOpenPositions(db)[0]?.cost_out_multiple).toBeGreaterThanOrEqual(2);
+    expect(listPendingSizeAsks(db)).toHaveLength(0);
   });
 
   it("still auto-enters at test size when sentiment is not high", async () => {
@@ -209,6 +143,57 @@ describe("high-sentiment size ask", () => {
     expect(msg).toMatch(/^bought #/);
     expect(msg).toMatch(/0.01 SOL/);
     expect(listPendingSizeAsks(db)).toHaveLength(0);
+  });
+
+  it("queues a Grok Bot opportunity when auto live is MASTER-blocked", async () => {
+    const db = store();
+    const { listOpenOpportunities } = await import("@night/storage");
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: false,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [hit()],
+      guardrails: [],
+      dayKey: dayKey(),
+    });
+    expect(msg).toMatch(/^opportunity #/);
+    expect(msg).toMatch(/Grok Bot should buy/);
+    expect(listOpenPositions(db)).toHaveLength(0);
+    expect(listOpenOpportunities(db)).toHaveLength(1);
+    expect(listOpenOpportunities(db)[0]?.ticker).toBe("MEME");
+  });
+
+  it("fills an explicit keep size-ask when Grok Bot passes sizeAskId", async () => {
+    const db = store();
+    const { insertSizeAsk, answerSizeAsk, getSizeAsk } = await import("@night/storage");
+    const ask = insertSizeAsk(db, {
+      mint: token().mint,
+      ticker: token().ticker,
+      sentiment: 0.77,
+      testSol: 0.01,
+      note: "legacy",
+    });
+    answerSizeAsk(db, ask.id, { status: "keep", chosenSol: 0.01 });
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [hit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      sizeAskId: ask.id,
+    });
+    expect(msg).toMatch(/^bought #/);
+    expect(msg).toMatch(/0.01 SOL/);
+    expect(getSizeAsk(db, ask.id)?.status).toBe("filled");
   });
 });
 

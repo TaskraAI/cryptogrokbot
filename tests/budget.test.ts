@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyEntryToBudget, applyRealizedPnl, canEnter, canReturnPrincipal, tokensToRecoverPrincipal } from "@night/risk";
+import { applyEntryToBudget, applyRealizedPnl, canEnter, canReturnPrincipal, pickCostOutMultiple, tokensToRecoverPrincipal } from "@night/risk";
 import { policy } from "./fixtures.ts";
 import type { BudgetState, RuntimeFlags } from "@night/shared";
 
@@ -133,6 +133,29 @@ describe("compound math", () => {
     expect(
       canReturnPrincipal({ bagValueSol: 1, principalSol: 0.1, recoveredSol: 0.1, multiple: 1 }),
     ).toBe(false);
+  });
+
+  it("picks 2x cost-out on weak names and 5x on strong hype+volume", () => {
+    expect(
+      pickCostOutMultiple({
+        policy,
+        sentiment: 0.1,
+        score: 60,
+        volume5m: 500,
+        liquidityUsd: 6000,
+        uniqueSources: 1,
+      }),
+    ).toBe(2);
+    expect(
+      pickCostOutMultiple({
+        policy,
+        sentiment: 0.8,
+        score: 90,
+        volume5m: 20_000,
+        liquidityUsd: 80_000,
+        uniqueSources: 4,
+      }),
+    ).toBe(5);
   });
 
   it("counts only losses toward the daily loss cap", () => {

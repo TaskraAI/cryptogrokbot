@@ -13,11 +13,13 @@ import {
   listTodos,
   listUngradedClosed,
   listPendingSizeAsks,
+  listOpenOpportunities,
   insertTodo,
   insertFeedback,
   setTodoDone,
   getSizeAsk,
   answerSizeAsk,
+  markOpportunitySkipped,
   getBudget,
   setFlag,
   insertChallengeIdea,
@@ -257,6 +259,23 @@ function publicPosition(p: ReturnType<typeof listRecentPositions>[number]) {
     grade_note: p.grade_note,
     opened_at: p.opened_at,
     closed_at: p.closed_at,
+  };
+}
+
+function publicOpportunity(o: ReturnType<typeof listOpenOpportunities>[number], policy: Policy) {
+  return {
+    id: o.id,
+    mint: o.mint,
+    ticker: o.ticker,
+    sentiment: o.sentiment,
+    score: o.score,
+    volume5m: o.volume5m,
+    priceUsd: o.price_usd,
+    costOutMultiple: o.cost_out_multiple,
+    reason: o.reason,
+    note: o.note,
+    at: o.at,
+    sizeSol: policy.maxSolPerTrade,
   };
 }
 
@@ -566,6 +585,7 @@ async function routeAuthed(
         ? { ok: scan.ok === 1, summary: scan.summary, at: scan.at, details: JSON.parse(scan.details_json) }
         : null,
       sizeAsks: listPendingSizeAsks(ctx.store).map((a) => publicSizeAsk(a, ctx.policy)),
+      opportunities: listOpenOpportunities(ctx.store).map((o) => publicOpportunity(o, ctx.policy)),
       challenge: challengeState(ctx),
     });
     return;
@@ -968,6 +988,44 @@ async function routeAuthed(
       ctx.crew.error("grok", err instanceof Error ? err.message : "desk failed");
       json(res, 400, { error: err instanceof Error ? err.message : "desk failed" });
     }
+    return;
+  }
+
+  if (path === "/api/opportunities" && method === "GET") {
+    json(res, 200, {
+      opportunities: listOpenOpportunities(ctx.store).map((o) => publicOpportunity(o, ctx.policy)),
+      sizeSol: ctx.policy.maxSolPerTrade,
+      costOutMin: ctx.policy.costOutMinMultiple,
+      costOutMax: ctx.policy.costOutMaxMultiple,
+    });
+    return;
+  }
+
+  const oppOne = path.match(/^\/api\/opportunities\/(\d+)$/);
+  if (oppOne && method === "POST") {
+    if (refuseUnlessGrokBot(res, actor)) return;
+    const opp = listOpenOpportunities(ctx.store).find((o) => o.id === Number(oppOne[1]));
+    if (!opp) {
+      json(res, 404, { error: "opportunity not found" });
+      return;
+    }
+    const body = await readJson(req);
+    const action = str(body.action).toLowerCase();
+    if (action === "skip") {
+      markOpportunitySkipped(ctx.store, opp.id);
+      json(res, 200, { ok: true, skipped: true, id: opp.id });
+      return;
+    }
+    if (action === "buy") {
+      const result = await ctx.buy({
+        mint: opp.mint,
+        sol: ctx.policy.maxSolPerTrade,
+        grokBotOrder: true,
+      });
+      json(res, result.ok ? 200 : 400, result);
+      return;
+    }
+    json(res, 400, { error: "action must be buy or skip" });
     return;
   }
 

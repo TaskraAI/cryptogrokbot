@@ -19,13 +19,15 @@ import {
   getFlag,
   listAllClosed,
   listClosedSince,
+  listOpenOpportunities,
   listOpenPositions,
+  markOpportunityMissed,
   recentSourceHits,
   updatePosition,
   upsertBudget,
   type Store,
 } from "@night/storage";
-import { applyNightlyLearning, askGrokResearch, askLlm, lessonPrompt, loadLessons, similarFewShots, tagMistake } from "@night/learning";
+import { appendLesson, applyNightlyLearning, askGrokResearch, askLlm, lessonPrompt, loadLessons, similarFewShots, tagMistake } from "@night/learning";
 import { notify } from "@night/telegram";
 import { CrewBoard } from "@night/crew";
 import type { AppConfig } from "./config.ts";
@@ -136,6 +138,7 @@ export class AgentRuntime {
     this.crew.start("scholar", "shadow marks + nightly stats");
     try {
       await this.shadowMark(logs);
+      await this.gradeMisses(logs);
       this.maybeNightly();
       this.crew.idle("scholar", "journal up to date");
     } catch (err) {
@@ -233,6 +236,18 @@ export class AgentRuntime {
     logs.push(msg);
     if (msg.startsWith("bought")) {
       await notify(this.cfg.telegramToken, this.cfg.telegramChatId, msg);
+      return;
+    }
+    if (msg.startsWith("opportunity ")) {
+      const id = Number(/opportunity #(\d+)/.exec(msg)?.[1]);
+      this.crew.blocked("grok", msg);
+      if (!id || this.notifiedSizeAsks.has(id)) return;
+      this.notifiedSizeAsks.add(id);
+      await notify(
+        this.cfg.telegramToken,
+        this.cfg.telegramChatId,
+        `Gem opportunity — Grok Bot should buy:\n${msg}\nPOST /api/buy with Bearer. Do not wait for Taskra.`,
+      );
       return;
     }
     if (!msg.startsWith("ask ")) return;
@@ -440,6 +455,30 @@ export class AgentRuntime {
       );
     }
     return out.join("\n") || "no positions";
+  }
+
+  private async gradeMisses(logs: string[]): Promise<void> {
+    const now = Date.now();
+    for (const opp of listOpenOpportunities(this.store)) {
+      if (now - opp.at < 30 * 60_000) continue;
+      if (!opp.price_usd) continue;
+      const pair = await fetchDexToken(opp.mint);
+      const price = Number(pair?.priceUsd ?? 0);
+      if (!price) continue;
+      const multiple = price / opp.price_usd;
+      if (multiple >= 2) {
+        markOpportunityMissed(this.store, opp.id, {
+          postPriceUsd: price,
+          multipleSeen: multiple,
+          note: `ran ${multiple.toFixed(1)}x after we did not buy`,
+        });
+        appendLesson(
+          this.cfg.lessonsPath,
+          `MISSED GEM ${opp.ticker}: ${multiple.toFixed(1)}x after skip (hype ${opp.sentiment.toFixed(2)} vol5m ${opp.volume5m}). Buy hype+volume faster. Do not wait for Taskra.`,
+        );
+        logs.push(`missed-gem ${opp.ticker} ${multiple.toFixed(1)}x`);
+      }
+    }
   }
 
   private maybeNightly(): void {

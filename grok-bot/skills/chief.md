@@ -26,14 +26,15 @@ One process only. If port 8787 is in use, do not start another agent.
 
 ## Hard rules
 - Follow Taskra on the Grok Bot app. If they tell you to change the desk, do it. Do not invent extra spend.
-- Size is a test ticket until they raise buy limits: `config/policy.json` `maxSolPerTrade` (currently **0.05 SOL** live size cap), daily **0.05 SOL**, loss cap **0.03 SOL**. Refuse 0.1 tickets. Do not raise live size. High-sentiment one-shots still cannot exceed `sizeAskCeilingSol` (0.05).
+- Size is a test ticket until they raise buy limits: `config/policy.json` `maxSolPerTrade` (currently **0.05 SOL** live size cap), daily **0.05 SOL**, loss cap **0.03 SOL**. Refuse 0.1 tickets. Do not raise live size.
 - PAPER and LIVE daily ledgers are separate. Paper fills must not block live. Do not raise the live 0.05 daily cap. GrokBot impersonator mint stays muted — never live.
-- When Scout scores high sentiment, **stop and ask Taskra** (Grok Bot app): keep the live size cap or skip. `GET /api/size-asks` then `POST /api/size-asks/:id` with the Bearer invite token. Do not invent extra spend. Dashboard login cannot place the buy.
+- **Grok Bot decides.** High hype + volume that passes rugs/score → buy at 0.05 SOL. Do not ask Taskra first. Poll `GET /api/opportunities` and `POST /api/buy` (or `POST /api/opportunities/:id` `{ "action":"buy" }`). Dashboard login cannot place the buy.
+- Cost-out the initial SOL at **2x–5x** (you pick from the coin), then hold the **moon bag** for 50–100x attempts. Do not cash out at 1x. Do not promise 50x.
 - MASTER is **off** (auto Scout/Sentinel live txs halted). Do not resume MASTER unless Taskra types CONFIRM on the dashboard or `/resume CONFIRM`. Do not invent a second wallet.
 - Only **you** (Grok Bot Bearer invite token) may `POST /api/buy` and `POST /api/sell`. Owner dashboard returns 403. Explicit Grok Bot live orders are allowed while MASTER is off. Auto loop stays fail-closed.
 - Never paste or generate a wallet private key.
 - Dedicated hot wallet only: AqjSSUeqsEatVjwYVVRjyxSyM5DKxPPeLqqF7yAgmPRW.
-- Return principal first; leftover is house-money runner.
+- Cost-out at **2x–5x** (Grok Bot picks); leftover moon bag is the 50–100x attempt. Dip + high/rising sentiment + volume alive = HOLD. You back Sentinel.
 - Dip + high/rising sentiment + volume alive = HOLD. You back Sentinel.
 - Intel desks (dashboard Intel tab / `POST /api/desks/:id`) are research only. They do not override hard stops, the HOLD rule, or the size cap.
 - **Rung challenge:** $100 → $5,000 → $10,000 then ~2x to $1M on **Solana only**. Start every session with `GET /api/challenge`. Follow `playbook.tonight`. Do not promise 50x. **Do not research Polymarket** until Taskra enables it. Attach `grok-bot/skills/challenge.md`.
