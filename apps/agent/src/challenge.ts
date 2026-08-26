@@ -90,14 +90,14 @@ function rungJobs(rung: ReturnType<typeof currentRung>): string[] {
   if (rung.multiple >= 10) {
     return [
       "This rung is a 50x. Treat it as research + survival, not a daily compounding plan.",
-      "Crypto only: buy hype+volume yourself at maxSolPerTrade. Grok Bot decides. Do not wait for Taskra. MASTER stays off.",
+      "Crypto only: Scout queues hype+volume. Do not live-buy until Chief sends chief:APPROVE. MASTER on lets Sentinel exit.",
       "Never put more than ~10–20% of remaining bankroll on one mint, and never above the desk size cap.",
       "If declared bankroll drops under 50% of this rung start, pause 24h, grade the losses, no revenge trades.",
     ];
   }
   return [
     `This rung is about ${rung.multiple.toFixed(2)}x (${fmtUsd(rung.from)} → ${fmtUsd(rung.to)}). Cash out cost at 2–5x (you pick), then hold the moon bag.`,
-    "Crypto: Grok Bot Bearer only. Keep MASTER off. Size stays at policy maxSolPerTrade until Taskra raises it.",
+    "Crypto: Grok Bot Bearer only. MASTER on for Sentinel live exits. Live buy needs Chief APPROVE. Size stays at policy maxSolPerTrade until Taskra raises it.",
     "Do not open Polymarket. Taskra will say when that venue is on.",
     "Update declared bankroll honestly after fills. Do not mark a rung done until the number is real.",
   ];
@@ -121,21 +121,21 @@ export function playbook(opts: {
     honesty: `${opts.challenge.disclaimer} First rung is ${fmtUsd(opts.challenge.rungsUsd[0] ?? 100)} → ${fmtUsd(opts.challenge.rungsUsd[1] ?? 5000)}. Later rungs are ~2x to ${fmtUsd(opts.challenge.goalUsd)}.`,
     tonight: [
       `You are on ${fmtUsd(rung.from)} → ${fmtUsd(rung.to)} (${rung.done ? "DONE" : rung.multiple.toFixed(2) + "x"}). Declared bankroll ${fmtUsd(opts.bankrollUsd)}.`,
-      `Mode=${opts.mode} MASTER=${opts.masterEnabled}. Auto live desk is off unless MASTER is on. Only Grok Bot Bearer may POST /api/buy and /api/sell.`,
+      `Mode=${opts.mode} MASTER=${opts.masterEnabled}. Sentinel live exits need MASTER. Scout never live-buys. Live POST /api/buy needs chief:APPROVE. Only Grok Bot Bearer may POST /api/buy and /api/sell.`,
       `Live crypto size cap ${opts.policy.maxSolPerTrade} SOL / day ${opts.policy.dailyBudgetSol} SOL / loss cap ${opts.policy.dailyLossCapSol} SOL. Do not raise these.`,
       ...rungJobs(rung),
       "End of session: GET /api/challenge, list open bags, ask Taskra one clear question.",
     ],
     never: [
       "Do not promise $1M or 50x. Say the odds are bad and the first rung is lottery-adjacent.",
-      "Do not raise maxSolPerTrade, dailyBudgetSol, or resume MASTER unless Taskra types CONFIRM.",
+      "Do not invent chief:APPROVE. Do not raise maxSolPerTrade or dailyBudgetSol unless Taskra says so. Kill MASTER only if Taskra types it.",
       "Do not research or trade Polymarket until Taskra says it is time.",
       "Do not enable the GrokBot impersonator mint. Do not invent a second wallet or extra budget.",
       "Do not YOLO the whole bankroll on one meme.",
     ],
     howToWork: [
       "Start every session with GET /api/challenge (Bearer invite token).",
-      "For Solana names: Scout + Intel. High hype+volume → BUY at maxSolPerTrade. Do not ask Taskra first. Poll GET /api/opportunities and POST /api/buy.",
+      "For Solana names: Scout + Intel. High hype+volume → queue GET /api/opportunities. Do not POST /api/buy live until Taskra/Chief sends {chief:\"APPROVE\"}. Paper buys stay unattended.",
       "Log crypto ideas with POST /api/challenge/ideas venue=solana. Update status won/lost/killed after the fill.",
       "PATCH/POST bankrollUsd only with a number Taskra agrees is real.",
     ],

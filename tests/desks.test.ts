@@ -72,6 +72,7 @@ async function startCtx(dir: string, password = "test-desks-pass", email = "hell
         sol: opts.sol ?? 0.05,
         force: opts.force,
         grokBotOrder: opts.grokBotOrder,
+        chiefApproved: opts.chiefApproved,
         dayKey: dayKey(),
       }),
     sell: (idOrMint, opts) =>
@@ -172,6 +173,8 @@ describe("intel desks", () => {
     expect(js).toContain("/api/challenge");
     expect(js).toContain("Gem — buy this");
     expect(js).toContain("/api/opportunities");
+    expect(js).toContain("Chief must APPROVE");
+    expect(js).toContain("data-action=\"approve\"");
     expect(js).toContain("Polymarket stays off until you say it is time");
     expect(() => new Function(js)).not.toThrow();
   });

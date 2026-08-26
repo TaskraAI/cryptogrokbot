@@ -59,6 +59,7 @@ async function main(): Promise<void> {
         force: opts.force,
         sizeAskId: opts.sizeAskId,
         grokBotOrder: opts.grokBotOrder,
+        chiefApproved: opts.chiefApproved,
         extraRulesPath: cfg.rulesPath,
         dayKey: dayKey(Date.now(), policy.timezone),
         connection: runtime.connection,
@@ -84,7 +85,7 @@ async function main(): Promise<void> {
     `Night agent starting mode=${cfg.mode} master=${cfg.masterEnabled} db=${cfg.databasePath} host=${cfg.dashboardHost}`,
   );
   console.warn(
-    "Not financial advice. Auto live desk needs MODE=LIVE and MASTER_ENABLED=true. Grok Bot Bearer can place explicit orders while MASTER is off.",
+    "Not financial advice. MASTER on lets Sentinel live-exit. Scout never live-buys. Grok Bot live buy needs chief:APPROVE.",
   );
 
   const token = process.env.CLOUDFLARE_API_TOKEN ?? "";

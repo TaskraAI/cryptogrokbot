@@ -20,6 +20,7 @@ import {
   getSizeAsk,
   answerSizeAsk,
   markOpportunitySkipped,
+  approveOpportunity,
   getBudget,
   setFlag,
   insertChallengeIdea,
@@ -32,6 +33,7 @@ import { loadExtraRules, setExtraRuleEnabled, effectiveDailyBudgetSol } from "@n
 import { loadSources } from "@night/social";
 import { fetchDexToken } from "@night/signals";
 import type { TradeOutcome } from "./trade.ts";
+import { parseChiefApprove } from "./entries.ts";
 import { dashboardHtml } from "./dashboard-html.ts";
 import {
   clearPendingCookieHeader,
@@ -89,6 +91,7 @@ export interface DashboardContext {
     force?: boolean;
     sizeAskId?: number;
     grokBotOrder?: boolean;
+    chiefApproved?: boolean;
   }) => Promise<TradeOutcome>;
   sell: (idOrMint: string, opts?: { grokBotOrder?: boolean }) => Promise<TradeOutcome>;
   repoRoot?: string;
@@ -276,6 +279,7 @@ function publicOpportunity(o: ReturnType<typeof listOpenOpportunities>[number], 
     note: o.note,
     at: o.at,
     sizeSol: policy.maxSolPerTrade,
+    chiefApproved: o.chief_approved === 1,
   };
 }
 
@@ -575,6 +579,7 @@ async function routeAuthed(
       email: ctx.email,
       actor: actor?.kind ?? null,
       canPlaceOrders,
+      canApproveChief: actor?.kind === "owner" || actor?.kind === "grokbot",
       todos: listTodos(ctx.store).map((t) => ({
         id: t.id,
         title: t.title,
@@ -794,11 +799,17 @@ async function routeAuthed(
       return;
     }
     const flags = ctx.flags();
+    const chiefApproved = flags.mode !== "LIVE" || parseChiefApprove(body);
+    if (flags.mode === "LIVE" && !chiefApproved) {
+      json(res, 403, { error: "needs Chief permission (chief: APPROVE)", ok: false });
+      return;
+    }
     const result = await ctx.buy({
       mint,
       sol: typeof body.sol === "number" ? body.sol : Number(body.sol) || undefined,
       force: Boolean(body.force) && flags.mode === "PAPER",
       grokBotOrder: true,
+      chiefApproved,
     });
     json(res, result.ok ? 200 : 400, result);
     return;
@@ -1003,7 +1014,6 @@ async function routeAuthed(
 
   const oppOne = path.match(/^\/api\/opportunities\/(\d+)$/);
   if (oppOne && method === "POST") {
-    if (refuseUnlessGrokBot(res, actor)) return;
     const opp = listOpenOpportunities(ctx.store).find((o) => o.id === Number(oppOne[1]));
     if (!opp) {
       json(res, 404, { error: "opportunity not found" });
@@ -1011,21 +1021,48 @@ async function routeAuthed(
     }
     const body = await readJson(req);
     const action = str(body.action).toLowerCase();
+    if (action === "approve") {
+      if (actor?.kind !== "owner" && actor?.kind !== "grokbot") {
+        json(res, 403, { error: "only the owner or Grok Bot can approve", ok: false });
+        return;
+      }
+      const updated = approveOpportunity(ctx.store, opp.id);
+      json(res, 200, {
+        ok: true,
+        approved: true,
+        id: opp.id,
+        chiefApproved: true,
+        opportunity: updated ? publicOpportunity(updated, ctx.policy) : undefined,
+      });
+      return;
+    }
     if (action === "skip") {
+      if (actor?.kind !== "owner" && actor?.kind !== "grokbot") {
+        json(res, 403, { error: GROK_BOT_ORDERS_ONLY, ok: false });
+        return;
+      }
       markOpportunitySkipped(ctx.store, opp.id);
       json(res, 200, { ok: true, skipped: true, id: opp.id });
       return;
     }
     if (action === "buy") {
+      if (refuseUnlessGrokBot(res, actor)) return;
+      const flags = ctx.flags();
+      const chiefApproved = opp.chief_approved === 1 || parseChiefApprove(body);
+      if (flags.mode === "LIVE" && !chiefApproved) {
+        json(res, 403, { error: "needs Chief permission (chief: APPROVE)", ok: false });
+        return;
+      }
       const result = await ctx.buy({
         mint: opp.mint,
         sol: ctx.policy.maxSolPerTrade,
         grokBotOrder: true,
+        chiefApproved: flags.mode !== "LIVE" || chiefApproved,
       });
       json(res, result.ok ? 200 : 400, result);
       return;
     }
-    json(res, 400, { error: "action must be buy or skip" });
+    json(res, 400, { error: "action must be approve, buy, or skip" });
     return;
   }
 
@@ -1070,6 +1107,12 @@ async function routeAuthed(
       json(res, 400, { error: "action must be keep or increase" });
       return;
     }
+    const flags = ctx.flags();
+    const chiefApproved = flags.mode !== "LIVE" || parseChiefApprove(body);
+    if (flags.mode === "LIVE" && !chiefApproved) {
+      json(res, 403, { error: "needs Chief permission (chief: APPROVE)", ok: false });
+      return;
+    }
     const answered = answerSizeAsk(ctx.store, askId, { status, chosenSol });
     if (!answered) {
       json(res, 409, { error: "size ask already answered" });
@@ -1081,6 +1124,7 @@ async function routeAuthed(
       sol: chosenSol,
       sizeAskId: answered.id,
       grokBotOrder: true,
+      chiefApproved,
     });
     ctx.crew.idle("grok", result.message);
     json(res, 200, {

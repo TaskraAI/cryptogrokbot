@@ -56,6 +56,8 @@ export async function buyChosenMint(opts: {
   /** Confirmed keep/increase; one-shot size may exceed maxSolPerTrade up to sizeAskCeilingSol. */
   sizeAskId?: number;
   grokBotOrder?: boolean;
+  /** Live buy: Chief must send chief:"APPROVE". Scout never sets this. */
+  chiefApproved?: boolean;
 }): Promise<TradeOutcome> {
   const blocked = liveTxBlocked(opts.flags, "buy", Boolean(opts.keypair), opts.grokBotOrder);
   if (blocked) {
@@ -91,6 +93,7 @@ export async function buyChosenMint(opts: {
     skipScore: Boolean(opts.force),
     sizeAskId: opts.sizeAskId,
     grokBotOrder: opts.grokBotOrder,
+    chiefApproved: opts.chiefApproved,
     connection: opts.connection,
     keypair: opts.keypair,
     pumpApiKey: opts.pumpApiKey,
@@ -238,7 +241,7 @@ export function statusReport(opts: { flags: RuntimeFlags; policy: Policy; store:
     `mode=${opts.flags.mode} master=${opts.flags.masterEnabled}`,
     `paper buys never send a transaction`,
     `live auto desk needs MODE=LIVE and MASTER_ENABLED=true and WALLET_SECRET_KEY`,
-    `Grok Bot Bearer can place explicit live buy/sell while MASTER is off; auto Scout/Sentinel cannot`,
+    `Grok Bot Bearer live buy needs chief:APPROVE; Scout never live-buys; Sentinel live exits need MASTER`,
     `kill/resume (dashboard or /kill) cannot set MODE`,
     `paper budget ${paper.spent_sol}/${paperCap.cap} SOL  trades ${paper.trades}/${opts.policy.maxTradesPerDay}`,
     `live budget ${live.spent_sol}/${cap.cap} SOL  trades ${live.trades}/${opts.policy.maxTradesPerDay}`,

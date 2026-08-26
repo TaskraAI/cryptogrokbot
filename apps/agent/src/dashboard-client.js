@@ -156,7 +156,7 @@ async function renderHome() {
   $("page-home").innerHTML =
     "<h1>Desk</h1>" +
     '<div class="banner">' + pill(d.mode) + " master=" + esc(String(d.masterEnabled)) +
-    " · auto live desk needs MASTER · only Grok Bot Bearer can buy/sell</div>" +
+    " · Sentinel live exits need MASTER · Scout never live-buys · live buy needs Chief APPROVE</div>" +
     masterCardHtml(d) +
     grokAsksHtml(d) +
     gemsHtml(d) +
@@ -258,8 +258,8 @@ function masterCardHtml(d) {
   return (
     '<div class="card"><h2 style="margin-top:0">MASTER</h2>' +
     "<p>" + (on
-      ? "Auto Scout/Sentinel live txs are on. Kill MASTER to halt the auto desk. Grok Bot Bearer can still place explicit buy/sell."
-      : "MASTER off. Auto live buys and live exits are halted. Only Grok Bot (Bearer invite token) can place buy and sell orders.") +
+      ? "MASTER on: Sentinel can live-exit. Scout never live-buys — names queue for Chief APPROVE. Grok Bot live buy needs chief:APPROVE in the body."
+      : "MASTER off. Auto live buys and live exits are halted. Only Grok Bot (Bearer invite token) can place buy and sell, and live buys still need Chief APPROVE.") +
     "</p>" +
     (on
       ? '<button class="danger" id="killMaster" style="width:100%">Kill MASTER</button>'
@@ -306,20 +306,32 @@ function gemsHtml(d) {
   const rows = d.opportunities || [];
   if (!rows.length) return "";
   return rows.map((o) => {
-    const can = Boolean(d.canPlaceOrders);
+    const canBuy = Boolean(d.canPlaceOrders);
+    const canApprove = Boolean(d.canApproveChief);
+    const approved = Boolean(o.chiefApproved);
+    const live = String(d.mode) === "LIVE";
+    const buttons = [];
+    if (canApprove && !approved) {
+      buttons.push('<button data-gem="' + o.id + '" data-action="approve">Approve</button>');
+    }
+    if (canBuy && (!live || approved)) {
+      buttons.push('<button data-gem="' + o.id + '" data-action="buy">Buy ' + Number(o.sizeSol) + " SOL</button>");
+    }
+    if (canBuy || canApprove) {
+      buttons.push('<button class="ghost" data-gem="' + o.id + '" data-action="skip">Skip</button>');
+    }
     return (
       '<div class="card"><h2 style="margin-top:0">Gem — buy this</h2>' +
       "<p><b>" + esc(o.ticker) + "</b> hype <b>" + Number(o.sentiment).toFixed(2) +
       "</b> · score " + Number(o.score).toFixed(0) +
       " · vol5m " + Number(o.volume5m).toLocaleString() +
-      " · cost-out <b>" + Number(o.costOutMultiple) + "x</b> then moon bag</p>" +
+      " · cost-out <b>" + Number(o.costOutMultiple) + "x</b> then moon bag" +
+      (approved ? ' · <b>Chief APPROVED</b>' : "") + "</p>" +
       "<p class='muted'>" + esc(o.mint) + "</p>" +
-      "<p class='muted'>" + esc(o.note || "Grok Bot decides. Do not wait.") + "</p>" +
-      (can
-        ? '<div class="row"><button data-gem="' + o.id + '" data-action="buy">Buy ' + Number(o.sizeSol) + " SOL</button>" +
-          '<button class="ghost" data-gem="' + o.id + '" data-action="skip">Skip</button></div>'
-        : "<p>Tell Grok Bot: buy " + Number(o.sizeSol) + " SOL of " + esc(o.ticker) +
-          " (Bearer POST /api/buy). Dashboard login cannot place orders.</p>") +
+      "<p class='muted'>" + esc(o.note || "Chief must APPROVE before a live buy. Scout never live-buys.") + "</p>" +
+      (buttons.length
+        ? '<div class="row">' + buttons.join("") + "</div>"
+        : "<p>Chief must APPROVE this gem, then Grok Bot Bearer POST /api/buy with {chief:\"APPROVE\"}. Dashboard login cannot place orders.</p>") +
       '<p class="muted" data-gem-msg="' + o.id + '"></p></div>'
     );
   }).join("");
@@ -480,16 +492,21 @@ async function renderTrade() {
   $("page-trade").innerHTML =
     "<h1>Trade</h1>" +
     '<div class="banner">' + pill(d.mode) +
-    " Only Grok Bot (Bearer invite token) can place buy/sell. MASTER off halts auto Scout/Sentinel live txs. Live size stays at maxSolPerTrade.</div>" +
+    " Only Grok Bot (Bearer invite token) can place buy/sell. Scout never live-buys. Live buy needs Chief APPROVE. Sentinel live exits need MASTER.</div>" +
     '<div class="card"><label>Mint address</label><input id="buyMint" placeholder="Solana mint"/>' +
     '<label>Size (SOL)</label><input id="buySol" type="number" step="0.001" min="0.001" value="0.05"/>' +
+    (String(d.mode) === "LIVE"
+      ? '<label>Chief token (live)</label><input id="buyChief" placeholder="APPROVE" autocomplete="off"/>'
+      : "") +
     '<div class="row" style="margin-top:10px">' +
     (can
       ? '<button id="doBuy">Buy mint</button>'
       : '<button id="doBuy" disabled>Buy mint (Grok Bot only)</button>') +
     '<button class="ghost" id="loadDex">Load DexScreener</button></div>' +
     '<p id="buyMsg" class="muted">' +
-    (can ? "" : "Owner dashboard cannot send orders. Tell Grok Bot the mint and size.") +
+    (can
+      ? (String(d.mode) === "LIVE" ? "Live buy needs Chief to type APPROVE. Do not invent it." : "")
+      : "Owner dashboard cannot send orders. Tell Grok Bot the mint and size after Chief APPROVE.") +
     "</p><div id=\"dexBox\"></div></div>" +
     "<h2>Watchlist</h2>" + (items || "<p class='muted'>Empty watchlist</p>");
   const doBuy = $("doBuy");
@@ -512,7 +529,11 @@ async function buyMint(mint, sol) {
   const msg = $("buyMsg") || document.createElement("p");
   if ($("buyMsg")) $("buyMsg").textContent = "buying…";
   try {
-    const r = await api("/api/buy", { method: "POST", body: JSON.stringify({ mint, sol }) });
+    const r = await api("/api/buy", { method: "POST", body: JSON.stringify({
+      mint,
+      sol,
+      chief: ($("buyChief") && $("buyChief").value) || undefined,
+    }) });
     alert(r.message || (r.ok ? "bought" : "failed"));
     if (page === "trade") renderTrade();
   } catch (e) {

@@ -8,7 +8,9 @@ Checks:
 - `data/` and `.env` are gitignored (password file, wallet secrets, sqlite)
 - tracked files do not contain API tokens or wallet secrets
 - live auto buys and auto live sells still fail closed without MODE=LIVE + MASTER + wallet
-- Grok Bot Bearer can place explicit buy/sell while MASTER is off; owner dashboard cannot
+- MASTER on for Sentinel live exits; Scout never live-buys
+- live `/api/buy` needs `chief:APPROVE`; Grok Bot must not invent it; owner dashboard cannot buy
+- Grok Bot Bearer can still sell; owner dashboard cannot
 - dashboard Home has Kill MASTER / Resume CONFIRM; boot does not stomp a kill when env still says true
 - extra budget cannot raise the daily cap unless `ALLOW_EXTRA_BUDGET=true`
 

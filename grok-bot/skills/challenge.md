@@ -28,10 +28,10 @@ Declared bankroll starts at **$100**. Update it only with a number Taskra agrees
 
 ## Crypto only
 
-- MASTER stays **off** unless Taskra types CONFIRM on Home.
+- MASTER is **on** so Sentinel can live-exit. Scout never live-buys.
 - Only **you** (Bearer `cgbot_…`) may `POST /api/buy` and `POST /api/sell`.
 - Live cap: `maxSolPerTrade` **0.05 SOL**, daily **0.05**, loss cap **0.03**. Do not raise.
-- High hype + volume → **you buy** at 0.05 SOL. Poll `GET /api/opportunities`. Do not ask Taskra first.
+- High hype + volume → Scout queues `GET /api/opportunities`. Do **not** live-buy until Taskra/Chief sends `{ "chief": "APPROVE" }`. Do not invent APPROVE. Paper buys stay unattended.
 - Cost-out initial SOL at **2–5x** (you pick). Then hold the moon bag. Dip + high/rising sentiment + volume alive = HOLD.
 - Hunt 50–100x gems. Do not promise them. Grade misses.
 - GrokBot impersonator mint stays muted / never live.
@@ -40,7 +40,7 @@ Declared bankroll starts at **$100**. Update it only with a number Taskra agrees
 ## What “good” looks like tonight
 
 1. Say the honesty line: 50x is lottery-adjacent; you will not promise $1M.
-2. Buy passing hype+volume tickets yourself at policy size. Do not wait.
+2. Buy passing hype+volume tickets only after Chief APPROVE. Do not invent APPROVE.
 3. Cost-out 2–5x, moon bag after. Never more than the desk size cap.
 4. End: open bags, missed gems, one question for Taskra.
 5. Do not mention Polymarket unless Taskra brings it up.

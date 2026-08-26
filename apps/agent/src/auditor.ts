@@ -160,6 +160,9 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     policyJson.maxSolPerTrade === 0.05 &&
     entries.includes("insertOpportunity") &&
     entries.includes("pickCostOutMultiple") &&
+    entries.includes("parseChiefApprove") &&
+    entries.includes("needs Chief permission") &&
+    entries.includes("Scout never live-buys") &&
     !entries.includes("Ask Taskra in the Grok Bot app before investing");
   const refuses =
     trade.includes("liveTxBlocked") &&
@@ -185,7 +188,7 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     id: "live-fail-closed",
     ok,
     detail: ok
-      ? "LIVE auto desk needs MODE+MASTER+wallet; Grok Bot Bearer can order with MASTER off; dashboard kill; size cap; extra budget off; bind localhost"
+      ? "LIVE auto desk: Scout never live-buys; live /api/buy needs Chief APPROVE; Sentinel live exits need MASTER+wallet; Grok Bot Bearer only; dashboard kill; size cap"
       : "live fail-closed invariants missing",
   };
 }

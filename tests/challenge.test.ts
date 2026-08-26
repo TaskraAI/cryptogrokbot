@@ -58,7 +58,8 @@ describe("rung challenge", () => {
     expect(book.never.join(" ")).toMatch(/Do not research or trade Polymarket until Taskra says it is time/);
     expect(book.never.join(" ")).not.toMatch(/CLOB/);
     expect(book.never.join(" ")).toMatch(/promise/);
-    expect(book.tonight.join(" ")).toMatch(/Grok Bot Bearer/);
+    expect(book.never.join(" ")).toMatch(/Do not invent chief:APPROVE/);
+    expect(book.howToWork.join(" ")).toMatch(/chief:"APPROVE"/);
     expect(book.howToWork.join(" ")).toMatch(/\/api\/challenge/);
     expect(book.venues.map((v) => v.id)).toEqual(["solana"]);
   });

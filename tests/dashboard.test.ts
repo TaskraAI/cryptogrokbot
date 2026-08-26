@@ -79,6 +79,7 @@ async function startCtx(
         force: opts.force,
         sizeAskId: opts.sizeAskId,
         grokBotOrder: opts.grokBotOrder,
+        chiefApproved: opts.chiefApproved,
         dayKey: dayKey(),
       }),
     sell: (idOrMint, opts) =>
@@ -610,6 +611,58 @@ describe("dashboard auth and paper API", () => {
     expect(kept.message).toMatch(/^bought #/);
     expect(kept.message).toMatch(/0.01 SOL/);
     expect(listOpenPositions(store)).toHaveLength(1);
+  });
+
+  it("refuses a live Grok Bot buy without Chief APPROVE and lets the owner approve a gem", async () => {
+    const dir = tmp();
+    const liveFlags: RuntimeFlags = { ...paperFlags, mode: "LIVE", masterEnabled: true };
+    const { server, url, store, codes } = await startCtx(dir, "chief-approve-pass", "hello@taskra.ai", liveFlags);
+    servers.push(server);
+    const cookie = await completeLogin(url, "chief-approve-pass", "hello@taskra.ai", codes);
+    const bot = await inviteGrokBot(url, cookie);
+    const mint = "ChiefMint11111111111111111111111111111111111";
+    const noChief = await fetch(`${url}/api/buy`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
+      body: JSON.stringify({ mint, sol: 0.05 }),
+    });
+    expect(noChief.status).toBe(403);
+    expect(((await noChief.json()) as { error?: string }).error).toMatch(/Chief permission/);
+    expect(listOpenPositions(store)).toHaveLength(0);
+
+    const { insertOpportunity } = await import("@night/storage");
+    const opp = insertOpportunity(store, {
+      mint,
+      ticker: "CHIEF",
+      sentiment: 0.8,
+      score: 70,
+      volume5m: 9000,
+      priceUsd: 0.001,
+      costOutMultiple: 3,
+      reason: "test",
+    });
+    const ownerBuy = await fetch(`${url}/api/opportunities/${opp.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ action: "buy" }),
+    });
+    expect(ownerBuy.status).toBe(403);
+    const approve = await fetch(`${url}/api/opportunities/${opp.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ action: "approve" }),
+    });
+    expect(approve.status).toBe(200);
+    expect(((await approve.json()) as { chiefApproved?: boolean }).chiefApproved).toBe(true);
+    const grokBuy = await fetch(`${url}/api/opportunities/${opp.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
+      body: JSON.stringify({ action: "buy" }),
+    });
+    expect(grokBuy.status).not.toBe(403);
+    const bought = (await grokBuy.json()) as { ok?: boolean; message?: string; error?: string };
+    expect(JSON.stringify(bought)).not.toMatch(/needs Chief permission/);
+    expect(listOpenPositions(store)).toHaveLength(0);
   });
 });
 

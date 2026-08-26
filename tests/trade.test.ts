@@ -208,6 +208,7 @@ describe("live fail-closed", () => {
       token: t,
       dayKey: dayKey(),
       grokBotOrder: true,
+      chiefApproved: true,
     });
     expect(r.ok).toBe(false);
     expect(r.message).not.toMatch(/MASTER_ENABLED/);
@@ -215,7 +216,7 @@ describe("live fail-closed", () => {
     expect(listOpenPositions(store)).toHaveLength(0);
   });
 
-  it("buyChosenMint LIVE with MASTER but no keypair refuses", async () => {
+  it("buyChosenMint LIVE with MASTER but no grokBotOrder queues instead of buying", async () => {
     const store = mem();
     const t = token();
     const r = await buyChosenMint({
@@ -227,7 +228,25 @@ describe("live fail-closed", () => {
       dayKey: dayKey(),
     });
     expect(r.ok).toBe(false);
-    expect(r.message).toMatch(/WALLET_SECRET_KEY/);
+    expect(r.message).toMatch(/opportunity #|Scout never live-buys|needs Chief/);
+    expect(listOpenPositions(store)).toHaveLength(0);
+  });
+
+  it("buyChosenMint LIVE grokBotOrder + Chief APPROVE with MASTER still needs a wallet", async () => {
+    const store = mem();
+    const t = token();
+    const r = await buyChosenMint({
+      store,
+      policy: DEFAULT_POLICY,
+      flags: { ...paperFlags, mode: "LIVE", masterEnabled: true },
+      mint: t.mint,
+      token: t,
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.message).toMatch(/WALLET_SECRET_KEY|honeypot|buy failed/);
     expect(listOpenPositions(store)).toHaveLength(0);
   });
 

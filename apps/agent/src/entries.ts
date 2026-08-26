@@ -23,6 +23,19 @@ import {
 import type { Connection, Keypair } from "@solana/web3.js";
 import type { BudgetState } from "@night/shared";
 
+export function parseChiefApprove(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value === "string") {
+    const s = value.trim().toUpperCase();
+    return s === "APPROVE" || s === "CHIEF";
+  }
+  if (!value || typeof value !== "object") return false;
+  const body = value as Record<string, unknown>;
+  if (body.chiefApprove === true) return true;
+  const c = String(body.chief ?? "").trim().toUpperCase();
+  return c === "APPROVE" || c === "CHIEF";
+}
+
 /** Trusted hit so a user-chosen mint can pass the multi-source scorer. */
 export function manualSource(mint: string, ticker?: string): SourceHit {
   return {
@@ -63,6 +76,45 @@ function ticketFromAsk(ask: SizeAskRow, testSol: number, ceilingSol: number): { 
   return { sol: Math.min(sol, testSol), cap: testSol };
 }
 
+function queueScoutOpportunity(opts: {
+  store: Store;
+  token: TokenMetrics;
+  sentiment: number;
+  score: number;
+  volume5m: number;
+  priceUsd: number;
+  costOutMultiple: number;
+  testSol: number;
+  now: number;
+  reason: string;
+}): string {
+  const opp = insertOpportunity(opts.store, {
+    mint: opts.token.mint,
+    ticker: opts.token.ticker,
+    sentiment: opts.sentiment,
+    score: opts.score,
+    volume5m: opts.volume5m,
+    priceUsd: opts.priceUsd,
+    costOutMultiple: opts.costOutMultiple,
+    reason: opts.reason,
+    note: `Hype ${opts.sentiment.toFixed(2)} vol5m ${opts.volume5m}. Buy ${opts.testSol} SOL after Chief APPROVE, cost-out ${opts.costOutMultiple}x, moon bag after.`,
+  });
+  insertDecision(opts.store, {
+    at: opts.now,
+    kind: "ask",
+    mint: opts.token.mint,
+    allowed: false,
+    reason: `opportunity #${opp.id} queued; needs Chief APPROVE`,
+    score: opts.score,
+    payload: { sentiment: opts.sentiment, opportunityId: opp.id, costOutMultiple: opts.costOutMultiple },
+  });
+  return (
+    `opportunity #${opp.id} ${opts.token.ticker}: queued for Chief APPROVE then Grok Bot buy ${opts.testSol} SOL ` +
+    `(hype ${opts.sentiment.toFixed(2)}, vol5m ${opts.volume5m}, cost-out ${opts.costOutMultiple}x then moon bag). ` +
+    `Scout never live-buys. ${opts.reason}`
+  );
+}
+
 export async function tryEnter(opts: {
   store: Store;
   policy: Policy;
@@ -88,6 +140,8 @@ export async function tryEnter(opts: {
   sizeAskId?: number;
   /** Explicit Grok Bot order: live buy allowed while auto-desk MASTER is off. */
   grokBotOrder?: boolean;
+  /** Live buy: Chief must send chief:"APPROVE". Scout auto-loop never sets this. */
+  chiefApproved?: boolean;
 }): Promise<string> {
   const now = opts.now ?? Date.now();
   const open = listOpenPositions(opts.store);
@@ -196,31 +250,18 @@ export async function tryEnter(opts: {
   });
   if (!gate.ok) {
     if (gate.reason.includes("MASTER_ENABLED") && !opts.grokBotOrder) {
-      const opp = insertOpportunity(opts.store, {
-        mint: opts.token.mint,
-        ticker: opts.token.ticker,
+      return queueScoutOpportunity({
+        store: opts.store,
+        token: opts.token,
         sentiment,
         score: scored.score,
         volume5m: opts.token.volume5m,
         priceUsd: opts.token.priceUsd,
         costOutMultiple,
+        testSol,
+        now,
         reason: gate.reason,
-        note: `Hype ${sentiment.toFixed(2)} vol5m ${opts.token.volume5m}. Buy ${testSol} SOL, cost-out ${costOutMultiple}x, moon bag after.`,
       });
-      insertDecision(opts.store, {
-        at: now,
-        kind: "ask",
-        mint: opts.token.mint,
-        allowed: false,
-        reason: `opportunity #${opp.id} queued for Grok Bot`,
-        score: scored.score,
-        payload: { sentiment, opportunityId: opp.id, costOutMultiple },
-      });
-      return (
-        `opportunity #${opp.id} ${opts.token.ticker}: Grok Bot should buy ${testSol} SOL ` +
-        `(hype ${sentiment.toFixed(2)}, vol5m ${opts.token.volume5m}, cost-out ${costOutMultiple}x then moon bag). ` +
-        `Auto live blocked: ${gate.reason}`
-      );
     }
     insertDecision(opts.store, {
       at: now,
@@ -231,6 +272,33 @@ export async function tryEnter(opts: {
       score: scored.score,
     });
     return `blocked ${opts.token.ticker}: ${gate.reason}`;
+  }
+
+  // MASTER on still does not let Scout spray live tickets. Queue for Chief.
+  if (opts.flags.mode === "LIVE" && !opts.grokBotOrder) {
+    return queueScoutOpportunity({
+      store: opts.store,
+      token: opts.token,
+      sentiment,
+      score: scored.score,
+      volume5m: opts.token.volume5m,
+      priceUsd: opts.token.priceUsd,
+      costOutMultiple,
+      testSol,
+      now,
+      reason: "Scout never live-buys; needs Chief APPROVE",
+    });
+  }
+  if (opts.flags.mode === "LIVE" && opts.grokBotOrder && !opts.chiefApproved) {
+    insertDecision(opts.store, {
+      at: now,
+      kind: "block",
+      mint: opts.token.mint,
+      allowed: false,
+      reason: "needs Chief permission (chief: APPROVE)",
+      score: scored.score,
+    });
+    return `blocked ${opts.token.ticker}: needs Chief permission (chief: APPROVE)`;
   }
 
   if (opts.flags.mode === "LIVE") {

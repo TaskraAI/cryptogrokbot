@@ -69,7 +69,7 @@ Default policy (`config/policy.json`): **0.05 SOL/day**, 5 trades, **0.05 SOL** 
 |---|---|---|
 | What happens | SQLite ledger only. No transaction is sent. | Jupiter (graduated) or PumpPortal local-sign (curve), then a signed tx |
 | Wallet | Not required | `WALLET_SECRET_KEY` **or** a dashboard wallet secret required or the buy **fails closed** |
-| Master switch | Ignored for paper fills | Auto Scout/Sentinel live txs need `MASTER_ENABLED=true` **or** dashboard **Resume MASTER** / `/resume CONFIRM`. Kill from Home or `/kill`. **Grok Bot Bearer** can still place explicit live buy/sell while MASTER is off |
+| Master switch | Ignored for paper fills | Sentinel live **exits** need `MASTER_ENABLED=true`. **Scout never live-buys** even with MASTER on — names queue for Chief APPROVE. Kill from Home or `/kill`. **Grok Bot Bearer** live buy needs `{chief:"APPROVE"}` |
 | Dashboard buy/sell | **Grok Bot Bearer only** (owner cookie returns 403) | Same. Owner Home has Kill MASTER. The client cannot force live. Auto live sells still need master + wallet |
 | Extra daily budget | Ignored (`ALLOW_EXTRA_BUDGET` default false) | Ignored unless `ALLOW_EXTRA_BUDGET=true` (logged; not settable from an unauthenticated path) |
 
@@ -82,7 +82,7 @@ WALLET_SECRET_KEY=   # JSON byte array or base58. Hot wallet only. Never the mai
 HELIUS_RPC_URL=      # recommended over public RPC
 ```
 
-Telegram `/kill` or dashboard **Kill MASTER** turns the SQLite `master` flag off (auto live buys **and** auto live exits fail closed; paper sells still run). Boot no longer stomps that flag when `.env` still has `MASTER_ENABLED=true`. `MASTER_ENABLED=false` in env always kills on restart. `/resume CONFIRM` or Home **Resume MASTER** (type CONFIRM) turns master back on. That is a **kill/resume switch only**: it cannot change `MODE`. The DB cannot flip paper to live. Auto live still requires `MODE=LIVE` from env **and** master **and** a hot wallet. **Only Grok Bot** (`Authorization: Bearer cgbot_…`) can place dashboard buy/sell (paper and live). Owner login cannot.
+Telegram `/kill` or dashboard **Kill MASTER** turns the SQLite `master` flag off (Scout still cannot live-buy; **Sentinel live exits** fail closed; paper sells still run). Boot no longer stomps that flag when `.env` still has `MASTER_ENABLED=true`. `MASTER_ENABLED=false` in env always kills on restart. `/resume CONFIRM` or Home **Resume MASTER** (type CONFIRM) turns master back on. That is a **kill/resume switch only**: it cannot change `MODE`. The DB cannot flip paper to live. Sentinel live exits require `MODE=LIVE` from env **and** master **and** a hot wallet. **Scout never live-buys.** **Only Grok Bot** (`Authorization: Bearer cgbot_…`) can place dashboard buy/sell (paper and live). Live `/api/buy` also needs `{ "chief": "APPROVE" }` (or an owner-approved gem). Owner login cannot buy/sell.
 
 Dashboard bind defaults to `127.0.0.1`. A public bind is optional (`DASHBOARD_BIND=0.0.0.0`); when bind is not loopback, the session cookie is `Secure` unless you set `DASHBOARD_SECURE_COOKIE=false`.
 
@@ -93,7 +93,7 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 | Var | Required | Purpose |
 |-----|----------|---------|
 | `MODE` | no (default PAPER) | `PAPER` or `LIVE` |
-| `MASTER_ENABLED` | no (default false) | auto live entries and auto live exits (kill/resume via dashboard or Telegram when MODE=LIVE). Env `false` kills sqlite on boot; env `true` does not revive a dashboard `/kill` |
+| `MASTER_ENABLED` | no (default false) | Sentinel live exits (kill/resume via dashboard or Telegram when MODE=LIVE). Scout never live-buys. Env `false` kills sqlite on boot; env `true` does not revive a dashboard `/kill` |
 | `ALLOW_EXTRA_BUDGET` | no (default false) | if true, `extra_budget_sol` may raise the daily cap (logged) |
 | `WALLET_SECRET_KEY` | live only | hot wallet |
 | `DASHBOARD_BIND` | no | default `127.0.0.1` |

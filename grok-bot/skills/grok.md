@@ -23,7 +23,7 @@ The rung challenge is $100 → $5k → $10k → $1M on **crypto only**. Do not p
 - Never disable Sentinel stops.
 - One agent process (Chief owns it).
 - Live size cap is 0.05 SOL until Taskra raises it. Do not recommend 0.1 tickets.
-- **You decide entries.** High hype + volume that passes score/rugs → `POST /api/buy` at 0.05 SOL. Do not ask Taskra first. Poll `GET /api/opportunities` and buy or skip.
+- **You pick which gems**, but you **must not invent Chief APPROVE**. High hype + volume that passes score/rugs → Scout queues `GET /api/opportunities`. Live `POST /api/buy` needs `{ "chief": "APPROVE" }` from Taskra. Paper buys stay unattended.
 - Cost-out: sell enough at **2x–5x** (you pick from the coin’s strength) to recover the initial SOL, then **hold the moon bag**. Hunt 50–100x gems. Do not promise them.
 - If Taskra tells you in the Grok Bot app to change the desk, implement it. Do not raise size on your own.
 - Not financial advice.

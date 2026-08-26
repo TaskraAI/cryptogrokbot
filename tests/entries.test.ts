@@ -3,9 +3,9 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_POLICY, dayKey } from "@night/shared";
-import { listOpenPositions, listPendingSizeAsks, openStore } from "@night/storage";
+import { listOpenPositions, listPendingSizeAsks, listOpenOpportunities, openStore } from "@night/storage";
 import { scoreSentiment } from "@night/tape";
-import { tryEnter } from "../apps/agent/src/entries.ts";
+import { parseChiefApprove, tryEnter } from "../apps/agent/src/entries.ts";
 import { hit, quietHit, token } from "./fixtures.ts";
 
 const paperFlags = {
@@ -65,7 +65,7 @@ describe("paper entries", () => {
     expect(msg).toMatch(/MASTER_ENABLED/);
   });
 
-  it("lets an explicit Grok Bot live order past MASTER (score and sim still run)", async () => {
+  it("lets an explicit Grok Bot live order past MASTER when Chief APPROVE is set", async () => {
     const db = store();
     const msg = await tryEnter({
       store: db,
@@ -82,10 +82,42 @@ describe("paper entries", () => {
       guardrails: [],
       dayKey: dayKey(),
       grokBotOrder: true,
+      chiefApproved: true,
     });
     expect(msg).not.toMatch(/MASTER_ENABLED is off/);
+    expect(msg).not.toMatch(/needs Chief permission/);
     expect(msg).not.toMatch(/^bought/);
     expect(msg).toMatch(/honeypot|WALLET_SECRET_KEY|wallet or RPC missing|buy failed/);
+  });
+
+  it("blocks a Grok Bot live order without Chief APPROVE", async () => {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: DEFAULT_POLICY,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: true,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+    });
+    expect(msg).toMatch(/needs Chief permission/);
+    expect(listOpenPositions(db)).toHaveLength(0);
+  });
+
+  it("does not treat CONFIRM as Chief APPROVE", () => {
+    expect(parseChiefApprove("CONFIRM")).toBe(false);
+    expect(parseChiefApprove({ chief: "CONFIRM" })).toBe(false);
+    expect(parseChiefApprove({ chief: "APPROVE" })).toBe(true);
+    expect(parseChiefApprove({ chiefApprove: true })).toBe(true);
+    expect(parseChiefApprove("APPROVE")).toBe(true);
   });
 
   it("refuses a size above maxSolPerTrade instead of clipping", async () => {
@@ -164,10 +196,34 @@ describe("high-sentiment auto-buy", () => {
       dayKey: dayKey(),
     });
     expect(msg).toMatch(/^opportunity #/);
-    expect(msg).toMatch(/Grok Bot should buy/);
+    expect(msg).toMatch(/Chief APPROVE/);
     expect(listOpenPositions(db)).toHaveLength(0);
     expect(listOpenOpportunities(db)).toHaveLength(1);
     expect(listOpenOpportunities(db)[0]?.ticker).toBe("MEME");
+  });
+
+  it("queues a Grok Bot opportunity when MASTER is on but Scout has no Chief APPROVE", async () => {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: true,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [hit()],
+      guardrails: [],
+      dayKey: dayKey(),
+    });
+    expect(msg).toMatch(/^opportunity #/);
+    expect(msg).toMatch(/Scout never live-buys/);
+    expect(listOpenPositions(db)).toHaveLength(0);
+    expect(listOpenOpportunities(db)).toHaveLength(1);
+    expect(listOpenOpportunities(db)[0]?.chief_approved).toBe(0);
   });
 
   it("fills an explicit keep size-ask when Grok Bot passes sizeAskId", async () => {

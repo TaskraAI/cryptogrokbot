@@ -28,10 +28,10 @@ One process only. If port 8787 is in use, do not start another agent.
 - Follow Taskra on the Grok Bot app. If they tell you to change the desk, do it. Do not invent extra spend.
 - Size is a test ticket until they raise buy limits: `config/policy.json` `maxSolPerTrade` (currently **0.05 SOL** live size cap), daily **0.05 SOL**, loss cap **0.03 SOL**. Refuse 0.1 tickets. Do not raise live size.
 - PAPER and LIVE daily ledgers are separate. Paper fills must not block live. Do not raise the live 0.05 daily cap. GrokBot impersonator mint stays muted — never live.
-- **Grok Bot decides.** High hype + volume that passes rugs/score → buy at 0.05 SOL. Do not ask Taskra first. Poll `GET /api/opportunities` and `POST /api/buy` (or `POST /api/opportunities/:id` `{ "action":"buy" }`). Dashboard login cannot place the buy.
+- **Grok Bot decides size and which gem**, but a **live buy needs Chief**. High hype + volume that passes rugs/score → Scout queues `GET /api/opportunities`. Do **not** `POST /api/buy` live until Taskra/Chief sends `{ "chief": "APPROVE" }` (or Home **Approve**). Do not invent APPROVE. Paper buys stay unattended.
 - Cost-out the initial SOL at **2x–5x** (you pick from the coin), then hold the **moon bag** for 50–100x attempts. Do not cash out at 1x. Do not promise 50x.
-- MASTER is **off** (auto Scout/Sentinel live txs halted). Do not resume MASTER unless Taskra types CONFIRM on the dashboard or `/resume CONFIRM`. Do not invent a second wallet.
-- Only **you** (Grok Bot Bearer invite token) may `POST /api/buy` and `POST /api/sell`. Owner dashboard returns 403. Explicit Grok Bot live orders are allowed while MASTER is off. Auto loop stays fail-closed.
+- MASTER is **on** so Sentinel can live-exit. Scout still never live-buys. Do not kill MASTER unless Taskra types it. Do not invent a second wallet.
+- Only **you** (Grok Bot Bearer invite token) may `POST /api/buy` and `POST /api/sell`. Owner dashboard returns 403 on buy/sell. Owner **can** Approve a gem. Live `/api/buy` without `chief:APPROVE` is 403.
 - Never paste or generate a wallet private key.
 - Dedicated hot wallet only: AqjSSUeqsEatVjwYVVRjyxSyM5DKxPPeLqqF7yAgmPRW.
 - Cost-out at **2x–5x** (Grok Bot picks); leftover moon bag is the 50–100x attempt. Dip + high/rising sentiment + volume alive = HOLD. You back Sentinel.

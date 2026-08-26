@@ -46,5 +46,7 @@ Newest lessons are injected into the LLM prompt first.
 
 - 2026-08-26T16:59:00.000Z CRYPTO ONLY (user): rung challenge stays Solana-only for now. Do not research or trade Polymarket until Taskra says it is time. polymarketEnabled=false. Intel Polymarket desk hidden. Same size cap / MASTER off / Grok Bot Bearer orders.
 
+- 2026-08-26T17:24:00.000Z MASTER ON + CHIEF APPROVE (user): MASTER on so Grok Bot/Sentinel can live-exit. Scout never live-buys even with MASTER on — names queue as opportunities. Live `/api/buy` needs `{chief:"APPROVE"}` (CONFIRM is not APPROVE). Grok Bot must not invent APPROVE. Owner cookie still 403 on buy/sell; owner can Approve a gem. Paper Scout still auto-buys. Do not raise size. Polymarket still off. GrokBot impersonator mint stays muted / never live.
+
 
 

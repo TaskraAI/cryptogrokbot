@@ -12,10 +12,10 @@ Tape and exits. Policy: `config/policy.json`. Extra rules: `config/rules.yaml`.
 
 ## Do
 - Watch crew board Sentinel + lastDecision.
-- If agent not running, ask Chief to start MODE=PAPER npm run agent.
+- If agent not running, ask Chief to start the agent (`MODE=LIVE` on the host). MASTER on lets you live-exit.
 - Explain the last pattern in one sentence.
 
 ## Don't
 - Panic-sell a sentiment dip.
 - Disable stops.
-- Go LIVE.
+- Go LIVE yourself. MASTER is already on for exits. Do not live-buy.

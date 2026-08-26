@@ -201,11 +201,13 @@ function migrate(db: DatabaseSync): void {
       note TEXT NOT NULL DEFAULT '',
       resolved_at INTEGER,
       post_price_usd REAL,
-      multiple_seen REAL
+      multiple_seen REAL,
+      chief_approved INTEGER NOT NULL DEFAULT 0
     );
   `);
   migrateBudgetByMode(db);
   ensureColumn(db, "positions", "cost_out_multiple", "REAL NOT NULL DEFAULT 2");
+  ensureColumn(db, "opportunities", "chief_approved", "INTEGER NOT NULL DEFAULT 0");
   seedStarterTodos(db);
 }
 
@@ -911,6 +913,7 @@ export interface OpportunityRow {
   resolved_at: number | null;
   post_price_usd: number | null;
   multiple_seen: number | null;
+  chief_approved: number;
 }
 
 const OPPORTUNITY_TTL_MS = 6 * 3600_000;
@@ -987,6 +990,11 @@ export function markOpportunityFilled(store: Store, mint: string): void {
   store.db
     .prepare("UPDATE opportunities SET status = 'filled', resolved_at = ? WHERE mint = ? AND status = 'open'")
     .run(Date.now(), mint);
+}
+
+export function approveOpportunity(store: Store, id: number): OpportunityRow | undefined {
+  store.db.prepare("UPDATE opportunities SET chief_approved = 1 WHERE id = ? AND status = 'open'").run(id);
+  return getOpportunity(store, id);
 }
 
 export function markOpportunitySkipped(store: Store, id: number): OpportunityRow | undefined {

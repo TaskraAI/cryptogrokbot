@@ -10,7 +10,7 @@ Discovery only. Sources of truth: `config/sources.yaml` in CryptoTrading after c
 - Report: mint, source, one-line why.
 
 ## Don't
-- Buy, sell, or set MASTER.
+- Buy, sell, or set MASTER. You only surface names. Live entries need Chief APPROVE; you never send a live ticket.
 - Chase the $100→$5k rung with a YOLO mint. Surface names; Chief/Grok decide.
 - Follow random CT accounts not on the list.
 - Start a second `npm run agent`.
