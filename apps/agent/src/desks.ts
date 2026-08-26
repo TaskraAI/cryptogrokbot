@@ -3,6 +3,7 @@ import type { Policy } from "@night/shared";
 import { fetchDexSearch, fetchDexToken, type DexPair } from "@night/signals";
 import { listOpenPositions, type Store } from "@night/storage";
 import type { AppConfig } from "./config.ts";
+import { formatPolymarketGrounding, searchPolymarket } from "./polymarket.ts";
 
 export type DeskField = {
   key: string;
@@ -202,6 +203,27 @@ export const DESKS: DeskDef[] = [
       { key: "year", label: "Year", type: "select", options: ["2026"] },
     ],
   },
+  {
+    id: "polymarket",
+    title: "Polymarket",
+    blurb: "Event markets for the rung challenge. Research only — paper ideas, no live CLOB bets.",
+    useXSearch: true,
+    sections: [
+      "Market question and exact resolution source",
+      "Current implied odds vs a base-rate / news view",
+      "Why the book might be wrong (or why it is efficient)",
+      "Max loss if you are wrong (defined risk)",
+      "Suggested paper size vs the current rung bankroll",
+      "When to kill the idea (invalidation)",
+      "Correlation with the Solana meme book (do not double the same bet)",
+      "Verdict: Watch / Paper / Avoid — never 'bet the rung'",
+    ],
+    fields: [
+      { key: "query", label: "Topic / market", placeholder: "bitcoin, election, Fed, sports" },
+      { key: "bias", label: "Lean", type: "select", options: ["no lean", "Yes", "No", "other outcome"] },
+      { key: "horizon", label: "Horizon", type: "select", options: ["hours", "days", "weeks"] },
+    ],
+  },
 ];
 
 const lastRuns = new Map<string, DeskRun>();
@@ -235,7 +257,7 @@ function clip(v: string, n = 400): string {
 export function buildDeskPrompt(desk: DeskDef, fields: Record<string, string>, grounded: string): string {
   const f = (k: string, fallback = "") => clip(fields[k] || fallback);
   const numbered = desk.sections.map((s, i) => `${i + 1}. ${s}`).join("\n");
-  const rules = `You are CryptoGrokBot on cryptogrokbot.com — a personal Solana meme-coin night desk. Paper is default. Never recommend disabling hard stops. Dip + high/rising sentiment + volume alive = HOLD. Dedicated hot wallet only. Number every section. Be brutally honest. This is research, not financial advice. Year: 2026.`;
+  const rules = `You are CryptoGrokBot on cryptogrokbot.com — a personal Solana meme-coin night desk plus Polymarket research. Paper is default. Never recommend disabling hard stops. Dip + high/rising sentiment + volume alive = HOLD. Dedicated hot wallet only. Number every section. Be brutally honest. This is research, not financial advice. Year: 2026. Taskra's rung challenge is $100 → $5,000 → $10,000 then ~2x rungs to $1,000,000. Do not promise that path. Live crypto size stays at policy maxSolPerTrade. Do not place live Polymarket bets.`;
 
   if (desk.id === "sentiment") {
     return `${rules}
@@ -352,9 +374,26 @@ This desk is a dedicated Solana meme hot-wallet agent, not a full net-worth plan
 Provide:
 ${numbered}
 
-Make it realistic. Principal first. Stay inside daily budget / max trades / hard stop.
+Make it realistic. Principal first. Stay inside daily budget / max trades / hard stop. The $100→$5k rung is 50x — do not size as if 50x is a plan.
 
 Book:
+${grounded}`;
+  }
+
+  if (desk.id === "polymarket") {
+    return `${rules}
+
+Research Polymarket event contracts for Taskra's rung challenge.
+Topic: ${f("query", "top volume")}
+Lean: ${f("bias", "no lean")}
+Horizon: ${f("horizon", "days")}
+
+Paper ideas only. No CLOB orders. Defined risk. Do not bet the rung. Prefer liquid books with a clear resolution source.
+
+Analyze:
+${numbered}
+
+Live Polymarket + desk policy:
 ${grounded}`;
   }
 
@@ -439,7 +478,15 @@ export async function gatherDeskContext(
     lines.push("Open paper/live positions: " + open.map((row) => `#${row.id} ${row.ticker} ${row.status}`).join(", "));
   }
   const q = searchQuery(opts?.deskId ?? "", fields);
-  if (q.length >= 2) {
+  if (opts?.deskId === "polymarket") {
+    const topic = clip(fields.query || fields.token || fields.ticker || "", 80);
+    try {
+      const events = await searchPolymarket(topic, 6);
+      lines.push(formatPolymarketGrounding(events));
+    } catch {
+      lines.push("Polymarket lookup failed (offline). Research still allowed; do not invent prices.");
+    }
+  } else if (q.length >= 2) {
     const maxMc = opts?.deskId === "gems" ? parseMaxMcap(fields.mcap || "") : null;
     lines.push(...(await dexLookup(q, maxMc)));
   }
@@ -529,6 +576,16 @@ const FRAMEWORK_NOTES: Record<string, string[]> = {
     "Tools: RugCheck, DexScreener, Solscan holders, Bubblemaps, WHOIS, this desk Auditor.",
     "2026 tactics: AI-cloned KOL video, fake stream-unlock, lookalike tickers, 'revenue-share' with no on-chain fee switch.",
     "If already in: this desk paper-sells / never adds. Live: do not send more. Record the mint as a lesson.",
+  ],
+  polymarket: [
+    "Quote the exact question and the resolution source (site + what counts as Yes).",
+    "Implied odds from the book vs a conservative base rate. If you cannot name a base rate, Avoid.",
+    "Mispricing needs a specific information edge, not a vibe. Sports shorts need a number (Elo, injury, hours to start).",
+    "Max loss = paper size. Never 'I'll add if it goes against me' on the first rung.",
+    "Size: tiny vs declared bankroll. First rung ($100→$5k) paper $5–$20 ideas, not $50.",
+    "Kill if the story changes, liquidity dries, or the event is postponed into 50-50 rules.",
+    "If the same view is already in a Solana meme, do not stack it on Polymarket.",
+    "Watch / Paper / Avoid. Default Avoid. Log Watch/Paper via POST /api/challenge/ideas.",
   ],
 };
 

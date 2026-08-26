@@ -11,6 +11,7 @@ Discovery only. Sources of truth: `config/sources.yaml` in CryptoTrading after c
 
 ## Don't
 - Buy, sell, or set MASTER.
+- Chase the $100→$5k rung with a YOLO mint. Surface names; Chief/Grok decide.
 - Follow random CT accounts not on the list.
 - Start a second `npm run agent`.
 

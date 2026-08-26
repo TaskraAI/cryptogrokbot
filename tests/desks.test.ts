@@ -131,7 +131,7 @@ describe("intel desks", () => {
     for (const s of servers) s.close();
   });
 
-  it("covers the eight Grok workflows with numbered sections", () => {
+  it("covers the nine Grok workflows with numbered sections", () => {
     expect(DESKS.map((d) => d.id)).toEqual([
       "sentiment",
       "gems",
@@ -141,6 +141,7 @@ describe("intel desks", () => {
       "narratives",
       "portfolio",
       "scams",
+      "polymarket",
     ]);
     for (const desk of DESKS) {
       const prompt = buildDeskPrompt(desk, {}, "grounded");
@@ -161,6 +162,8 @@ describe("intel desks", () => {
     expect(js).toContain("Open Intel");
     expect(js).toContain("/api/desks");
     expect(js).toContain("X sentiment, gems, project eval");
+    expect(js).toContain("Rung challenge");
+    expect(js).toContain("/api/challenge");
     expect(() => new Function(js)).not.toThrow();
   });
 
@@ -224,7 +227,7 @@ describe("intel desks", () => {
       desks: { id: string; title: string; useXSearch: boolean }[];
       grokReady: boolean;
     };
-    expect(body.desks).toHaveLength(8);
+    expect(body.desks).toHaveLength(9);
     expect(body.desks.map((d) => d.id)).toEqual(DESKS.map((d) => d.id));
     expect(body.desks.find((d) => d.id === "sentiment")?.useXSearch).toBe(true);
     expect(body.desks.find((d) => d.id === "timing")?.useXSearch).toBe(false);

@@ -259,7 +259,11 @@ Only after you have graded paper fills:
 
 Chief’s description forbids inventing LIVE/MASTER. If a Bot offers to go live, refuse.
 
----
+### 11. Rung challenge ($100 → $5k → $10k → $1M)
+
+Paste `first-tasks/rung-challenge.md` to **Chief**. Attach `skills/challenge.md` on Chief and Grok.
+
+Expect: Home **Rung challenge** card, `GET /api/challenge` playbook, Intel **Polymarket** desk, paper ideas only. Grok Bot must say 50x is not a plan. Live crypto size stays 0.05 SOL. No live Polymarket bets until you explicitly fund that later.
 
 ## Quick map: who you talk to
 
@@ -268,7 +272,8 @@ Chief’s description forbids inventing LIVE/MASTER. If a Bot offers to go live,
 | Start/stop paper agent, board, clone, `.env` | `@Chief` |
 | Handles, CAs, empty sources | `@Scout` |
 | Hold vs sell, tape, stops | `@Sentinel` |
-| Thesis / research | `@Grok` |
+| Thesis / research / Polymarket paper ideas | `@Grok` |
+| Rung challenge, bankroll, kill switch | `@Chief` |
 | Grades, lessons, `rules.yaml` | `@Scholar` |
 | See handoffs | Night desk **group** |
 

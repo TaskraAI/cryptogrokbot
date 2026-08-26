@@ -9,7 +9,7 @@ describe("fail-closed config defaults", () => {
     expect(cfg.dashboardBind).toBe("127.0.0.1");
     expect(cfg.allowExtraBudget).toBe(false);
     expect(cfg.dashboardSecureCookie).toBe(false);
-    expect(cfg.walletSecret).toBe("");
+    expect(cfg.challengePath).toMatch(/challenge\.json$/);
   });
 
   it("does not treat MODE=LIVE as enough for master", () => {

@@ -159,6 +159,7 @@ async function renderHome() {
     " · auto live desk needs MASTER · only Grok Bot Bearer can buy/sell</div>" +
     masterCardHtml(d) +
     grokAsksHtml(d) +
+    challengeCardHtml(d) +
     '<div class="card"><h2 style="margin-top:0">P&amp;L</h2>' +
     "<p>Paper net <b>" + Number(d.pnl.paperNetSol).toFixed(4) + " SOL</b> · " + d.pnl.paperTrades + " closed</p>" +
     "<p>Live net <b>" + Number(d.pnl.liveNetSol).toFixed(4) + " SOL</b> · " + d.pnl.liveTrades + " closed</p>" +
@@ -167,7 +168,7 @@ async function renderHome() {
         " SOL</b> · Live day <b>" + Number(d.budget.live.spentSol).toFixed(3) + "/" + Number(d.budget.live.cap) + " SOL</b></p>"
       : "") +
     "<p>Open positions: " + d.openCount + "</p></div>" +
-    '<div class="card"><h2 style="margin-top:0">Intel</h2><p class="muted">Eight Grok desks: X sentiment, gems, project eval, whales, timing, narratives, portfolio, scam radar.</p>' +
+    '<div class="card"><h2 style="margin-top:0">Intel</h2><p class="muted">Nine Grok desks: X sentiment, gems, project eval, whales, timing, narratives, portfolio, scam radar, Polymarket.</p>' +
     '<button id="goIntel" style="width:100%">Open Intel</button></div>' +
     '<div class="card" id="accessCard"><h2 style="margin-top:0">Access</h2>' +
     "<p class='muted'>Owner: " + esc(d.email || "") + " · email verification</p>" +
@@ -201,8 +202,53 @@ async function renderHome() {
   const gi = $("goIntel");
   if (gi) gi.onclick = () => go("intel");
   bindMaster();
+  bindChallenge();
   bindSizeAsks();
   await bindAccess();
+}
+
+function challengeCardHtml(d) {
+  const c = d.challenge;
+  if (!c) return "";
+  const r = c.rung || {};
+  const jobs = ((c.playbook && c.playbook.tonight) || []).slice(0, 7).map((t) => "<li>" + esc(t) + "</li>").join("");
+  const ideas = (c.ideas || []).slice(0, 6).map((i) =>
+    "<p><span class='pill'>" + esc(i.venue) + "</span> " + esc(i.title) +
+    " <span class='muted'>" + esc(i.status) + (i.side ? " · " + esc(i.side) : "") + "</span></p>"
+  ).join("");
+  const from = Number(r.from || 100);
+  const to = Number(r.to || 5000);
+  return (
+    '<div class="card"><h2 style="margin-top:0">Rung challenge</h2>' +
+    "<p><b>$" + from.toLocaleString() + " → $" + to.toLocaleString() + "</b>" +
+    " · declared <b>$" + Number(c.bankrollUsd || 0).toLocaleString() + "</b>" +
+    " · " + Number(r.progressPct || 0).toFixed(0) + "% of this rung</p>" +
+    "<p class='muted'>" + esc((c.playbook && c.playbook.honesty) || "") + "</p>" +
+    "<p class='muted'>Crypto via Grok Bot Bearer. Polymarket is research + paper ideas (no live CLOB).</p>" +
+    "<ol style='padding-left:18px'>" + jobs + "</ol>" +
+    "<h2>Paper ideas</h2>" + (ideas || "<p class='muted'>None yet. Grok Bot logs them after research.</p>") +
+    '<label>Declared bankroll (USD)</label><div class="row"><input id="bankrollUsd" type="number" min="0" step="1" value="' +
+    Number(c.bankrollUsd || 100) + '"/><button id="saveBankroll" class="ghost">Save</button></div>' +
+    '<p id="challengeMsg" class="muted"></p></div>'
+  );
+}
+
+function bindChallenge() {
+  const btn = $("saveBankroll");
+  if (!btn) return;
+  btn.onclick = async () => {
+    const msg = $("challengeMsg");
+    btn.disabled = true;
+    if (msg) msg.textContent = "saving…";
+    try {
+      await api("/api/challenge", { method: "POST", body: JSON.stringify({ bankrollUsd: Number($("bankrollUsd").value) }) });
+    } catch (e) {
+      if (msg) msg.textContent = e.message || "failed";
+      btn.disabled = false;
+      return;
+    }
+    renderHome();
+  };
 }
 
 function masterCardHtml(d) {

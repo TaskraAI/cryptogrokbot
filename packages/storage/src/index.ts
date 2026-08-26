@@ -171,6 +171,20 @@ function migrate(db: DatabaseSync): void {
       answered_at INTEGER,
       note TEXT NOT NULL DEFAULT ''
     );
+
+    CREATE TABLE IF NOT EXISTS challenge_ideas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      at INTEGER NOT NULL,
+      venue TEXT NOT NULL,
+      title TEXT NOT NULL,
+      url TEXT NOT NULL DEFAULT '',
+      side TEXT NOT NULL DEFAULT '',
+      size_usd REAL NOT NULL DEFAULT 0,
+      note TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'watch',
+      rung_from INTEGER NOT NULL DEFAULT 100,
+      rung_to INTEGER NOT NULL DEFAULT 5000
+    );
   `);
   migrateBudgetByMode(db);
   seedStarterTodos(db);
@@ -771,4 +785,79 @@ export function closeSizeAsksForMint(store: Store, mint: string): void {
       "UPDATE size_asks SET status = 'filled' WHERE mint = ? AND status IN ('pending','keep','increase')",
     )
     .run(mint);
+}
+
+export type ChallengeIdeaStatus = "watch" | "paper" | "killed" | "won" | "lost";
+
+export interface ChallengeIdeaRow {
+  id: number;
+  at: number;
+  venue: string;
+  title: string;
+  url: string;
+  side: string;
+  size_usd: number;
+  note: string;
+  status: string;
+  rung_from: number;
+  rung_to: number;
+}
+
+export function insertChallengeIdea(
+  store: Store,
+  row: {
+    venue: string;
+    title: string;
+    url?: string;
+    side?: string;
+    sizeUsd?: number;
+    note?: string;
+    status?: ChallengeIdeaStatus;
+    rungFrom?: number;
+    rungTo?: number;
+  },
+): ChallengeIdeaRow {
+  const status = row.status && ["watch", "paper", "killed", "won", "lost"].includes(row.status) ? row.status : "watch";
+  const result = store.db
+    .prepare(
+      "INSERT INTO challenge_ideas (at, venue, title, url, side, size_usd, note, status, rung_from, rung_to) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .run(
+      Date.now(),
+      row.venue.slice(0, 32),
+      row.title.slice(0, 240),
+      (row.url ?? "").slice(0, 500),
+      (row.side ?? "").slice(0, 80),
+      Number.isFinite(row.sizeUsd) ? Number(row.sizeUsd) : 0,
+      (row.note ?? "").slice(0, 1000),
+      status,
+      Number(row.rungFrom) || 100,
+      Number(row.rungTo) || 5000,
+    );
+  return getChallengeIdea(store, Number(result.lastInsertRowid))!;
+}
+
+export function getChallengeIdea(store: Store, id: number): ChallengeIdeaRow | undefined {
+  return store.db.prepare("SELECT * FROM challenge_ideas WHERE id = ?").get(id) as ChallengeIdeaRow | undefined;
+}
+
+export function listChallengeIdeas(store: Store, limit = 40): ChallengeIdeaRow[] {
+  return asRows<ChallengeIdeaRow[]>(
+    store.db.prepare("SELECT * FROM challenge_ideas ORDER BY id DESC LIMIT ?").all(limit),
+  );
+}
+
+export function updateChallengeIdea(
+  store: Store,
+  id: number,
+  patch: { status?: ChallengeIdeaStatus; note?: string; sizeUsd?: number },
+): ChallengeIdeaRow | undefined {
+  const row = getChallengeIdea(store, id);
+  if (!row) return undefined;
+  const status =
+    patch.status && ["watch", "paper", "killed", "won", "lost"].includes(patch.status) ? patch.status : row.status;
+  const note = patch.note != null ? String(patch.note).slice(0, 1000) : row.note;
+  const size = patch.sizeUsd != null && Number.isFinite(patch.sizeUsd) ? Number(patch.sizeUsd) : row.size_usd;
+  store.db.prepare("UPDATE challenge_ideas SET status = ?, note = ?, size_usd = ? WHERE id = ?").run(status, note, size, id);
+  return getChallengeIdea(store, id);
 }

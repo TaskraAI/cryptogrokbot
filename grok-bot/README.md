@@ -58,10 +58,10 @@ Then **Skills → add** the matching file from `skills/`.
 
 | Create this Bot | Paste from |
 |-----------------|------------|
-| Chief | `profiles/chief.md` + `skills/chief.md` |
+| Chief | `profiles/chief.md` + `skills/chief.md` + `skills/challenge.md` |
 | Scout | `profiles/scout.md` + `skills/scout.md` |
 | Sentinel | `profiles/sentinel.md` + `skills/sentinel.md` |
-| Grok | `profiles/grok.md` + `skills/grok.md` |
+| Grok | `profiles/grok.md` + `skills/grok.md` + `skills/challenge.md` |
 | Scholar | `profiles/scholar.md` + `skills/scholar.md` |
 
 Optional: give each a distinct emoji / color in Edit Profile so the group chat is readable.

@@ -127,6 +127,18 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
   const loop = readFileSync(resolve(repoRoot, "apps/agent/src/loop.ts"), "utf8");
   const indexSrc = readFileSync(resolve(repoRoot, "apps/agent/src/index.ts"), "utf8");
   const masterFlag = readFileSync(resolve(repoRoot, "apps/agent/src/master-flag.ts"), "utf8");
+  const chal = JSON.parse(readFileSync(resolve(repoRoot, "config/challenge.json"), "utf8")) as {
+    startUsd?: number;
+    goalUsd?: number;
+  };
+  const pm = readFileSync(resolve(repoRoot, "apps/agent/src/polymarket.ts"), "utf8");
+  const chalOk =
+    chal.startUsd === 100 &&
+    chal.goalUsd === 1_000_000 &&
+    board.includes("/api/challenge") &&
+    pm.includes("gamma-api.polymarket.com") &&
+    !pm.includes("clob.polymarket.com") &&
+    !pm.includes("/order");
   const refuses =
     trade.includes("liveTxBlocked") &&
     trade.includes("MASTER_ENABLED is not true") &&
@@ -143,7 +155,8 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     loop.includes("cannot flip PAPER to LIVE") &&
     indexSrc.includes("applyMasterBootPolicy") &&
     masterFlag.includes('setFlag(store, "master", "false")') &&
-    !indexSrc.includes('setFlag(store, "master", String(cfg.masterEnabled))');
+    !indexSrc.includes('setFlag(store, "master", String(cfg.masterEnabled))') &&
+    chalOk;
   const ok = defaultsOk && liveNeedsBoth && publicBindSecure && extraOffUnlessEnv && refuses;
   return {
     id: "live-fail-closed",

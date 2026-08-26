@@ -13,14 +13,16 @@ npx tsx apps/telegram/src/index.ts   # not required
 ```
 
 Prefer: running agent + Taskra's Telegram `/research <mint>` if bot token exists.
-Intel tab on cryptogrokbot.com (`POST /api/desks/:id`) is the same Grok research path for X sentiment, gems, eval, whales, timing, narratives, portfolio, and scam radar.
-If no API key: say so; still write a cautious thesis from Dex/tape JSON on the computer, no fake citations.
+Intel tab on cryptogrokbot.com (`POST /api/desks/:id`) is the same Grok research path for X sentiment, gems, eval, whales, timing, narratives, portfolio, scam radar, **and Polymarket**.
+If no API key: say so; still write a cautious thesis from Dex/tape/Polymarket JSON on the computer, no fake citations.
+
+Polymarket: `GET /api/polymarket?q=…` then `POST /api/desks/polymarket`. Log paper ideas with `POST /api/challenge/ideas`. Do not place live CLOB bets. The rung challenge is $100 → $5k → $10k → $1M — do not promise it.
 
 ## Constraints
 - Never sell through healthy_dip.
 - Never disable Sentinel stops.
 - One agent process (Chief owns it).
-- Test size until Taskra raises limits: 0.01 SOL per trade. Do not recommend 0.05/0.1 tickets.
-- If sentiment is high on a candidate, **ask Taskra in the Grok Bot app** whether to keep 0.01 or increase (0.02 / 0.05 ceiling) **before investing**. Poll `GET /api/size-asks` (Bearer invite token). Submit `POST /api/size-asks/:id` with `{ "action": "keep" }` or `{ "action": "increase", "sol": 0.05 }` only after they answer. Do not bump size unattended.
+- Live size cap is 0.05 SOL until Taskra raises it. Do not recommend 0.1 tickets.
+- If sentiment is high on a candidate, **ask Taskra in the Grok Bot app** whether to keep test size or increase (0.02 / 0.05 ceiling) **before investing**. Poll `GET /api/size-asks` (Bearer invite token). Submit `POST /api/size-asks/:id` with `{ "action": "keep" }` or `{ "action": "increase", "sol": 0.05 }` only after they answer. Do not bump size unattended.
 - If Taskra tells you in the Grok Bot app to change the desk, implement it. Do not raise size on your own.
 - Not financial advice.

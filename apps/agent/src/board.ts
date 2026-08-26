@@ -20,6 +20,9 @@ import {
   answerSizeAsk,
   getBudget,
   setFlag,
+  insertChallengeIdea,
+  updateChallengeIdea,
+  getChallengeIdea,
   type Store,
 } from "@night/storage";
 import { appendLesson, buildReview, loadLessons } from "@night/learning";
@@ -61,6 +64,8 @@ import { sendLoginCode, type SendCodeFn } from "./mail.ts";
 import { addWallet, listPublicWallets, removeWallet } from "./wallets.ts";
 import { auditorPulseDetail, runAuditorScan } from "./auditor.ts";
 import { getDesk, lastDeskMeta, lastDeskRun, listDesks, runDeskAnalysis } from "./desks.ts";
+import { challengePayload, loadChallenge, setBankrollUsd } from "./challenge.ts";
+import { searchPolymarket } from "./polymarket.ts";
 import type { AppConfig } from "./config.ts";
 
 export const GROK_BOT_ORDERS_ONLY = "only Grok Bot can place buy/sell orders";
@@ -267,6 +272,17 @@ function publicSizeAsk(a: ReturnType<typeof listPendingSizeAsks>[number], policy
     note: a.note,
     at: a.at,
   };
+}
+
+function challengeState(ctx: DashboardContext) {
+  const flags = ctx.flags();
+  return challengePayload({
+    store: ctx.store,
+    challenge: loadChallenge(ctx.cfg.challengePath),
+    policy: ctx.policy,
+    masterEnabled: flags.masterEnabled,
+    mode: flags.mode,
+  });
 }
 
 export async function handleDashboardRequest(
@@ -546,7 +562,103 @@ async function routeAuthed(
         ? { ok: scan.ok === 1, summary: scan.summary, at: scan.at, details: JSON.parse(scan.details_json) }
         : null,
       sizeAsks: listPendingSizeAsks(ctx.store).map((a) => publicSizeAsk(a, ctx.policy)),
+      challenge: challengeState(ctx),
     });
+    return;
+  }
+
+  if (path === "/api/challenge" && method === "GET") {
+    json(res, 200, challengeState(ctx));
+    return;
+  }
+
+  if (path === "/api/challenge" && method === "POST") {
+    if (actor?.kind !== "owner" && actor?.kind !== "grokbot") {
+      json(res, 403, { error: "owner or Grok Bot can update bankroll", ok: false });
+      return;
+    }
+    const body = await readJson(req);
+    const usd = typeof body.bankrollUsd === "number" ? body.bankrollUsd : Number(body.bankrollUsd);
+    if (!Number.isFinite(usd) || usd < 0 || usd > 10_000_000) {
+      json(res, 400, { error: "bankrollUsd required" });
+      return;
+    }
+    setBankrollUsd(ctx.store, usd);
+    json(res, 200, { ok: true, ...challengeState(ctx) });
+    return;
+  }
+
+  if (path === "/api/challenge/ideas" && method === "POST") {
+    if (actor?.kind !== "owner" && actor?.kind !== "grokbot") {
+      json(res, 403, { error: "owner or Grok Bot can log ideas", ok: false });
+      return;
+    }
+    const body = await readJson(req);
+    const title = str(body.title).trim();
+    const venue = str(body.venue).trim().toLowerCase() || "polymarket";
+    if (!title) {
+      json(res, 400, { error: "title required" });
+      return;
+    }
+    if (venue !== "solana" && venue !== "polymarket") {
+      json(res, 400, { error: "venue must be solana or polymarket" });
+      return;
+    }
+    const state = challengeState(ctx);
+    const row = insertChallengeIdea(ctx.store, {
+      venue,
+      title,
+      url: str(body.url),
+      side: str(body.side),
+      sizeUsd: typeof body.sizeUsd === "number" ? body.sizeUsd : Number(body.sizeUsd) || 0,
+      note: str(body.note),
+      status: str(body.status) as "watch" | "paper" | "killed" | "won" | "lost",
+      rungFrom: state.rung.from,
+      rungTo: state.rung.to,
+    });
+    json(res, 200, { ok: true, idea: {
+      id: row.id,
+      at: row.at,
+      venue: row.venue,
+      title: row.title,
+      url: row.url,
+      side: row.side,
+      sizeUsd: row.size_usd,
+      note: row.note,
+      status: row.status,
+    } });
+    return;
+  }
+
+  const ideaOne = path.match(/^\/api\/challenge\/ideas\/(\d+)$/);
+  if (ideaOne && method === "PATCH") {
+    if (actor?.kind !== "owner" && actor?.kind !== "grokbot") {
+      json(res, 403, { error: "owner or Grok Bot can update ideas", ok: false });
+      return;
+    }
+    const existing = getChallengeIdea(ctx.store, Number(ideaOne[1]));
+    if (!existing) {
+      json(res, 404, { error: "idea not found" });
+      return;
+    }
+    const body = await readJson(req);
+    const row = updateChallengeIdea(ctx.store, existing.id, {
+      status: str(body.status) as "watch" | "paper" | "killed" | "won" | "lost" | undefined,
+      note: body.note != null ? str(body.note) : undefined,
+      sizeUsd: typeof body.sizeUsd === "number" ? body.sizeUsd : undefined,
+    });
+    json(res, 200, { ok: true, idea: row });
+    return;
+  }
+
+  if (path === "/api/polymarket" && method === "GET") {
+    const q = url.searchParams.get("q") ?? "";
+    try {
+      const events = await searchPolymarket(q, 10);
+      json(res, 200, { events, liveTrading: false, note: "research only — no CLOB orders" });
+    } catch (err) {
+      json(res, 502, { error: err instanceof Error ? err.message : "polymarket lookup failed", events: [] });
+    }
     return;
   }
 

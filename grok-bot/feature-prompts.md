@@ -82,6 +82,15 @@ If none, say none. Restate when we HOLD a dip.
 @Chief stop npm run agent. Confirm port 8787 is free. Do not delete the repo.
 ```
 
+**Rung challenge (crypto + Polymarket)**
+
+```
+@Chief GET /api/challenge and follow playbook.tonight.
+@Grok scan GET /api/polymarket then run Intel desk polymarket on one liquid market.
+Log a paper idea with POST /api/challenge/ideas. Do not place live Polymarket bets.
+Do not promise $1M. Do not raise size. Ask me before any live Solana spend.
+```
+
 **Secrets** (you fill the secret card, not chat)
 
 ```
