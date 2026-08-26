@@ -228,7 +228,7 @@ describe("live fail-closed", () => {
       dayKey: dayKey(),
     });
     expect(r.ok).toBe(false);
-    expect(r.message).toMatch(/opportunity #|Scout never live-buys|needs Chief/);
+    expect(r.message).toMatch(/WALLET_SECRET_KEY|opportunity #|Scout never live-buys|needs Chief/);
     expect(listOpenPositions(store)).toHaveLength(0);
   });
 

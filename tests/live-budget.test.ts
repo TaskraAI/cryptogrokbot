@@ -130,6 +130,8 @@ describe("paper vs live daily budget", () => {
       guardrails: [],
       dayKey: day,
       sol: 0.05,
+      grokBotOrder: true,
+      chiefApproved: true,
     });
     expect(liveMsg).not.toMatch(/daily budget exhausted/);
     expect(liveMsg).toMatch(/^bought #/);
