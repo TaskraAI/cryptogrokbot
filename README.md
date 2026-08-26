@@ -68,8 +68,8 @@ Default policy (`config/policy.json`): **0.05 SOL/day**, 5 trades, **0.05 SOL** 
 |---|---|---|
 | What happens | SQLite ledger only. No transaction is sent. | Jupiter (graduated) or PumpPortal local-sign (curve), then a signed tx |
 | Wallet | Not required | `WALLET_SECRET_KEY` **or** a dashboard wallet secret required or the buy **fails closed** |
-| Master switch | Ignored for paper fills | Must be `MASTER_ENABLED=true` **or** `/resume CONFIRM` after a `/kill` or the live tx **fails closed** |
-| Dashboard buy/sell | Paper unless the process is `MODE=LIVE` | Same fail-closed rules; the client cannot force live. Live sells also need master + wallet |
+| Master switch | Ignored for paper fills | Auto Scout/Sentinel live txs need `MASTER_ENABLED=true` **or** dashboard **Resume MASTER** / `/resume CONFIRM`. Kill from Home or `/kill`. **Grok Bot Bearer** can still place explicit live buy/sell while MASTER is off |
+| Dashboard buy/sell | **Grok Bot Bearer only** (owner cookie returns 403) | Same. Owner Home has Kill MASTER. The client cannot force live. Auto live sells still need master + wallet |
 | Extra daily budget | Ignored (`ALLOW_EXTRA_BUDGET` default false) | Ignored unless `ALLOW_EXTRA_BUDGET=true` (logged; not settable from an unauthenticated path) |
 
 Live is two flags **and** a dedicated hot-wallet secret (`.env` or `data/wallet-secrets.json`):
@@ -81,7 +81,7 @@ WALLET_SECRET_KEY=   # JSON byte array or base58. Hot wallet only. Never the mai
 HELIUS_RPC_URL=      # recommended over public RPC
 ```
 
-Telegram `/kill` turns the SQLite `master` flag off (live buys **and** live sells fail closed; paper sells still run). `/resume CONFIRM` turns master back on. That is a **kill/resume switch only**: it cannot change `MODE`. The DB cannot flip paper to live. Live still requires `MODE=LIVE` from env **and** master **and** a hot wallet.
+Telegram `/kill` or dashboard **Kill MASTER** turns the SQLite `master` flag off (auto live buys **and** auto live exits fail closed; paper sells still run). Boot no longer stomps that flag when `.env` still has `MASTER_ENABLED=true`. `MASTER_ENABLED=false` in env always kills on restart. `/resume CONFIRM` or Home **Resume MASTER** (type CONFIRM) turns master back on. That is a **kill/resume switch only**: it cannot change `MODE`. The DB cannot flip paper to live. Auto live still requires `MODE=LIVE` from env **and** master **and** a hot wallet. **Only Grok Bot** (`Authorization: Bearer cgbot_…`) can place dashboard buy/sell (paper and live). Owner login cannot.
 
 Dashboard bind defaults to `127.0.0.1`. A public bind is optional (`DASHBOARD_BIND=0.0.0.0`); when bind is not loopback, the session cookie is `Secure` unless you set `DASHBOARD_SECURE_COOKIE=false`.
 
@@ -92,7 +92,7 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 | Var | Required | Purpose |
 |-----|----------|---------|
 | `MODE` | no (default PAPER) | `PAPER` or `LIVE` |
-| `MASTER_ENABLED` | no (default false) | live entries and live exits (kill/resume via Telegram when MODE=LIVE) |
+| `MASTER_ENABLED` | no (default false) | auto live entries and auto live exits (kill/resume via dashboard or Telegram when MODE=LIVE). Env `false` kills sqlite on boot; env `true` does not revive a dashboard `/kill` |
 | `ALLOW_EXTRA_BUDGET` | no (default false) | if true, `extra_budget_sol` may raise the daily cap (logged) |
 | `WALLET_SECRET_KEY` | live only | hot wallet |
 | `DASHBOARD_BIND` | no | default `127.0.0.1` |
@@ -115,14 +115,14 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 ## Safety
 
 - Dedicated hot wallet. Never point this at your main wallet.
-- Hitting `dailyBudgetSol`, `maxTradesPerDay`, or `dailyLossCapSol` **stops buys**, not paper exits. Live exits also stop when master is off. **PAPER and LIVE each have their own daily ledger** — paper fills do not consume the live cap.
+- Hitting `dailyBudgetSol`, `maxTradesPerDay`, or `dailyLossCapSol` **stops buys**, not paper exits. Auto live exits also stop when master is off. **Grok Bot Bearer** explicit orders can still live-trade while MASTER is off. **PAPER and LIVE each have their own daily ledger** — paper fills do not consume the live cap.
 - `extra_budget_sol` does **not** raise the daily cap unless `ALLOW_EXTRA_BUDGET=true`.
 - Per-trade size is refused inside `executeBuy` if it exceeds `maxSolPerTrade`. High sentiment does **not** auto-raise size: Grok Bot asks first (keep 0.01 or a one-shot increase up to `sizeAskCeilingSol`, currently 0.05).
 - Live buy runs a Jupiter sell-sim first. Freeze / guardrails / `/never` rules are hard denies.
 - LLM cannot disable a hard stop or sell through a `healthy_dip`.
-- Unauthenticated mutating API calls return 401. The old open crew board is behind the same login.
+- Unauthenticated mutating API calls return 401. Owner session cannot buy/sell (403). Only Grok Bot Bearer places orders. The old open crew board is behind the same login.
 - Dashboard login is email + password + TOTP 2FA. Wallet secrets are never returned after save. Default bind is localhost.
-- Auditor (6th crew agent) records scans in SQLite: paper default, secrets not in git, live fail-closed (sell gate, size cap, extra budget off, localhost bind).
+- Auditor (6th crew agent) records scans in SQLite: paper default, secrets not in git, live fail-closed (Grok Bot-only orders, dashboard kill, size cap, extra budget off, localhost bind).
 
 ## Telegram
 
@@ -133,7 +133,7 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 | `/pnl` `/review [today\|7d\|30d\|all]` `/trade <id>` | journal |
 | `/grade <id> win\|meh\|fail [note]` | train the journal |
 | `/lesson <text>` `/never <rule>` `/guardrails` `/unguard <id>` | lessons + hard denies |
-| `/kill` `/resume CONFIRM` `/sellall CONFIRM` | halt live txs / resume master (MODE unchanged) / flatten |
+| `/kill` `/resume CONFIRM` `/sellall CONFIRM` | halt auto live txs / resume master (MODE unchanged; dashboard Home has the same kill/resume) / flatten |
 | `/crew` | live Grok crew (Scout / Sentinel / Grok / Scholar / Auditor) |
 | `/rules` `/rule on\|off <id>` | extra rules in `config/rules.yaml` |
 | `/research <mint>` | Grok multi-agent research (needs `XAI_API_KEY`) |

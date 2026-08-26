@@ -125,22 +125,31 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
   const exec = readFileSync(resolve(repoRoot, "packages/execution/src/index.ts"), "utf8");
   const risk = readFileSync(resolve(repoRoot, "packages/risk/src/index.ts"), "utf8");
   const loop = readFileSync(resolve(repoRoot, "apps/agent/src/loop.ts"), "utf8");
+  const indexSrc = readFileSync(resolve(repoRoot, "apps/agent/src/index.ts"), "utf8");
+  const masterFlag = readFileSync(resolve(repoRoot, "apps/agent/src/master-flag.ts"), "utf8");
   const refuses =
     trade.includes("liveTxBlocked") &&
     trade.includes("MASTER_ENABLED is not true") &&
     trade.includes("WALLET_SECRET_KEY is missing") &&
-    board.includes("LIVE sell refused: MASTER_ENABLED") &&
+    trade.includes("grokBotOrder") &&
+    board.includes("only Grok Bot can place buy/sell orders") &&
+    board.includes("/api/master") &&
     exec.includes("refuseOversizeBuy") &&
     exec.includes("size") &&
     exec.includes("exceeds maxSolPerTrade") &&
+    exec.includes("grokBotOrder") &&
     risk.includes("allowExtraBudget") &&
-    loop.includes("cannot flip PAPER to LIVE");
+    risk.includes("allowExplicitLive") &&
+    loop.includes("cannot flip PAPER to LIVE") &&
+    indexSrc.includes("applyMasterBootPolicy") &&
+    masterFlag.includes('setFlag(store, "master", "false")') &&
+    !indexSrc.includes('setFlag(store, "master", String(cfg.masterEnabled))');
   const ok = defaultsOk && liveNeedsBoth && publicBindSecure && extraOffUnlessEnv && refuses;
   return {
     id: "live-fail-closed",
     ok,
     detail: ok
-      ? "LIVE needs MODE=LIVE + MASTER_ENABLED + wallet; sell gated; size cap in executeBuy; extra budget off; bind localhost"
+      ? "LIVE auto desk needs MODE+MASTER+wallet; Grok Bot Bearer can order with MASTER off; dashboard kill; size cap; extra budget off; bind localhost"
       : "live fail-closed invariants missing",
   };
 }

@@ -1,13 +1,14 @@
 import "dotenv/config";
 import { resolve } from "node:path";
 import { dayKey } from "@night/shared";
-import { openStore, setFlag } from "@night/storage";
+import { openStore } from "@night/storage";
 import { createTelegramBot } from "@night/telegram";
 import { loadAppConfig, loadPolicy } from "./config.ts";
 import { AgentRuntime } from "./loop.ts";
 import { pulseAuditorFromStore, startCrewServer, type DashboardContext } from "./board.ts";
 import { resolveDashboardEmail, resolveDashboardPassword } from "./auth.ts";
 import { buyChosenMint, sellChosen } from "./trade.ts";
+import { applyMasterBootPolicy } from "./master-flag.ts";
 import { probeCloudflare, formatCloudflareProbe } from "./cloudflare.ts";
 import { runAuditorScan } from "./auditor.ts";
 
@@ -15,7 +16,7 @@ async function main(): Promise<void> {
   const cfg = loadAppConfig();
   const policy = loadPolicy(cfg.policyPath);
   const store = openStore(cfg.databasePath);
-  setFlag(store, "master", String(cfg.masterEnabled));
+  applyMasterBootPolicy(store, cfg.masterEnabled);
   const runtime = new AgentRuntime(cfg, policy, store);
 
   const pw = resolveDashboardPassword({
@@ -57,17 +58,19 @@ async function main(): Promise<void> {
         sol: opts.sol,
         force: opts.force,
         sizeAskId: opts.sizeAskId,
+        grokBotOrder: opts.grokBotOrder,
         extraRulesPath: cfg.rulesPath,
         dayKey: dayKey(Date.now(), policy.timezone),
         connection: runtime.connection,
         keypair: runtime.keypair,
         pumpApiKey: cfg.pumpApiKey,
       }),
-    sell: (idOrMint) =>
+    sell: (idOrMint, opts) =>
       sellChosen({
         store,
         policy,
         idOrMint,
+        grokBotOrder: opts?.grokBotOrder,
         flags: runtime.currentFlags(),
         connection: runtime.connection,
         keypair: runtime.keypair,
@@ -80,7 +83,9 @@ async function main(): Promise<void> {
   console.log(
     `Night agent starting mode=${cfg.mode} master=${cfg.masterEnabled} db=${cfg.databasePath} host=${cfg.dashboardHost}`,
   );
-  console.warn("Not financial advice. Paper mode until MODE=LIVE and MASTER_ENABLED=true.");
+  console.warn(
+    "Not financial advice. Auto live desk needs MODE=LIVE and MASTER_ENABLED=true. Grok Bot Bearer can place explicit orders while MASTER is off.",
+  );
 
   const token = process.env.CLOUDFLARE_API_TOKEN ?? "";
   if (token) {

@@ -85,6 +85,8 @@ export async function tryEnter(opts: {
   skipScore?: boolean;
   /** Confirmed keep/increase row; allows one-shot size up to sizeAskCeilingSol. */
   sizeAskId?: number;
+  /** Explicit Grok Bot order: live buy allowed while auto-desk MASTER is off. */
+  grokBotOrder?: boolean;
 }): Promise<string> {
   const now = opts.now ?? Date.now();
   const open = listOpenPositions(opts.store);
@@ -106,6 +108,7 @@ export async function tryEnter(opts: {
     openPositions: listOpenPositions(opts.store, opts.flags.mode).length,
     flags: opts.flags,
     now,
+    allowExplicitLive: Boolean(opts.grokBotOrder),
   });
   if (!gate.ok) {
     insertDecision(opts.store, {
@@ -297,6 +300,7 @@ export async function tryEnter(opts: {
     sol: requested,
     maxSolPerTrade: cap,
     masterEnabled: opts.flags.masterEnabled,
+    grokBotOrder: opts.grokBotOrder,
     slippagePct: opts.policy.slippagePctCap,
     connection: opts.connection,
     keypair: opts.keypair,

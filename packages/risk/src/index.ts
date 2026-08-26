@@ -33,9 +33,11 @@ export function canEnter(opts: {
   openPositions: number;
   flags: RuntimeFlags;
   now?: number;
+  /** Grok Bot explicit order: live buy allowed while the auto-desk MASTER kill is off. */
+  allowExplicitLive?: boolean;
 }): EntryGate {
   const now = opts.now ?? Date.now();
-  if (opts.flags.mode === "LIVE" && !opts.flags.masterEnabled) {
+  if (opts.flags.mode === "LIVE" && !opts.flags.masterEnabled && !opts.allowExplicitLive) {
     return { ok: false, reason: "MASTER_ENABLED is off; live buys blocked" };
   }
   if (opts.flags.mode === "LIVE" && !opts.flags.rpcHealthy) {

@@ -156,7 +156,8 @@ async function renderHome() {
   $("page-home").innerHTML =
     "<h1>Desk</h1>" +
     '<div class="banner">' + pill(d.mode) + " master=" + esc(String(d.masterEnabled)) +
-    " · live stays fail-closed without MASTER</div>" +
+    " · auto live desk needs MASTER · only Grok Bot Bearer can buy/sell</div>" +
+    masterCardHtml(d) +
     grokAsksHtml(d) +
     '<div class="card"><h2 style="margin-top:0">P&amp;L</h2>' +
     "<p>Paper net <b>" + Number(d.pnl.paperNetSol).toFixed(4) + " SOL</b> · " + d.pnl.paperTrades + " closed</p>" +
@@ -199,8 +200,58 @@ async function renderHome() {
   $("logout").onclick = async () => { await api("/api/logout", { method: "POST", body: "{}" }); showLogin(); };
   const gi = $("goIntel");
   if (gi) gi.onclick = () => go("intel");
+  bindMaster();
   bindSizeAsks();
   await bindAccess();
+}
+
+function masterCardHtml(d) {
+  const on = Boolean(d.masterEnabled);
+  return (
+    '<div class="card"><h2 style="margin-top:0">MASTER</h2>' +
+    "<p>" + (on
+      ? "Auto Scout/Sentinel live txs are on. Kill MASTER to halt the auto desk. Grok Bot Bearer can still place explicit buy/sell."
+      : "MASTER off. Auto live buys and live exits are halted. Only Grok Bot (Bearer invite token) can place buy and sell orders.") +
+    "</p>" +
+    (on
+      ? '<button class="danger" id="killMaster" style="width:100%">Kill MASTER</button>'
+      : '<label>Type CONFIRM to resume the auto live desk</label><input id="resumeConfirm" placeholder="CONFIRM" autocomplete="off"/>' +
+        '<button id="resumeMaster" style="width:100%;margin-top:8px">Resume MASTER</button>') +
+    '<p id="masterMsg" class="muted"></p></div>'
+  );
+}
+
+function bindMaster() {
+  const msg = $("masterMsg");
+  const kill = $("killMaster");
+  if (kill) {
+    kill.onclick = async () => {
+      kill.disabled = true;
+      if (msg) msg.textContent = "killing…";
+      try {
+        await api("/api/master", { method: "POST", body: JSON.stringify({ enabled: false }) });
+      } catch (e) {
+        if (msg) msg.textContent = e.message || "failed";
+      }
+      renderHome();
+    };
+  }
+  const resume = $("resumeMaster");
+  if (resume) {
+    resume.onclick = async () => {
+      const confirm = ($("resumeConfirm") && $("resumeConfirm").value || "").trim();
+      resume.disabled = true;
+      if (msg) msg.textContent = "resuming…";
+      try {
+        await api("/api/master", { method: "POST", body: JSON.stringify({ enabled: true, confirm }) });
+      } catch (e) {
+        if (msg) msg.textContent = e.message || "failed";
+        resume.disabled = false;
+        return;
+      }
+      renderHome();
+    };
+  }
 }
 
 function grokAsksHtml(d) {
@@ -209,20 +260,24 @@ function grokAsksHtml(d) {
   return asks.map((a) => {
     const test = Number(a.testSol);
     const ceil = Number(a.ceilingSol);
-    const mid = 0.02;
-    const keepLabel = "Keep " + test;
+    const can = Boolean(d.canPlaceOrders);
     const extra = [];
-    extra.push('<button data-ask="' + a.id + '" data-action="keep">' + esc(keepLabel) + "</button>");
-    if (mid > test + 1e-12 && mid <= ceil + 1e-12) {
-      extra.push('<button class="ghost" data-ask="' + a.id + '" data-action="increase" data-sol="0.02">Increase 0.02</button>');
+    if (can) {
+      extra.push('<button data-ask="' + a.id + '" data-action="keep">Keep ' + test + "</button>");
+      if (0.02 > test + 1e-12 && 0.02 <= ceil + 1e-12) {
+        extra.push('<button class="ghost" data-ask="' + a.id + '" data-action="increase" data-sol="0.02">Increase 0.02</button>');
+      }
+      extra.push('<button data-ask="' + a.id + '" data-action="increase" data-sol="' + ceil + '">Increase ' + ceil + "</button>");
     }
-    extra.push('<button data-ask="' + a.id + '" data-action="increase" data-sol="' + ceil + '">Increase ' + ceil + "</button>");
     return (
       '<div class="card"><h2 style="margin-top:0">Grok asks</h2>' +
       "<p>Sentiment <b>" + Number(a.sentiment).toFixed(2) + "</b> is high on <b>" + esc(a.ticker) +
       "</b>. Increase trade size before investing?</p>" +
       "<p class='muted'>" + esc(a.mint) + "</p>" +
-      '<div class="row">' + extra.join("") + "</div>" +
+      (can
+        ? '<div class="row">' + extra.join("") + "</div>"
+        : "<p>Tell Grok Bot: keep " + test + ", increase 0.02, or increase " + ceil +
+          ". Dashboard login cannot place buy/sell orders.</p>") +
       '<p class="muted" data-ask-msg="' + a.id + '"></p></div>'
     );
   }).join("");
@@ -315,26 +370,37 @@ async function renderCrew() {
 
 async function renderTrade() {
   const d = await api("/api/trade");
-  const items = (d.watchlist || []).map((w) =>
+    const items = (d.watchlist || []).map((w) =>
     '<div class="card"><div class="row" style="align-items:center"><div><b>' + esc(w.ticker || "?") +
     "</b><div class='mint'>" + esc(w.mint) + "</div></div>" +
-    '<button data-buy="' + esc(w.mint) + '">Paper buy</button></div>' +
+    (d.canPlaceOrders
+      ? '<button data-buy="' + esc(w.mint) + '">Buy</button>'
+      : '<span class="muted">Grok Bot only</span>') +
+    "</div>" +
     (w.pairAddress
       ? '<iframe class="dex" title="DexScreener" src="https://dexscreener.com/solana/' + encodeURIComponent(w.pairAddress) +
         '?embed=1&theme=dark&trades=0&info=0" allow="clipboard-write"></iframe>'
       : '<p class="muted">No DexScreener pair yet.</p>') +
     "</div>"
   ).join("");
+  const can = Boolean(d.canPlaceOrders);
   $("page-trade").innerHTML =
     "<h1>Trade</h1>" +
-    '<div class="banner">' + pill(d.mode) + " Paper buy writes the SQLite ledger only. Live needs MODE=LIVE, MASTER, and a hot wallet. Size above maxSolPerTrade is refused.</div>" +
+    '<div class="banner">' + pill(d.mode) +
+    " Only Grok Bot (Bearer invite token) can place buy/sell. MASTER off halts auto Scout/Sentinel live txs. Live size stays at maxSolPerTrade.</div>" +
     '<div class="card"><label>Mint address</label><input id="buyMint" placeholder="Solana mint"/>' +
     '<label>Size (SOL)</label><input id="buySol" type="number" step="0.001" min="0.001" value="0.05"/>' +
-    '<div class="row" style="margin-top:10px"><button id="doBuy">Paper buy mint</button>' +
+    '<div class="row" style="margin-top:10px">' +
+    (can
+      ? '<button id="doBuy">Buy mint</button>'
+      : '<button id="doBuy" disabled>Buy mint (Grok Bot only)</button>') +
     '<button class="ghost" id="loadDex">Load DexScreener</button></div>' +
-    '<p id="buyMsg" class="muted"></p><div id="dexBox"></div></div>' +
+    '<p id="buyMsg" class="muted">' +
+    (can ? "" : "Owner dashboard cannot send orders. Tell Grok Bot the mint and size.") +
+    "</p><div id=\"dexBox\"></div></div>" +
     "<h2>Watchlist</h2>" + (items || "<p class='muted'>Empty watchlist</p>");
-  $("doBuy").onclick = () => buyMint($("buyMint").value.trim(), Number($("buySol").value || 0.01));
+  const doBuy = $("doBuy");
+  if (doBuy && can) doBuy.onclick = () => buyMint($("buyMint").value.trim(), Number($("buySol").value || 0.01));
   $("loadDex").onclick = async () => {
     const mint = $("buyMint").value.trim();
     if (!mint) return;
@@ -369,7 +435,11 @@ async function renderBook() {
     '<div class="mint">' + esc(p.mint) + "</div>" +
     "<p>spent " + p.sol_spent + " SOL · tokens " + p.tokens_held +
     (p.net_sol != null ? " · net " + Number(p.net_sol).toFixed(4) : "") + "</p>" +
-    (p.status === "open" ? '<button data-sell="' + p.id + '">Paper sell</button>' : "") +
+    (p.status === "open"
+      ? (d.canPlaceOrders
+        ? '<button data-sell="' + p.id + '">Sell</button>'
+        : "<p class='muted'>Grok Bot Bearer sells this bag. Dashboard login cannot.</p>")
+      : "") +
     (p.grade ? "<p class='muted'>grade " + esc(p.grade) + " " + esc(p.grade_note || "") + "</p>" : "") +
     "</div>"
   ).join("");

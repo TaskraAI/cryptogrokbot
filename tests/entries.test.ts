@@ -65,6 +65,28 @@ describe("paper entries", () => {
     expect(msg).toMatch(/MASTER_ENABLED/);
   });
 
+  it("lets an explicit Grok Bot live order past MASTER until wallet is missing", async () => {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: DEFAULT_POLICY,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: false,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+    });
+    expect(msg).not.toMatch(/MASTER_ENABLED is off/);
+    expect(msg).toMatch(/WALLET_SECRET_KEY|wallet or RPC missing|buy failed/);
+  });
+
   it("refuses a size above maxSolPerTrade instead of clipping", async () => {
     const db = store();
     const msg = await tryEnter({

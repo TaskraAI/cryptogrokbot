@@ -26,9 +26,14 @@ export interface TradeOutcome {
   message: string;
 }
 
-export function liveTxBlocked(flags: RuntimeFlags, kind: "buy" | "sell", hasWallet?: boolean): string | null {
+export function liveTxBlocked(
+  flags: RuntimeFlags,
+  kind: "buy" | "sell",
+  hasWallet?: boolean,
+  grokBotOrder?: boolean,
+): string | null {
   if (flags.mode !== "LIVE") return null;
-  if (!flags.masterEnabled) return `LIVE ${kind} refused: MASTER_ENABLED is not true`;
+  if (!flags.masterEnabled && !grokBotOrder) return `LIVE ${kind} refused: MASTER_ENABLED is not true`;
   if (hasWallet === false) return `LIVE ${kind} refused: WALLET_SECRET_KEY is missing`;
   return null;
 }
@@ -50,8 +55,9 @@ export async function buyChosenMint(opts: {
   pumpApiKey?: string;
   /** Confirmed keep/increase; one-shot size may exceed maxSolPerTrade up to sizeAskCeilingSol. */
   sizeAskId?: number;
+  grokBotOrder?: boolean;
 }): Promise<TradeOutcome> {
-  const blocked = liveTxBlocked(opts.flags, "buy", Boolean(opts.keypair));
+  const blocked = liveTxBlocked(opts.flags, "buy", Boolean(opts.keypair), opts.grokBotOrder);
   if (blocked) {
     return { ok: false, message: blocked };
   }
@@ -84,6 +90,7 @@ export async function buyChosenMint(opts: {
     sol: opts.sol,
     skipScore: Boolean(opts.force),
     sizeAskId: opts.sizeAskId,
+    grokBotOrder: opts.grokBotOrder,
     connection: opts.connection,
     keypair: opts.keypair,
     pumpApiKey: opts.pumpApiKey,
@@ -101,6 +108,7 @@ export async function sellChosen(opts: {
   pumpApiKey?: string;
   /** Skip DexScreener (tests / offline paper). */
   priceUsd?: number;
+  grokBotOrder?: boolean;
 }): Promise<TradeOutcome> {
   const flags = opts.flags ?? {
     mode: "PAPER" as const,
@@ -109,7 +117,7 @@ export async function sellChosen(opts: {
     jupiterHealthy: true,
     telegramHealthy: false,
   };
-  const blocked = liveTxBlocked(flags, "sell", Boolean(opts.keypair));
+  const blocked = liveTxBlocked(flags, "sell", Boolean(opts.keypair), opts.grokBotOrder);
   if (blocked) {
     return { ok: false, message: blocked };
   }
@@ -138,6 +146,7 @@ export async function sellChosen(opts: {
     policy: opts.policy,
     sellAll: true,
     flags,
+    grokBotOrder: opts.grokBotOrder,
     connection: opts.connection,
     keypair: opts.keypair,
     pumpApiKey: opts.pumpApiKey,
@@ -228,8 +237,9 @@ export function statusReport(opts: { flags: RuntimeFlags; policy: Policy; store:
   return [
     `mode=${opts.flags.mode} master=${opts.flags.masterEnabled}`,
     `paper buys never send a transaction`,
-    `live buys need MODE=LIVE and MASTER_ENABLED=true and WALLET_SECRET_KEY`,
-    `live sells need the same three; /resume is a kill/resume switch and cannot set MODE`,
+    `live auto desk needs MODE=LIVE and MASTER_ENABLED=true and WALLET_SECRET_KEY`,
+    `Grok Bot Bearer can place explicit live buy/sell while MASTER is off; auto Scout/Sentinel cannot`,
+    `kill/resume (dashboard or /kill) cannot set MODE`,
     `paper budget ${paper.spent_sol}/${paperCap.cap} SOL  trades ${paper.trades}/${opts.policy.maxTradesPerDay}`,
     `live budget ${live.spent_sol}/${cap.cap} SOL  trades ${live.trades}/${opts.policy.maxTradesPerDay}`,
     `size ${opts.policy.maxSolPerTrade} SOL  hard stop ${opts.policy.hardStopPct}%`,

@@ -19,8 +19,9 @@ Usage:
 Defaults (from .env):
   MODE=PAPER          dry-run ledger only; no chain tx
   MASTER_ENABLED=false
-  Live spend requires MODE=LIVE and MASTER_ENABLED=true and WALLET_SECRET_KEY.
-  Live sells need the same three. /resume cannot set MODE.
+  Live spend for the auto desk requires MODE=LIVE and MASTER_ENABLED=true and WALLET_SECRET_KEY.
+  Grok Bot Bearer can place explicit live orders while MASTER is off.
+  Dashboard Kill MASTER / Telegram /kill halt auto live txs. /resume cannot set MODE.
 
 Flags:
   --sol N     size; refused if above policy.json maxSolPerTrade

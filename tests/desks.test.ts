@@ -71,10 +71,18 @@ async function startCtx(dir: string, password = "test-desks-pass", email = "hell
         token: token({ mint: opts.mint, ticker: "API" }),
         sol: opts.sol ?? 0.05,
         force: opts.force,
+        grokBotOrder: opts.grokBotOrder,
         dayKey: dayKey(),
       }),
-    sell: (idOrMint) =>
-      sellChosen({ store, policy: DEFAULT_POLICY, idOrMint, flags: paperFlags, priceUsd: 0.001 }),
+    sell: (idOrMint, opts) =>
+      sellChosen({
+        store,
+        policy: DEFAULT_POLICY,
+        idOrMint,
+        flags: paperFlags,
+        priceUsd: 0.001,
+        grokBotOrder: opts?.grokBotOrder,
+      }),
   };
   const server = createDashboardServer(ctx);
   const port = await new Promise<number>((resolve, reject) => {

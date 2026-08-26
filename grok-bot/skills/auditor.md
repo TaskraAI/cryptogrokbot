@@ -7,7 +7,9 @@ Checks:
 - `.env.example` still defaults `MODE=PAPER`, `MASTER_ENABLED=false`, `DASHBOARD_BIND=127.0.0.1`
 - `data/` and `.env` are gitignored (password file, wallet secrets, sqlite)
 - tracked files do not contain API tokens or wallet secrets
-- live buys and live sells still fail closed without MODE=LIVE + MASTER + wallet
+- live auto buys and auto live sells still fail closed without MODE=LIVE + MASTER + wallet
+- Grok Bot Bearer can place explicit buy/sell while MASTER is off; owner dashboard cannot
+- dashboard Home has Kill MASTER / Resume CONFIRM; boot does not stomp a kill when env still says true
 - extra budget cannot raise the daily cap unless `ALLOW_EXTRA_BUDGET=true`
 
 Do not paste secrets into chat, PRs, or `lessons.md`.

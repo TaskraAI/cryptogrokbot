@@ -19,6 +19,7 @@ import {
   getSizeAsk,
   answerSizeAsk,
   getBudget,
+  setFlag,
   type Store,
 } from "@night/storage";
 import { appendLesson, buildReview, loadLessons } from "@night/learning";
@@ -54,12 +55,15 @@ import {
   markRedeemed,
   publicGrants,
   revokeGrant,
+  type AccessKind,
 } from "./access.ts";
 import { sendLoginCode, type SendCodeFn } from "./mail.ts";
 import { addWallet, listPublicWallets, removeWallet } from "./wallets.ts";
 import { auditorPulseDetail, runAuditorScan } from "./auditor.ts";
 import { getDesk, lastDeskMeta, lastDeskRun, listDesks, runDeskAnalysis } from "./desks.ts";
 import type { AppConfig } from "./config.ts";
+
+export const GROK_BOT_ORDERS_ONLY = "only Grok Bot can place buy/sell orders";
 
 export interface DashboardContext {
   store: Store;
@@ -72,8 +76,14 @@ export interface DashboardContext {
   totpFile: string;
   accessFile: string;
   sendCode?: SendCodeFn;
-  buy: (opts: { mint: string; sol?: number; force?: boolean; sizeAskId?: number }) => Promise<TradeOutcome>;
-  sell: (idOrMint: string) => Promise<TradeOutcome>;
+  buy: (opts: {
+    mint: string;
+    sol?: number;
+    force?: boolean;
+    sizeAskId?: number;
+    grokBotOrder?: boolean;
+  }) => Promise<TradeOutcome>;
+  sell: (idOrMint: string, opts?: { grokBotOrder?: boolean }) => Promise<TradeOutcome>;
   repoRoot?: string;
 }
 
@@ -104,12 +114,29 @@ function isSecure(req: IncomingMessage, _cfg: AppConfig): boolean {
 }
 
 function authed(req: IncomingMessage, ctx: DashboardContext): boolean {
-  const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
-  if (token && verifySession(token, ctx.password)) return true;
+  return requestActor(req, ctx) != null;
+}
+
+/** Bearer invite token wins over the session cookie so Grok Bot orders are not treated as owner. */
+export function requestActor(req: IncomingMessage, ctx: DashboardContext): { kind: AccessKind } | null {
   const header = String(req.headers.authorization ?? "");
   const m = header.match(/^Bearer\s+(.+)$/i);
-  if (m?.[1] && findGrantByToken(ctx.accessFile, m[1].trim())) return true;
-  return false;
+  if (m?.[1]) {
+    const grant = findGrantByToken(ctx.accessFile, m[1].trim());
+    if (grant) return { kind: grant.kind };
+  }
+  const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+  if (token && verifySession(token, ctx.password)) return { kind: "owner" };
+  return null;
+}
+
+function refuseUnlessGrokBot(
+  res: ServerResponse,
+  actor: { kind: AccessKind } | null,
+): boolean {
+  if (actor?.kind === "grokbot") return false;
+  json(res, 403, { error: GROK_BOT_ORDERS_ONLY, ok: false });
+  return true;
 }
 
 function publicOrigin(req: IncomingMessage, cfg: AppConfig): string {
@@ -405,7 +432,7 @@ export async function handleDashboardRequest(
   }
 
   try {
-    await routeAuthed(ctx, req, res, url, method, path);
+    await routeAuthed(ctx, req, res, url, method, path, requestActor(req, ctx));
   } catch (err) {
     const msg = err instanceof Error ? err.message : "internal";
     if (msg === "invalid json" || msg === "body too large") {
@@ -423,7 +450,9 @@ async function routeAuthed(
   url: URL,
   method: string,
   path: string,
+  actor: { kind: AccessKind } | null,
 ): Promise<void> {
+  const canPlaceOrders = actor?.kind === "grokbot";
   if ((path === "/api/session" || path === "/api/me") && method === "GET") {
     const flags = ctx.flags();
     json(res, 200, {
@@ -433,6 +462,8 @@ async function routeAuthed(
       host: ctx.cfg.dashboardHost,
       email: ctx.email,
       twoFactor: "email",
+      actor: actor?.kind ?? null,
+      canPlaceOrders,
     });
     return;
   }
@@ -503,6 +534,8 @@ async function routeAuthed(
       budget: dayBudgetPayload(ctx.store, ctx.policy, Boolean(flags.allowExtraBudget)),
       openCount: listOpenPositions(ctx.store).length,
       email: ctx.email,
+      actor: actor?.kind ?? null,
+      canPlaceOrders,
       todos: listTodos(ctx.store).map((t) => ({
         id: t.id,
         title: t.title,
@@ -555,7 +588,7 @@ async function routeAuthed(
         return { mint: w.mint, ticker: w.ticker ?? "", notes: w.notes ?? "", pairAddress };
       }),
     );
-    json(res, 200, { mode: ctx.flags().mode, watchlist });
+    json(res, 200, { mode: ctx.flags().mode, masterEnabled: ctx.flags().masterEnabled, canPlaceOrders, watchlist });
     return;
   }
 
@@ -575,7 +608,37 @@ async function routeAuthed(
     return;
   }
 
+  if (path === "/api/master" && method === "POST") {
+    const body = await readJson(req);
+    const enable = body.enabled === true || body.enabled === "true";
+    if (enable) {
+      if (actor?.kind !== "owner") {
+        json(res, 403, { error: "only the owner can resume MASTER", ok: false });
+        return;
+      }
+      if (str(body.confirm).toUpperCase() !== "CONFIRM") {
+        json(res, 400, { error: "type CONFIRM to resume MASTER", ok: false });
+        return;
+      }
+      setFlag(ctx.store, "master", "true");
+    } else {
+      if (actor?.kind !== "owner" && actor?.kind !== "grokbot") {
+        json(res, 403, { error: "only the owner or Grok Bot can kill MASTER", ok: false });
+        return;
+      }
+      setFlag(ctx.store, "master", "false");
+    }
+    const flags = ctx.flags();
+    json(res, 200, {
+      ok: true,
+      masterEnabled: flags.masterEnabled,
+      mode: flags.mode,
+    });
+    return;
+  }
+
   if (path === "/api/buy" && method === "POST") {
+    if (refuseUnlessGrokBot(res, actor)) return;
     const body = await readJson(req);
     const mint = str(body.mint).trim();
     if (!mint) {
@@ -583,32 +646,25 @@ async function routeAuthed(
       return;
     }
     const flags = ctx.flags();
-    if (flags.mode === "LIVE" && !flags.masterEnabled) {
-      json(res, 403, { error: "LIVE buy refused: MASTER_ENABLED is not true", ok: false });
-      return;
-    }
     const result = await ctx.buy({
       mint,
       sol: typeof body.sol === "number" ? body.sol : Number(body.sol) || undefined,
       force: Boolean(body.force) && flags.mode === "PAPER",
+      grokBotOrder: true,
     });
     json(res, result.ok ? 200 : 400, result);
     return;
   }
 
   if (path === "/api/sell" && method === "POST") {
+    if (refuseUnlessGrokBot(res, actor)) return;
     const body = await readJson(req);
     const idOrMint = str(body.idOrMint).trim();
     if (!idOrMint) {
       json(res, 400, { error: "idOrMint required" });
       return;
     }
-    const flags = ctx.flags();
-    if (flags.mode === "LIVE" && !flags.masterEnabled) {
-      json(res, 403, { error: "LIVE sell refused: MASTER_ENABLED is not true", ok: false });
-      return;
-    }
-    const result = await ctx.sell(idOrMint);
+    const result = await ctx.sell(idOrMint, { grokBotOrder: true });
     json(res, result.ok ? 200 : 400, result);
     return;
   }
@@ -619,6 +675,7 @@ async function routeAuthed(
       pnl: pnlPayload(ctx.store),
       positions: listRecentPositions(ctx.store).map(publicPosition),
       wallets,
+      canPlaceOrders,
     });
     return;
   }
@@ -798,6 +855,7 @@ async function routeAuthed(
 
   const sizeAskOne = path.match(/^\/api\/size-asks\/(\d+)$/);
   if (sizeAskOne && method === "POST") {
+    if (refuseUnlessGrokBot(res, actor)) return;
     const askId = Number(sizeAskOne[1]);
     const existing = getSizeAsk(ctx.store, askId);
     if (!existing) {
@@ -832,7 +890,12 @@ async function routeAuthed(
       return;
     }
     ctx.crew.start("grok", `${status} ${answered.ticker} at ${chosenSol} SOL`);
-    const result = await ctx.buy({ mint: answered.mint, sol: chosenSol, sizeAskId: answered.id });
+    const result = await ctx.buy({
+      mint: answered.mint,
+      sol: chosenSol,
+      sizeAskId: answered.id,
+      grokBotOrder: true,
+    });
     ctx.crew.idle("grok", result.message);
     json(res, 200, {
       ok: result.ok,

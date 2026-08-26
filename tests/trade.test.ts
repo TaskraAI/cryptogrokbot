@@ -3,9 +3,10 @@ import { mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_POLICY, dayKey } from "@night/shared";
-import { listFills, listOpenPositions, openStore, setFlag } from "@night/storage";
+import { listFills, listOpenPositions, openStore, setFlag, getFlag } from "@night/storage";
 import { executeBuy, executeSell, refuseOversizeBuy } from "@night/execution";
 import { buyChosenMint, sellChosen, statusReport } from "../apps/agent/src/trade.ts";
+import { applyMasterBootPolicy } from "../apps/agent/src/master-flag.ts";
 import { loadAppConfig } from "../apps/agent/src/config.ts";
 import { AgentRuntime } from "../apps/agent/src/loop.ts";
 import { token } from "./fixtures.ts";
@@ -120,6 +121,38 @@ describe("live fail-closed", () => {
     expect(r.error).toMatch(/maxSolPerTrade/);
   });
 
+  it("executeBuy LIVE with grokBotOrder skips MASTER but still needs a wallet", async () => {
+    const r = await executeBuy({
+      mode: "LIVE",
+      graduated: true,
+      mint: token().mint,
+      sol: 0.1,
+      slippagePct: 15,
+      masterEnabled: false,
+      grokBotOrder: true,
+      maxSolPerTrade: 0.1,
+    });
+    expect(r.signature).toBeUndefined();
+    expect(r.error).not.toMatch(/MASTER_ENABLED/);
+    expect(r.error).toMatch(/WALLET_SECRET_KEY|wallet or RPC missing/);
+  });
+
+  it("executeSell LIVE with grokBotOrder skips MASTER but still needs a wallet", async () => {
+    const r = await executeSell({
+      mode: "LIVE",
+      graduated: true,
+      mint: token().mint,
+      tokens: 1000,
+      slippagePct: 15,
+      solEstimate: 0.1,
+      masterEnabled: false,
+      grokBotOrder: true,
+    });
+    expect(r.signature).toBeUndefined();
+    expect(r.error).not.toMatch(/MASTER_ENABLED/);
+    expect(r.error).toMatch(/WALLET_SECRET_KEY|wallet or RPC missing/);
+  });
+
   it("executeBuy LIVE without MASTER does not send a tx", async () => {
     const r = await executeBuy({
       mode: "LIVE",
@@ -161,6 +194,24 @@ describe("live fail-closed", () => {
     });
     expect(r.ok).toBe(false);
     expect(r.message).toMatch(/MASTER_ENABLED/);
+    expect(listOpenPositions(store)).toHaveLength(0);
+  });
+
+  it("buyChosenMint LIVE grokBotOrder skips MASTER then refuses missing wallet", async () => {
+    const store = mem();
+    const t = token();
+    const r = await buyChosenMint({
+      store,
+      policy: DEFAULT_POLICY,
+      flags: { ...paperFlags, mode: "LIVE", masterEnabled: false },
+      mint: t.mint,
+      token: t,
+      dayKey: dayKey(),
+      grokBotOrder: true,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.message).not.toMatch(/MASTER_ENABLED/);
+    expect(r.message).toMatch(/WALLET_SECRET_KEY/);
     expect(listOpenPositions(store)).toHaveLength(0);
   });
 
@@ -217,6 +268,26 @@ describe("live fail-closed", () => {
     expect(f.masterEnabled).toBe(true);
   });
 
+  it("env MASTER false kills sqlite master on boot policy", () => {
+    const store = mem();
+    setFlag(store, "master", "true");
+    applyMasterBootPolicy(store, false);
+    expect(getFlag(store, "master")).toBe("false");
+  });
+
+  it("env MASTER true does not revive a killed sqlite master", () => {
+    const store = mem();
+    setFlag(store, "master", "false");
+    applyMasterBootPolicy(store, true);
+    expect(getFlag(store, "master")).toBe("false");
+  });
+
+  it("env MASTER true seeds sqlite when the flag is missing", () => {
+    const store = mem();
+    applyMasterBootPolicy(store, true);
+    expect(getFlag(store, "master")).toBe("true");
+  });
+
   it("status names the live opt-in flags", () => {
     const store = mem();
     const text = statusReport({
@@ -227,5 +298,6 @@ describe("live fail-closed", () => {
     });
     expect(text).toMatch(/MODE=LIVE/);
     expect(text).toMatch(/MASTER_ENABLED=true/);
+    expect(text).toMatch(/Grok Bot Bearer/);
   });
 });

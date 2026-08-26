@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { DEFAULT_POLICY, dayKey, type RuntimeFlags } from "@night/shared";
-import { lastAuditorScan, listOpenPositions, listTodos, openStore } from "@night/storage";
+import { lastAuditorScan, listOpenPositions, listTodos, openStore, getFlag } from "@night/storage";
 import { CrewBoard } from "@night/crew";
 import { loadAppConfig } from "../apps/agent/src/config.ts";
 import { createDashboardServer, type DashboardContext } from "../apps/agent/src/board.ts";
@@ -56,7 +56,10 @@ async function startCtx(
     crew,
     cfg,
     policy,
-    flags: () => runtimeFlags,
+    flags: () => ({
+      ...runtimeFlags,
+      masterEnabled: getFlag(store, "master", String(runtimeFlags.masterEnabled)) === "true",
+    }),
     password,
     email,
     totpFile: join(dir, ".dashboard-totp"),
@@ -75,10 +78,11 @@ async function startCtx(
         sol: opts.sol ?? policy.maxSolPerTrade,
         force: opts.force,
         sizeAskId: opts.sizeAskId,
+        grokBotOrder: opts.grokBotOrder,
         dayKey: dayKey(),
       }),
-    sell: (idOrMint) =>
-      sellChosen({ store, policy, idOrMint, flags: runtimeFlags, priceUsd: 0.001 }),
+    sell: (idOrMint, opts) =>
+      sellChosen({ store, policy, idOrMint, flags: runtimeFlags, priceUsd: 0.001, grokBotOrder: opts?.grokBotOrder }),
   };
   const server = createDashboardServer(ctx);
   const port = await new Promise<number>((resolve, reject) => {
@@ -101,6 +105,18 @@ function cookiesOf(res: Response): string {
     .filter(Boolean)
     .map((c) => c.split(";")[0]!)
     .join("; ");
+}
+
+async function inviteGrokBot(url: string, cookie: string): Promise<string> {
+  const invited = await fetch(`${url}/api/access/invite`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ kind: "grokbot" }),
+  });
+  expect(invited.status).toBe(200);
+  const grant = (await invited.json()) as { token?: string };
+  expect(grant.token).toMatch(/^cgbot_/);
+  return grant.token!;
 }
 
 async function completeLogin(
@@ -386,17 +402,26 @@ describe("dashboard auth and paper API", () => {
     expect(cookiesOf(verify)).toMatch(/cg_dash=/);
   });
 
-  it("logs in, paper-buys via API, and never returns a wallet secret", async () => {
+  it("logs in, paper-buys via Grok Bot Bearer, and never returns a wallet secret", async () => {
     const dir = tmp();
     const { server, url, store, codes } = await startCtx(dir, "s3cret-pass");
     servers.push(server);
     const cookie = await completeLogin(url, "s3cret-pass", "hello@taskra.ai", codes);
     expect(cookie).toMatch(/cg_dash=/);
+    const bot = await inviteGrokBot(url, cookie);
 
     const mint = "DashMint11111111111111111111111111111111111";
-    const buy = await fetch(`${url}/api/buy`, {
+    const ownerBuy = await fetch(`${url}/api/buy`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ mint, sol: 0.05 }),
+    });
+    expect(ownerBuy.status).toBe(403);
+    expect(((await ownerBuy.json()) as { error?: string }).error).toMatch(/only Grok Bot/);
+
+    const buy = await fetch(`${url}/api/buy`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
       body: JSON.stringify({ mint, sol: 0.05 }),
     });
     expect(buy.status).toBe(200);
@@ -427,9 +452,17 @@ describe("dashboard auth and paper API", () => {
     expect(Object.values(disk)).toContain(secret);
 
     const pos = listOpenPositions(store)[0]!;
-    const sold = await fetch(`${url}/api/sell`, {
+    const ownerSold = await fetch(`${url}/api/sell`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ idOrMint: String(pos.id) }),
+    });
+    expect(ownerSold.status).toBe(403);
+    expect(((await ownerSold.json()) as { error?: string }).error).toMatch(/only Grok Bot/);
+    expect(listOpenPositions(store)).toHaveLength(1);
+    const sold = await fetch(`${url}/api/sell`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
       body: JSON.stringify({ idOrMint: String(pos.id) }),
     });
     expect(sold.status).toBe(200);
@@ -452,38 +485,83 @@ describe("dashboard auth and paper API", () => {
     expect(JSON.stringify(await health.json())).not.toMatch(/cfat_|WALLET_SECRET/);
   });
 
-  it("refuses LIVE /api/sell when master is off and still paper-sells in PAPER", async () => {
+  it("refuses owner /api/sell even in PAPER and still lets Grok Bot paper-sell with MASTER off", async () => {
     const dir = tmp();
     const { server, url, store, flags, codes } = await startCtx(dir, "sell-gate-pass");
     servers.push(server);
     const cookie = await completeLogin(url, "sell-gate-pass", "hello@taskra.ai", codes);
+    const bot = await inviteGrokBot(url, cookie);
     const mint = "SellGateMint1111111111111111111111111111111";
     const buy = await fetch(`${url}/api/buy`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
       body: JSON.stringify({ mint, sol: 0.05 }),
     });
     expect(buy.status).toBe(200);
     const id = String(listOpenPositions(store)[0]!.id);
     flags.mode = "LIVE";
     flags.masterEnabled = false;
-    const liveSell = await fetch(`${url}/api/sell`, {
+    const ownerSell = await fetch(`${url}/api/sell`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
       body: JSON.stringify({ idOrMint: id }),
     });
-    expect(liveSell.status).toBe(403);
-    expect(((await liveSell.json()) as { error?: string }).error).toMatch(/MASTER_ENABLED/);
+    expect(ownerSell.status).toBe(403);
+    expect(((await ownerSell.json()) as { error?: string }).error).toMatch(/only Grok Bot/);
     expect(listOpenPositions(store)).toHaveLength(1);
     flags.mode = "PAPER";
     flags.masterEnabled = false;
     const paperSell = await fetch(`${url}/api/sell`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie },
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
       body: JSON.stringify({ idOrMint: id }),
     });
     expect(paperSell.status).toBe(200);
     expect(listOpenPositions(store)).toHaveLength(0);
+  });
+
+  it("lets the owner kill MASTER from the dashboard while Grok Bot can still paper-buy", async () => {
+    const dir = tmp();
+    const { server, url, store, codes } = await startCtx(dir, "master-kill-pass");
+    servers.push(server);
+    const cookie = await completeLogin(url, "master-kill-pass", "hello@taskra.ai", codes);
+    const bot = await inviteGrokBot(url, cookie);
+    const resumeNeedConfirm = await fetch(`${url}/api/master`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ enabled: true }),
+    });
+    expect(resumeNeedConfirm.status).toBe(400);
+    const kill = await fetch(`${url}/api/master`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ enabled: false }),
+    });
+    expect(kill.status).toBe(200);
+    expect(((await kill.json()) as { masterEnabled?: boolean }).masterEnabled).toBe(false);
+    const home = await fetch(`${url}/api/home`, { headers: { cookie } });
+    expect(((await home.json()) as { masterEnabled?: boolean; canPlaceOrders?: boolean }).masterEnabled).toBe(false);
+    const grokResume = await fetch(`${url}/api/master`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
+      body: JSON.stringify({ enabled: true, confirm: "CONFIRM" }),
+    });
+    expect(grokResume.status).toBe(403);
+    const buy = await fetch(`${url}/api/buy`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
+      body: JSON.stringify({ mint: "MasterOffMint11111111111111111111111111111", sol: 0.05 }),
+    });
+    expect(buy.status).toBe(200);
+    expect(((await buy.json()) as { ok?: boolean }).ok).toBe(true);
+    expect(listOpenPositions(store)).toHaveLength(1);
+    const resume = await fetch(`${url}/api/master`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ enabled: true, confirm: "CONFIRM" }),
+    });
+    expect(resume.status).toBe(200);
+    expect(((await resume.json()) as { masterEnabled?: boolean }).masterEnabled).toBe(true);
   });
 
   it("lets Grok Bot list pending size asks and keep test size before investing", async () => {
@@ -514,6 +592,12 @@ describe("dashboard auth and paper API", () => {
     expect(body.asks[0]?.ticker).toBe("HOT");
     const home = await fetch(`${url}/api/home`, { headers: { cookie } });
     expect(((await home.json()) as { sizeAsks: Array<{ ticker: string }> }).sizeAsks[0]?.ticker).toBe("HOT");
+    const ownerKeep = await fetch(`${url}/api/size-asks/${row.id}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ action: "keep" }),
+    });
+    expect(ownerKeep.status).toBe(403);
     const keep = await fetch(`${url}/api/size-asks/${row.id}`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${grant.token}` },

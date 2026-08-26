@@ -226,7 +226,7 @@ Telegram equivalents: `/review today`, `/grade <id> win|meh|fail [note]`, `/less
 > @Chief print policy.json caps and whether MASTER is off. Confirm MODE=PAPER.
 
 **Expect:** 0.5 SOL/day, 5 trades, 0.1 per trade, −25% hard stop, MASTER false.  
-Telegram: `/status` `/budget` `/policy` `/kill` (halts **live** buys and live sells; paper sells still run). `/resume CONFIRM` restores master when `MODE=LIVE` — it cannot set `MODE` and does not enable live while `MODE=PAPER`.
+Telegram: `/status` `/budget` `/policy` `/kill` (halts **auto** live buys and live sells; paper sells still run). Dashboard Home has **Kill MASTER** / **Resume MASTER** (type CONFIRM). `/resume CONFIRM` restores the auto desk when `MODE=LIVE` — it cannot set `MODE` and does not enable live while `MODE=PAPER`. **Only Grok Bot Bearer** can `POST /api/buy` and `POST /api/sell`. Explicit Grok Bot live orders still work while MASTER is off.
 
 ### 9. Telegram cockpit (optional second screen)
 
@@ -242,7 +242,7 @@ Phone: message **your** bot (not Grok Bot). Useful commands:
 | `/review 7d` `/trade <id>` `/grade …` | Journal |
 | `/research <mint>` | xAI multi-agent |
 | `/rules` `/rule on\|off <id>` | Extra filters |
-| `/kill` | Stop new entries |
+| `/kill` | Stop auto live entries (dashboard Home has the same kill) |
 | `/sellall CONFIRM` | Flatten (paper or live) |
 
 Keep Grok Bot for watching / teaching; keep Telegram for phone alerts.
@@ -255,7 +255,7 @@ Only after you have graded paper fills:
 2. Secret card: `WALLET_SECRET_KEY`, `HELIUS_RPC_URL`
 3. You type `MODE=LIVE` and `MASTER_ENABLED=true` in `.env` yourself
 4. Small `dailyBudgetSol` in `policy.json`
-5. `/kill` tested so you can halt entries
+5. `/kill` or dashboard Kill MASTER tested so you can halt auto entries
 
 Chief’s description forbids inventing LIVE/MASTER. If a Bot offers to go live, refuse.
 

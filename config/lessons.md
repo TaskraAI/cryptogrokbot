@@ -38,4 +38,5 @@ Newest lessons are injected into the LLM prompt first.
 
 - 2026-08-25T23:15:00.000Z HIGH SENTIMENT SIZE ASK (user): if sentiment is high, Grok Bot must ask Taskra in the app whether to increase trade size **before investing**. Do not auto-bump. Keep 0.01 unless they confirm a one-shot 0.02 or 0.05 (`sizeAskCeilingSol`). Never 0.1. Home **Grok asks** + `GET/POST /api/size-asks`.
 
-- 2026-08-25T23:20:00.000Z BUDGET SPLIT (bugfix): PAPER spend must not count toward the LIVE daily budget (and vice versa). Live daily cap stays 0.05 SOL. Do not raise live size. GrokBot mint stays muted / never live.
+- 2026-08-26T00:58:00.000Z MASTER KILL + GROKBOT-ONLY ORDERS (user): MASTER off. Auto Scout/Sentinel must not send live buy/sell. Dashboard Home has Kill MASTER / Resume CONFIRM (env `MASTER_ENABLED=false` also kills on boot; boot must not revive a kill). Only Grok Bot Bearer (`cgbot_…`) can place buy/sell (paper and live). Owner cookie 403. Grok Bot explicit live orders still work while MASTER is off. Do not raise live size. GrokBot impersonator mint stays muted / never live.
+

@@ -99,9 +99,11 @@ export function refuseLiveExecution(opts: {
   mode: Mode;
   masterEnabled?: boolean;
   hasWallet: boolean;
+  /** Explicit Grok Bot order: skip the auto-desk MASTER kill. */
+  grokBotOrder?: boolean;
 }): string | null {
   if (opts.mode !== "LIVE") return null;
-  if (opts.masterEnabled !== true) return "LIVE execution refused: MASTER_ENABLED is not true";
+  if (opts.masterEnabled !== true && !opts.grokBotOrder) return "LIVE execution refused: MASTER_ENABLED is not true";
   if (!opts.hasWallet) return "LIVE execution refused: WALLET_SECRET_KEY is missing";
   return null;
 }
@@ -115,6 +117,7 @@ export async function executeBuy(opts: {
   /** Per-trade cap. Defaults to policy maxSolPerTrade. Oversize is refused, not clipped. */
   maxSolPerTrade?: number;
   masterEnabled?: boolean;
+  grokBotOrder?: boolean;
   connection?: Connection;
   keypair?: Keypair;
   pumpApiKey?: string;
@@ -131,6 +134,7 @@ export async function executeBuy(opts: {
     mode: opts.mode,
     masterEnabled: opts.masterEnabled,
     hasWallet: Boolean(opts.keypair),
+    grokBotOrder: opts.grokBotOrder,
   });
   if (liveErr) {
     return { paper: false, sol: 0, tokens: 0, error: liveErr };
@@ -179,6 +183,7 @@ export async function executeSell(opts: {
   slippagePct: number;
   solEstimate: number;
   masterEnabled?: boolean;
+  grokBotOrder?: boolean;
   connection?: Connection;
   keypair?: Keypair;
   pumpApiKey?: string;
@@ -190,6 +195,7 @@ export async function executeSell(opts: {
     mode: opts.mode,
     masterEnabled: opts.masterEnabled,
     hasWallet: Boolean(opts.keypair),
+    grokBotOrder: opts.grokBotOrder,
   });
   if (liveErr) {
     return { paper: false, sol: 0, tokens: 0, error: liveErr };

@@ -51,6 +51,8 @@ export async function managePosition(opts: {
   keypair?: Keypair;
   pumpApiKey?: string;
   now?: number;
+  /** Explicit Grok Bot order: live sell allowed while auto-desk MASTER is off. */
+  grokBotOrder?: boolean;
 }): Promise<string> {
   const now = opts.now ?? Date.now();
   let pos = applyPeakAndGreen(rowToPosition(opts.row), opts.snap.priceUsd);
@@ -131,7 +133,7 @@ export async function managePosition(opts: {
   const positionLive = opts.row.mode === "LIVE";
   const wantLiveTx = runtimeMode === "LIVE" && positionLive;
   if (wantLiveTx) {
-    if (opts.flags?.masterEnabled !== true) {
+    if (opts.flags?.masterEnabled !== true && !opts.grokBotOrder) {
       updatePosition(opts.store, pos.id, patch);
       return `LIVE sell refused: MASTER_ENABLED is not true`;
     }
@@ -149,6 +151,7 @@ export async function managePosition(opts: {
     slippagePct: opts.policy.slippagePctCap,
     solEstimate,
     masterEnabled: opts.flags?.masterEnabled,
+    grokBotOrder: opts.grokBotOrder,
     connection: opts.connection,
     keypair: opts.keypair,
     pumpApiKey: opts.pumpApiKey,

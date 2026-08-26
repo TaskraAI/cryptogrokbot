@@ -133,7 +133,7 @@ export function createTelegramBot(token: string, chatId: string, ctx: TelegramCo
     if (!allow(c, chatId)) return;
     setFlag(ctx.store, "master", "false");
     await c.reply(
-      "MASTER off. New live entries and live exits halted. Paper sells still run. MODE is unchanged (env only).",
+      "MASTER off. Auto live entries and live exits halted. Paper sells still run. Grok Bot Bearer can still place explicit orders. MODE is unchanged (env only).",
     );
   });
   bot.command("resume", async (c) => {
@@ -150,7 +150,7 @@ export function createTelegramBot(token: string, chatId: string, ctx: TelegramCo
       return;
     }
     await c.reply(
-      "MASTER on. Live buys/sells allowed while MODE=LIVE and a hot wallet is present. /resume cannot change MODE; it only restores master after /kill.",
+      "MASTER on. Auto live buys/sells allowed while MODE=LIVE and a hot wallet is present. /resume cannot change MODE; it only restores the auto desk after /kill. Grok Bot Bearer can place explicit orders even while MASTER is off.",
     );
   });
   bot.command("sellall", async (c) => {
