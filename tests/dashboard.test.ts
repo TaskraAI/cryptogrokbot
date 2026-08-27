@@ -674,6 +674,18 @@ describe("dashboard auth and paper API", () => {
     const cookie = await completeLogin(url, "add-on-pass", "hello@taskra.ai", codes);
     const bot = await inviteGrokBot(url, cookie);
     const mint = "AddOnMint11111111111111111111111111111111111";
+    const oversize = await fetch(`${url}/api/buy`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
+      body: JSON.stringify({
+        mint: "FreshOversizeMint1111111111111111111111111",
+        sol: 0.2,
+        chief: "APPROVE",
+      }),
+    });
+    expect(oversize.status).toBe(400);
+    expect(((await oversize.json()) as { message?: string }).message).toMatch(/maxSolPerTrade/);
+
     const first = await fetch(`${url}/api/buy`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
@@ -703,18 +715,6 @@ describe("dashboard auth and paper API", () => {
     });
     expect(ownerAdd.status).toBe(403);
     expect(((await ownerAdd.json()) as { error?: string }).error).toMatch(/only Grok Bot/);
-
-    const oversize = await fetch(`${url}/api/buy`, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
-      body: JSON.stringify({
-        mint: "FreshOversizeMint1111111111111111111111111",
-        sol: 0.2,
-        chief: "APPROVE",
-      }),
-    });
-    expect(oversize.status).toBe(400);
-    expect(((await oversize.json()) as { message?: string }).message).toMatch(/maxSolPerTrade/);
 
     const added = await fetch(`${url}/api/buy`, {
       method: "POST",
