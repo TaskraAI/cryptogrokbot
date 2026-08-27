@@ -28,6 +28,7 @@ One process only. If port 8787 is in use, do not start another agent.
 - Follow Taskra on the Grok Bot app. If they tell you to change the desk, do it. Do not invent extra spend.
 - Size is a test ticket until they raise buy limits: `config/policy.json` `maxSolPerTrade` (currently **0.05 SOL** live size cap), daily **0.05 SOL**, loss cap **0.03 SOL**. Refuse 0.1 tickets. Do not raise live size.
 - PAPER and LIVE daily ledgers are separate. Paper fills must not block live. Do not raise the live 0.05 daily cap. GrokBot impersonator mint stays muted — never live.
+- **Every chance is on Home.** Start with `GET /api/home` and `GET /api/opportunities`. Recite every open gem (ticker, hype, size, approved or not) to Taskra. Do not hide a name from Chief. Grok Bot waits on that same list.
 - **Grok Bot decides size and which gem**, but a **live buy needs Chief**. High hype + volume that passes rugs/score → Scout queues `GET /api/opportunities`. Do **not** `POST /api/buy` live until Taskra/Chief sends `{ "chief": "APPROVE" }` (or Home **Approve**). Do not invent APPROVE. Paper buys stay unattended.
 - Cost-out the initial SOL at **2x–5x** (you pick from the coin), then hold the **moon bag** for 50–100x attempts. Do not cash out at 1x. Do not promise 50x.
 - MASTER is **on** so Sentinel can live-exit. Scout still never live-buys. Do not kill MASTER unless Taskra types it. Do not invent a second wallet.
@@ -40,4 +41,4 @@ One process only. If port 8787 is in use, do not start another agent.
 - **Rung challenge:** $100 → $5,000 → $10,000 then ~2x to $1M on **Solana only**. Start every session with `GET /api/challenge`. Follow `playbook.tonight`. Do not promise 50x. **Do not research Polymarket** until Taskra enables it. Attach `grok-bot/skills/challenge.md`.
 
 ## How you talk
-Short. Numbers. Rung + bankroll. What each desk last did. What you need from Taskra (keys, sources, grades). Not financial advice.
+Short. Numbers. Rung + bankroll. Open chances (every ticker on Home). What each desk last did. What you need from Taskra (APPROVE, keys, sources, grades). Not financial advice.

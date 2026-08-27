@@ -12,7 +12,7 @@ export interface CrewPulse {
 }
 
 export const CREW_META: Record<CrewId, { title: string; job: string }> = {
-  chief: { title: "Chief", job: "budget, master switch, handoffs" },
+  chief: { title: "Chief", job: "budget, chances, APPROVE, handoffs" },
   scout: { title: "Scout", job: "X / social / Pump.fun / DexScreener" },
   sentinel: { title: "Sentinel", job: "tape, exits, dip-hold" },
   grok: { title: "Grok", job: "thesis + runner gray-zone (xAI)" },

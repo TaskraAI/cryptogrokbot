@@ -34,6 +34,9 @@ import type { AppConfig } from "./config.ts";
 import { auditorPulseDetail } from "./auditor.ts";
 import { tryEnter } from "./entries.ts";
 import { managePosition, rowToPosition } from "./watchman.ts";
+import { chiefChanceNotice, chiefChancePulse, missedGemLesson } from "./chances.ts";
+import { sendDeskAlert } from "./mail.ts";
+import { resolveDashboardEmail } from "./auth.ts";
 
 export class AgentRuntime {
   flags: RuntimeFlags;
@@ -106,7 +109,7 @@ export class AgentRuntime {
     await Promise.all([scout, sentinel, scholar]);
     logs.push(...scoutLogs, ...sentinelLogs, ...scholarLogs);
     this.crew.idle("auditor", auditorPulseDetail(this.store));
-    this.crew.idle("chief", `tick done lines=${logs.length}`);
+    this.crew.idle("chief", chiefChancePulse(this.store, logs.length));
     return logs;
   }
 
@@ -240,14 +243,13 @@ export class AgentRuntime {
     }
     if (msg.startsWith("opportunity ")) {
       const id = Number(/opportunity #(\d+)/.exec(msg)?.[1]);
+      this.crew.start("chief", `chance #${id} queued — Approve or Skip on Home`);
       this.crew.blocked("grok", msg);
       if (!id || this.notifiedSizeAsks.has(id)) return;
       this.notifiedSizeAsks.add(id);
-      await notify(
-        this.cfg.telegramToken,
-        this.cfg.telegramChatId,
-        `Gem opportunity — Grok Bot should buy:\n${msg}\nPOST /api/buy with Bearer. Do not wait for Taskra.`,
-      );
+      const notice = chiefChanceNotice(msg);
+      await notify(this.cfg.telegramToken, this.cfg.telegramChatId, notice);
+      await this.alertChief(notice);
       return;
     }
     if (!msg.startsWith("ask ")) return;
@@ -258,8 +260,22 @@ export class AgentRuntime {
     await notify(
       this.cfg.telegramToken,
       this.cfg.telegramChatId,
-      `Grok asks before investing:\n${msg}\nAnswer on cryptogrokbot.com Home or tell Grok Bot: keep test size, increase 0.02, or increase 0.05.`,
+      `Grok asks before investing:\n${msg}\nChief: answer on https://cryptogrokbot.com/ Home. Grok Bot waits.`,
     );
+  }
+
+  private async alertChief(text: string): Promise<void> {
+    const em = resolveDashboardEmail({
+      envEmail: this.cfg.dashboardEmail,
+      filePath: this.cfg.dashboardEmailFile,
+      fallback: "hello@taskra.ai",
+    });
+    await sendDeskAlert({
+      to: em.email,
+      subject: "CryptoGrokBot chance — Chief, stay on the same page",
+      text,
+      resendKey: this.cfg.resendApiKey,
+    });
   }
 
   private enterContext(
@@ -474,7 +490,12 @@ export class AgentRuntime {
         });
         appendLesson(
           this.cfg.lessonsPath,
-          `MISSED GEM ${opp.ticker}: ${multiple.toFixed(1)}x after skip (hype ${opp.sentiment.toFixed(2)} vol5m ${opp.volume5m}). Buy hype+volume faster. Do not wait for Taskra.`,
+          missedGemLesson({
+            ticker: opp.ticker,
+            sentiment: opp.sentiment,
+            volume5m: opp.volume5m,
+            multiple,
+          }),
         );
         logs.push(`missed-gem ${opp.ticker} ${multiple.toFixed(1)}x`);
       }

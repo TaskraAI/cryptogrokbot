@@ -51,3 +51,36 @@ export async function sendLoginCode(opts: {
   console.log(`Dashboard email code for ${opts.to}: ${opts.code}`);
   return { delivered: false, via: "log" };
 }
+
+/** Email Chief when a chance queues. Telegram is sent separately by the agent loop. */
+export async function sendDeskAlert(opts: {
+  to: string;
+  subject: string;
+  text: string;
+  resendKey?: string;
+}): Promise<MailResult> {
+  const to = opts.to.trim();
+  const key = opts.resendKey?.trim() ?? "";
+  if (key && to.includes("@")) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${key}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "CryptoGrokBot <login@cryptogrokbot.com>",
+          to: [to],
+          subject: opts.subject.slice(0, 120),
+          text: opts.text.slice(0, 4000),
+        }),
+      });
+      if (res.ok) return { delivered: true, via: "resend" };
+    } catch {
+      // fall through
+    }
+  }
+  console.log(`Desk alert for ${to || "chief"}: ${opts.subject}\n${opts.text}`);
+  return { delivered: false, via: "log" };
+}

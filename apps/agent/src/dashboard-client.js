@@ -6,7 +6,7 @@
 const $ = (id) => document.getElementById(id);
 let page = "home";
 let cache = {};
-let crewTimer = null;
+let lastHomeFp = "";
 
 async function api(path, opts = {}) {
   const res = await fetch(path, {
@@ -127,6 +127,19 @@ function pill(mode) {
   return '<span class="pill ' + (live ? "live" : "paper") + '">' + (live ? "LIVE" : "PAPER") + "</span>";
 }
 
+function homeFingerprint(d) {
+  const open = (d.opportunities || []).map((o) => o.id + ":" + Number(o.chiefApproved)).join(",");
+  const recent = (d.recentOpportunities || []).map((o) => o.id + ":" + (o.status || "")).join(",");
+  return [d.mode, d.masterEnabled, d.openCount, open, recent].join("|");
+}
+
+function deskTyping() {
+  const ae = document.activeElement;
+  if (!ae) return false;
+  const tag = String(ae.tagName || "");
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
 async function refresh() {
   try {
     if (page === "home") await renderHome();
@@ -145,6 +158,7 @@ async function refresh() {
 async function renderHome() {
   const d = await api("/api/home");
   cache.home = d;
+  lastHomeFp = homeFingerprint(d);
   const todos = (d.todos || []).map((t) =>
     '<div class="todo card" style="margin:8px 0"><input type="checkbox" data-todo="' + t.id + '"' +
     (t.done ? " checked" : "") + "/><div><b>" + esc(t.title) + "</b></div></div>"
@@ -156,7 +170,7 @@ async function renderHome() {
   $("page-home").innerHTML =
     "<h1>Desk</h1>" +
     '<div class="banner">' + pill(d.mode) + " master=" + esc(String(d.masterEnabled)) +
-    " · Sentinel live exits need MASTER · Scout never live-buys · live buy needs Chief APPROVE</div>" +
+    " · Sentinel live exits need MASTER · Scout never live-buys · every chance is on Home for Chief APPROVE</div>" +
     masterCardHtml(d) +
     grokAsksHtml(d) +
     gemsHtml(d) +
@@ -303,13 +317,13 @@ function bindMaster() {
 }
 
 function gemsHtml(d) {
-  const rows = d.opportunities || [];
-  if (!rows.length) return "";
-  return rows.map((o) => {
-    const canBuy = Boolean(d.canPlaceOrders);
-    const canApprove = Boolean(d.canApproveChief);
+  const open = d.opportunities || [];
+  const recent = (d.recentOpportunities || []).filter((o) => o.status && o.status !== "open").slice(0, 10);
+  const canBuy = Boolean(d.canPlaceOrders);
+  const canApprove = Boolean(d.canApproveChief);
+  const live = String(d.mode) === "LIVE";
+  const cards = open.map((o) => {
     const approved = Boolean(o.chiefApproved);
-    const live = String(d.mode) === "LIVE";
     const buttons = [];
     if (canApprove && !approved) {
       buttons.push('<button data-gem="' + o.id + '" data-action="approve">Approve</button>');
@@ -334,7 +348,20 @@ function gemsHtml(d) {
         : "<p>Chief must APPROVE this gem, then Grok Bot Bearer POST /api/buy with {chief:\"APPROVE\"}. Dashboard login cannot place orders.</p>") +
       '<p class="muted" data-gem-msg="' + o.id + '"></p></div>'
     );
+  });
+  const history = recent.map((o) => {
+    const extra = o.multipleSeen ? " · " + Number(o.multipleSeen).toFixed(1) + "x after" : "";
+    return "<p><b>" + esc(o.ticker) + "</b> · " + esc(o.status) + extra +
+      (o.chiefApproved ? " · Chief APPROVED" : "") + "</p>";
   }).join("");
+  return (
+    '<div class="card"><h2 style="margin-top:0">Chances</h2>' +
+    "<p class='muted'>Chief and Grok stay on this list. Every Scout gem lands here. Approve or skip so Grok Bot is on the same page.</p>" +
+    (open.length ? "" : "<p>No open chances. Scout queues hype+volume here — nothing is hidden from Chief.</p>") +
+    "</div>" +
+    cards.join("") +
+    (history ? '<div class="card"><h2 style="margin-top:0">Recent chances</h2>' + history + "</div>" : "")
+  );
 }
 
 function bindGems() {
@@ -713,7 +740,13 @@ async function boot() {
     showLogin();
   }
   setInterval(() => {
-    if (page === "crew" && !$("app").classList.contains("hidden")) renderCrew().catch(() => {});
-  }, 2000);
+    if ($("app").classList.contains("hidden")) return;
+    if (page === "crew") renderCrew().catch(() => {});
+    if (page === "home" && !deskTyping()) {
+      api("/api/home").then((d) => {
+        if (homeFingerprint(d) !== lastHomeFp) return renderHome();
+      }).catch(() => {});
+    }
+  }, 4000);
 }
 boot();

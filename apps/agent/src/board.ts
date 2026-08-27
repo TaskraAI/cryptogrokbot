@@ -34,6 +34,7 @@ import { loadSources } from "@night/social";
 import { fetchDexToken } from "@night/signals";
 import type { TradeOutcome } from "./trade.ts";
 import { parseAddOn, parseChiefApprove } from "./entries.ts";
+import { chancesPayload, publicChance } from "./chances.ts";
 import { dashboardHtml } from "./dashboard-html.ts";
 import {
   clearPendingCookieHeader,
@@ -267,21 +268,7 @@ function publicPosition(p: ReturnType<typeof listRecentPositions>[number]) {
 }
 
 function publicOpportunity(o: ReturnType<typeof listOpenOpportunities>[number], policy: Policy) {
-  return {
-    id: o.id,
-    mint: o.mint,
-    ticker: o.ticker,
-    sentiment: o.sentiment,
-    score: o.score,
-    volume5m: o.volume5m,
-    priceUsd: o.price_usd,
-    costOutMultiple: o.cost_out_multiple,
-    reason: o.reason,
-    note: o.note,
-    at: o.at,
-    sizeSol: policy.maxSolPerTrade,
-    chiefApproved: o.chief_approved === 1,
-  };
+  return publicChance(o, policy);
 }
 
 function publicSizeAsk(a: ReturnType<typeof listPendingSizeAsks>[number], policy: Policy) {
@@ -591,7 +578,7 @@ async function routeAuthed(
         ? { ok: scan.ok === 1, summary: scan.summary, at: scan.at, details: JSON.parse(scan.details_json) }
         : null,
       sizeAsks: listPendingSizeAsks(ctx.store).map((a) => publicSizeAsk(a, ctx.policy)),
-      opportunities: listOpenOpportunities(ctx.store).map((o) => publicOpportunity(o, ctx.policy)),
+      ...chancesPayload(ctx.store, ctx.policy),
       challenge: challengeState(ctx),
     });
     return;
@@ -1006,7 +993,7 @@ async function routeAuthed(
 
   if (path === "/api/opportunities" && method === "GET") {
     json(res, 200, {
-      opportunities: listOpenOpportunities(ctx.store).map((o) => publicOpportunity(o, ctx.policy)),
+      ...chancesPayload(ctx.store, ctx.policy),
       sizeSol: ctx.policy.maxSolPerTrade,
       costOutMin: ctx.policy.costOutMinMultiple,
       costOutMax: ctx.policy.costOutMaxMultiple,

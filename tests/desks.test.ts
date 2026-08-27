@@ -172,6 +172,8 @@ describe("intel desks", () => {
     expect(js).toContain("Eight Grok desks");
     expect(js).toContain("Rung challenge");
     expect(js).toContain("/api/challenge");
+    expect(js).toContain("Chances");
+    expect(js).toContain("same page");
     expect(js).toContain("Gem — buy this");
     expect(js).toContain("/api/opportunities");
     expect(js).toContain("Chief must APPROVE");

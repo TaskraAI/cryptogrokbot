@@ -664,6 +664,55 @@ describe("dashboard auth and paper API", () => {
     const bought = (await grokBuy.json()) as { ok?: boolean; message?: string; error?: string };
     expect(JSON.stringify(bought)).not.toMatch(/needs Chief permission/);
     expect(listOpenPositions(store)).toHaveLength(0);
+    const listed = await fetch(`${url}/api/opportunities`, { headers: { cookie } });
+    const listedBody = (await listed.json()) as {
+      opportunities: Array<{ ticker: string }>;
+      recentOpportunities: Array<{ ticker: string; status: string }>;
+    };
+    expect(listedBody.recentOpportunities.some((o) => o.ticker === "CHIEF")).toBe(true);
+  });
+
+  it("shows Chief every chance on Home including skipped names", async () => {
+    const dir = tmp();
+    const { server, url, store, codes } = await startCtx(dir, "chances-home-pass", "hello@taskra.ai");
+    servers.push(server);
+    const cookie = await completeLogin(url, "chances-home-pass", "hello@taskra.ai", codes);
+    const { insertOpportunity, markOpportunitySkipped } = await import("@night/storage");
+    const open = insertOpportunity(store, {
+      mint: "OpenChanceMint11111111111111111111111111111",
+      ticker: "OPEN",
+      sentiment: 0.8,
+      score: 70,
+      volume5m: 4000,
+      priceUsd: 0.001,
+      costOutMultiple: 3,
+      reason: "hype",
+    });
+    const skipped = insertOpportunity(store, {
+      mint: "SkipChanceMint11111111111111111111111111111",
+      ticker: "SKIP",
+      sentiment: 0.3,
+      score: 20,
+      volume5m: 500,
+      priceUsd: 0.002,
+      costOutMultiple: 2,
+      reason: "fade",
+    });
+    markOpportunitySkipped(store, skipped.id);
+    const home = await fetch(`${url}/api/home`, { headers: { cookie } });
+    const body = (await home.json()) as {
+      opportunities: Array<{ id: number; ticker: string }>;
+      recentOpportunities: Array<{ ticker: string; status: string }>;
+    };
+    expect(body.opportunities.map((o) => o.id)).toContain(open.id);
+    expect(body.recentOpportunities.find((o) => o.ticker === "SKIP")?.status).toBe("skipped");
+    const chal = await fetch(`${url}/api/challenge`, { headers: { cookie } });
+    const chalBody = (await chal.json()) as {
+      opportunities: Array<{ ticker: string }>;
+      playbook: { tonight: string[]; howToWork: string[] };
+    };
+    expect(chalBody.opportunities.map((o) => o.ticker)).toContain("OPEN");
+    expect(chalBody.playbook.howToWork.join(" ")).toMatch(/same page/);
   });
 
   it("lets Grok Bot add SOL onto an open bag only with add+chief APPROVE", async () => {

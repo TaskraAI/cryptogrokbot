@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { Policy } from "@night/shared";
 import { getFlag, listChallengeIdeas, setFlag, type Store } from "@night/storage";
+import { chancesPayload } from "./chances.ts";
 
 export type ChallengeVenue = { id: "solana" | "polymarket" | string; label: string; weight: number };
 
@@ -123,8 +124,9 @@ export function playbook(opts: {
       `You are on ${fmtUsd(rung.from)} → ${fmtUsd(rung.to)} (${rung.done ? "DONE" : rung.multiple.toFixed(2) + "x"}). Declared bankroll ${fmtUsd(opts.bankrollUsd)}.`,
       `Mode=${opts.mode} MASTER=${opts.masterEnabled}. Sentinel live exits need MASTER. Scout never live-buys. Live POST /api/buy needs chief:APPROVE. Only Grok Bot Bearer may POST /api/buy and /api/sell.`,
       `Live crypto size cap ${opts.policy.maxSolPerTrade} SOL / day ${opts.policy.dailyBudgetSol} SOL / loss cap ${opts.policy.dailyLossCapSol} SOL. Do not raise these.`,
+      "GET /api/opportunities first. Recite every open chance to Taskra/Chief so you stay on the same page. If the queue is empty, say so.",
       ...rungJobs(rung),
-      "End of session: GET /api/challenge, list open bags, ask Taskra one clear question.",
+      "End of session: GET /api/challenge, list open bags and open chances, ask Taskra one clear question.",
     ],
     never: [
       "Do not promise $1M or 50x. Say the odds are bad and the first rung is lottery-adjacent.",
@@ -134,8 +136,9 @@ export function playbook(opts: {
       "Do not YOLO the whole bankroll on one meme.",
     ],
     howToWork: [
-      "Start every session with GET /api/challenge (Bearer invite token).",
-      "For Solana names: Scout + Intel. High hype+volume → queue GET /api/opportunities. Do not POST /api/buy live until Taskra/Chief sends {chief:\"APPROVE\"}. Paper buys stay unattended.",
+      "Start every session with GET /api/challenge and GET /api/opportunities (Bearer invite token).",
+      "Recite every open chance to Taskra/Chief. Stay on the same page — do not hide a gem from Home.",
+      "For Solana names: Scout + Intel. High hype+volume → queue GET /api/opportunities. Do not POST /api/buy live until Taskra/Chief sends {chief:\"APPROVE\"} or Home Approve. Paper buys stay unattended.",
       "Log crypto ideas with POST /api/challenge/ideas venue=solana. Update status won/lost/killed after the fill.",
       "PATCH/POST bankrollUsd only with a number Taskra agrees is real.",
     ],
@@ -172,6 +175,7 @@ export function challengePayload(opts: {
       mode: opts.mode,
     }),
     ideas: listChallengeIdeas(opts.store, 40).map(publicIdea),
+    ...chancesPayload(opts.store, opts.policy),
     polymarketEnabled: opts.challenge.polymarketEnabled === true,
     polymarketLive: false,
     cryptoOrders: "grokbot-bearer-only",

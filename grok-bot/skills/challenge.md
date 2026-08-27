@@ -10,6 +10,7 @@ This is **not** a promise. The first rung is **50x**. Most 50x paths die. Your j
 
 ```bash
 curl -sS -H "Authorization: Bearer $DASHBOARD_BOT_TOKEN" https://cryptogrokbot.com/api/challenge
+curl -sS -H "Authorization: Bearer $DASHBOARD_BOT_TOKEN" https://cryptogrokbot.com/api/opportunities
 ```
 
 On the Agent Computer, `http://127.0.0.1:8787/api/challenge` is the same. Read `playbook.tonight` and `playbook.never`. Follow them.
@@ -31,7 +32,7 @@ Declared bankroll starts at **$100**. Update it only with a number Taskra agrees
 - MASTER is **on** so Sentinel can live-exit. Scout never live-buys.
 - Only **you** (Bearer `cgbot_…`) may `POST /api/buy` and `POST /api/sell`.
 - Live cap: `maxSolPerTrade` **0.05 SOL**, daily **0.05**, loss cap **0.03**. Do not raise.
-- High hype + volume → Scout queues `GET /api/opportunities`. Do **not** live-buy until Taskra/Chief sends `{ "chief": "APPROVE" }`. Do not invent APPROVE. Paper buys stay unattended.
+- High hype + volume → Scout queues `GET /api/opportunities`. Recite every open chance to Taskra/Chief. Do **not** live-buy until Taskra/Chief sends `{ "chief": "APPROVE" }`. Do not invent APPROVE. Paper buys stay unattended.
 - Cost-out initial SOL at **2–5x** (you pick). Then hold the moon bag. Dip + high/rising sentiment + volume alive = HOLD.
 - Hunt 50–100x gems. Do not promise them. Grade misses.
 - GrokBot impersonator mint stays muted / never live.

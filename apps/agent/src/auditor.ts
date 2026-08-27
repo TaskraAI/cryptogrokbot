@@ -151,6 +151,7 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     board.includes("/api/challenge") &&
     board.includes("Polymarket is off until Taskra enables it") &&
     chalSrc.includes("Do not research or trade Polymarket until Taskra says it is time.") &&
+    chalSrc.includes("stay on the same page") &&
     pm.includes("gamma-api.polymarket.com") &&
     !pm.includes("clob.polymarket.com") &&
     !pm.includes("/order") &&
@@ -172,6 +173,10 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     board.includes("only Grok Bot can place buy/sell orders") &&
     board.includes("/api/master") &&
     board.includes("/api/opportunities") &&
+    board.includes("chancesPayload") &&
+    loop.includes("chiefChanceNotice") &&
+    loop.includes("chiefChancePulse") &&
+    !loop.includes("Do not wait for Taskra") &&
     exec.includes("refuseOversizeBuy") &&
     exec.includes("size") &&
     exec.includes("exceeds maxSolPerTrade") &&
