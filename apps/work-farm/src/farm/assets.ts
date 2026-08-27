@@ -83,21 +83,22 @@ export function generateTextures(scene: Phaser.Scene): void {
     g.destroy();
   }
 
-  // Agent body templates by hat style
+  // Agent body templates by hat style — larger, clearer sprites
   for (let hat = 0; hat < 5; hat++) {
     const g = scene.make.graphics({ x: 0, y: 0 });
-    // placeholder white body — tinted per agent
-    px(g, 0xffffff, 4, 6, 8, 8);
-    px(g, 0xffffff, 5, 3, 6, 4);
-    px(g, 0x1f2937, 6, 14, 2, 3);
-    px(g, 0x1f2937, 9, 14, 2, 3);
-    px(g, 0x111827, 6, 5, 2, 2);
+    px(g, 0xffffff, 3, 7, 10, 9);
+    px(g, 0xffffff, 4, 3, 8, 5);
+    px(g, 0x1f2937, 5, 16, 3, 4);
+    px(g, 0x1f2937, 10, 16, 3, 4);
+    px(g, 0x111827, 5, 5, 2, 2);
     px(g, 0x111827, 9, 5, 2, 2);
+    px(g, 0xfda4af, 6, 8, 2, 1);
     const hatColors = [0xef4444, 0x3b82f6, 0xf59e0b, 0x22c55e, 0xa855f7];
-    px(g, hatColors[hat]!, 4, 1, 8, 3);
-    if (hat === 1) px(g, hatColors[hat]!, 11, 0, 3, 2);
-    if (hat === 2) px(g, 0xfde68a, 6, 0, 4, 2);
-    g.generateTexture(`agent-${hat}`, 16, 18);
+    px(g, hatColors[hat]!, 3, 0, 10, 4);
+    if (hat === 1) px(g, hatColors[hat]!, 12, 0, 4, 3);
+    if (hat === 2) px(g, 0xfde68a, 5, 0, 6, 2);
+    if (hat === 3) px(g, 0x14532d, 6, 0, 4, 2);
+    g.generateTexture(`agent-${hat}`, 16, 20);
     g.destroy();
   }
 

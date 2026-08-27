@@ -1,6 +1,6 @@
 :root {
   --bg: #0b1220;
-  --panel: rgba(8, 14, 26, 0.78);
+  --panel: rgba(8, 14, 26, 0.92);
   --line: rgba(148, 163, 184, 0.28);
   --text: #e2e8f0;
   --muted: #94a3b8;
@@ -142,13 +142,17 @@ body {
   overflow: hidden;
   font-size: 18px;
   line-height: 1.25;
+  min-height: 120px;
 }
 
 .feed li {
   padding: 4px 0;
-  color: #cbd5e1;
+  color: #e2e8f0;
   border-bottom: 1px dashed rgba(148, 163, 184, 0.15);
   animation: feedIn 0.35s ease-out;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .value-row {

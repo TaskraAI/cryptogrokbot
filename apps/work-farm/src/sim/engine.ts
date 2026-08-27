@@ -94,8 +94,11 @@ export class FarmSim {
         const jobsHere = this.jobs.filter(
           (j) => !j.done && STAGES[j.stageIndex] === stage,
         ).length;
-        const base = Math.min(92, 18 + this.stageThroughput[stage] * 6 + atStage * 8 + jobsHere * 5);
-        return [stage, base];
+        const throughput = this.stageThroughput[stage];
+        // Wave between ~20–95 so bars feel alive and distinct per stage
+        const wave = (Math.sin(now / 4000 + STAGES.indexOf(stage)) + 1) * 12;
+        const base = 22 + throughput * 4 + atStage * 10 + jobsHere * 7 + wave;
+        return [stage, Math.max(12, Math.min(96, Math.round(base)))];
       }),
     ) as Record<StageId, number>;
 
@@ -156,7 +159,7 @@ export class FarmSim {
     this.activityHistory.push(active);
     if (this.activityHistory.length > 12) this.activityHistory.shift();
 
-    this.timeSavedMs += (active / this.agentCount) * dt * 0.35;
+    this.timeSavedMs += (active / Math.max(1, this.agentCount)) * dt * 2.8;
   }
 
   private spawnAgent(initial: boolean): void {
@@ -280,6 +283,7 @@ export class FarmSim {
       agent.stage = null;
       agent.workUntil = 0;
       this.tasksDone += 1;
+      if (this.tasksDone >= this.tasksGoal) this.tasksGoal += 50;
       this.valueCreated += 0.35 + Math.random() * 0.55;
       this.pushFeed(`${hhmm(now)} ${pick(FEED_LINES.complete)}`);
       agent.status = "walking";

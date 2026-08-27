@@ -24,15 +24,15 @@ export class FarmScene extends Phaser.Scene {
     paintMap(this);
 
     this.cameras.main.setBounds(0, 0, 48 * 16, 32 * 16);
-    this.cameras.main.centerOn(24 * 16, 14 * 16);
-    this.cameras.main.setZoom(1.15);
+    this.cameras.main.centerOn(24 * 16, 15 * 16);
+    this.cameras.main.setZoom(1.05);
 
-    // gentle camera drift for life
+    // gentle camera drift for life — keep all buildings framed
     this.tweens.add({
       targets: this.cameras.main,
-      scrollX: this.cameras.main.scrollX + 18,
-      scrollY: this.cameras.main.scrollY - 10,
-      duration: 12000,
+      scrollX: this.cameras.main.scrollX + 8,
+      scrollY: this.cameras.main.scrollY + 4,
+      duration: 16000,
       yoyo: true,
       repeat: -1,
       ease: "Sine.easeInOut",
