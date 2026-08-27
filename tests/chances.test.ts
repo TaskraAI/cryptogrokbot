@@ -57,5 +57,7 @@ describe("chief chances", () => {
     expect(payload.recentOpportunities.map((o) => o.ticker)).toEqual(["SKIP", "OPEN"]);
     expect(payload.opportunities[0]?.id).toBe(open.id);
     expect(chiefChancePulse(db, 3)).toMatch(/1 chance\(s\) on Home: OPEN/);
+    expect(payload.opportunities[0]?.chiefMayApprove).toBe(true);
+    expect(payload.mandate.chiefDeputy).toBe(true);
   });
 });

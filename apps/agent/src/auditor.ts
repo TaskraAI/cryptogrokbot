@@ -175,7 +175,8 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     board.includes("/api/opportunities") &&
     board.includes("chancesPayload") &&
     loop.includes("chiefChanceNotice") &&
-    loop.includes("chiefChancePulse") &&
+    loop.includes("deputyChief") &&
+    board.includes("/api/mandate") &&
     !loop.includes("Do not wait for Taskra") &&
     exec.includes("refuseOversizeBuy") &&
     exec.includes("size") &&

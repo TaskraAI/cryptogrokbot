@@ -202,12 +202,14 @@ function migrate(db: DatabaseSync): void {
       resolved_at INTEGER,
       post_price_usd REAL,
       multiple_seen REAL,
-      chief_approved INTEGER NOT NULL DEFAULT 0
+      chief_approved INTEGER NOT NULL DEFAULT 0,
+      approved_by TEXT NOT NULL DEFAULT ''
     );
   `);
   migrateBudgetByMode(db);
   ensureColumn(db, "positions", "cost_out_multiple", "REAL NOT NULL DEFAULT 2");
   ensureColumn(db, "opportunities", "chief_approved", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "opportunities", "approved_by", "TEXT NOT NULL DEFAULT ''");
   seedStarterTodos(db);
 }
 
@@ -914,6 +916,7 @@ export interface OpportunityRow {
   post_price_usd: number | null;
   multiple_seen: number | null;
   chief_approved: number;
+  approved_by: string;
 }
 
 const OPPORTUNITY_TTL_MS = 6 * 3600_000;
@@ -992,8 +995,9 @@ export function markOpportunityFilled(store: Store, mint: string): void {
     .run(Date.now(), mint);
 }
 
-export function approveOpportunity(store: Store, id: number): OpportunityRow | undefined {
-  store.db.prepare("UPDATE opportunities SET chief_approved = 1 WHERE id = ? AND status = 'open'").run(id);
+export function approveOpportunity(store: Store, id: number, approvedBy = "chief"): OpportunityRow | undefined {
+  const who = String(approvedBy || "chief").slice(0, 32);
+  store.db.prepare("UPDATE opportunities SET chief_approved = 1, approved_by = ? WHERE id = ? AND status = 'open'").run(who, id);
   return getOpportunity(store, id);
 }
 

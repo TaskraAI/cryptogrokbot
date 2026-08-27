@@ -170,10 +170,11 @@ async function renderHome() {
   $("page-home").innerHTML =
     "<h1>Desk</h1>" +
     '<div class="banner">' + pill(d.mode) + " master=" + esc(String(d.masterEnabled)) +
-    " · Sentinel live exits need MASTER · Scout never live-buys · every chance is on Home for Chief APPROVE</div>" +
+    " · Sentinel live exits need MASTER · Scout never live-buys · Chief deputized for routine APPROVE when you're away</div>" +
     masterCardHtml(d) +
     grokAsksHtml(d) +
     gemsHtml(d) +
+    mandateHtml(d) +
     challengeCardHtml(d) +
     '<div class="card"><h2 style="margin-top:0">P&amp;L</h2>' +
     "<p>Paper net <b>" + Number(d.pnl.paperNetSol).toFixed(4) + " SOL</b> · " + d.pnl.paperTrades + " closed</p>" +
@@ -325,8 +326,12 @@ function gemsHtml(d) {
   const cards = open.map((o) => {
     const approved = Boolean(o.chiefApproved);
     const buttons = [];
-    if (canApprove && !approved) {
-      buttons.push('<button data-gem="' + o.id + '" data-action="approve">Approve</button>');
+    if (canApprove && !approved && !o.needsTaskra) {
+      buttons.push('<button data-gem="' + o.id + '" data-action="approve">' +
+        (d.actor === "owner" ? "Approve" : "Chief approve") + "</button>");
+    }
+    if (canApprove && !approved && o.needsTaskra && d.actor === "owner") {
+      buttons.push('<button data-gem="' + o.id + '" data-action="approve">Approve (you)</button>');
     }
     if (canBuy && (!live || approved)) {
       buttons.push('<button data-gem="' + o.id + '" data-action="buy">Buy ' + Number(o.sizeSol) + " SOL</button>");
@@ -340,9 +345,10 @@ function gemsHtml(d) {
       "</b> · score " + Number(o.score).toFixed(0) +
       " · vol5m " + Number(o.volume5m).toLocaleString() +
       " · cost-out <b>" + Number(o.costOutMultiple) + "x</b> then moon bag" +
-      (approved ? ' · <b>Chief APPROVED</b>' : "") + "</p>" +
+      (approved ? ' · <b>Chief APPROVED' + (o.approvedBy ? " (" + esc(o.approvedBy) + ")" : "") + "</b>" : "") +
+      (o.needsTaskra && !approved ? ' · <b class="warn">needs Taskra</b>' : "") + "</p>" +
       "<p class='muted'>" + esc(o.mint) + "</p>" +
-      "<p class='muted'>" + esc(o.note || "Chief must APPROVE before a live buy. Scout never live-buys.") + "</p>" +
+      "<p class='muted'>" + esc(o.decisionWhy || o.note || "Chief must APPROVE before a live buy. Scout never live-buys.") + "</p>" +
       (buttons.length
         ? '<div class="row">' + buttons.join("") + "</div>"
         : "<p>Chief must APPROVE this gem, then Grok Bot Bearer POST /api/buy with {chief:\"APPROVE\"}. Dashboard login cannot place orders.</p>") +
@@ -356,11 +362,22 @@ function gemsHtml(d) {
   }).join("");
   return (
     '<div class="card"><h2 style="margin-top:0">Chances</h2>' +
-    "<p class='muted'>Chief and Grok stay on this list. Every Scout gem lands here. Approve or skip so Grok Bot is on the same page.</p>" +
+    "<p class='muted'>Chief and Grok stay on the same page. When you're away, Chief Approves routine gems (≤ cap). Majors wait for you unless standing lessons already say what you would do.</p>" +
     (open.length ? "" : "<p>No open chances. Scout queues hype+volume here — nothing is hidden from Chief.</p>") +
     "</div>" +
     cards.join("") +
     (history ? '<div class="card"><h2 style="margin-top:0">Recent chances</h2>' + history + "</div>" : "")
+  );
+}
+
+function mandateHtml(d) {
+  const m = d.mandate;
+  if (!m) return "";
+  const escList = (arr) => (arr || []).map((x) => "<li>" + esc(x) + "</li>").join("");
+  return (
+    '<div class="card"><h2 style="margin-top:0">Chief mandate</h2>' +
+    "<p>" + esc(m.routine || "") + "</p>" +
+    "<p class='muted'>Escalate to you</p><ul style='padding-left:18px'>" + escList(m.escalate) + "</ul></div>"
   );
 }
 

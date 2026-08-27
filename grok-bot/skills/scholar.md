@@ -13,4 +13,4 @@ Learning loop. Files: `config/lessons.md`, `config/guardrails.yaml`, `config/rul
 ## Don't
 - Loosen daily loss or kill switch because of the $1M challenge.
 - Edit .env LIVE flags.
-- Tell Grok Bot to invent `chief:APPROVE`. Live buys wait for Taskra. Paper Scout still auto-buys.
+- Tell Grok Bot to invent `chief:APPROVE`. Grok waits for Chief or Taskra. Chief may deputy-approve routine queued gems when Taskra is away. Paper Scout still auto-buys.

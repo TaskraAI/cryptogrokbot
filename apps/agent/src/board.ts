@@ -35,6 +35,7 @@ import { fetchDexToken } from "@night/signals";
 import type { TradeOutcome } from "./trade.ts";
 import { parseAddOn, parseChiefApprove } from "./entries.ts";
 import { chancesPayload, publicChance } from "./chances.ts";
+import { classifyChance, standingIntent } from "./mandate.ts";
 import { dashboardHtml } from "./dashboard-html.ts";
 import {
   clearPendingCookieHeader,
@@ -584,6 +585,11 @@ async function routeAuthed(
     return;
   }
 
+  if (path === "/api/mandate" && method === "GET") {
+    json(res, 200, standingIntent(ctx.policy));
+    return;
+  }
+
   if (path === "/api/challenge" && method === "GET") {
     json(res, 200, challengeState(ctx));
     return;
@@ -1015,7 +1021,16 @@ async function routeAuthed(
         json(res, 403, { error: "only the owner or Grok Bot can approve", ok: false });
         return;
       }
-      const updated = approveOpportunity(ctx.store, opp.id);
+      const decision = classifyChance({ mint: opp.mint, ticker: opp.ticker, policy: ctx.policy });
+      if (decision.action === "skip") {
+        json(res, 403, { error: decision.why, ok: false, needsTaskra: false });
+        return;
+      }
+      if (decision.needsTaskra && actor?.kind !== "owner") {
+        json(res, 403, { error: decision.why, ok: false, needsTaskra: true });
+        return;
+      }
+      const updated = approveOpportunity(ctx.store, opp.id, actor?.kind === "owner" ? "taskra" : "chief");
       json(res, 200, {
         ok: true,
         approved: true,

@@ -48,5 +48,7 @@ Newest lessons are injected into the LLM prompt first.
 
 - 2026-08-26T17:24:00.000Z MASTER ON + CHIEF APPROVE (user): MASTER on so Grok Bot/Sentinel can live-exit. Scout never live-buys even with MASTER on — names queue as opportunities. Live `/api/buy` needs `{chief:"APPROVE"}` (CONFIRM is not APPROVE). Grok Bot must not invent APPROVE. Owner cookie still 403 on buy/sell; owner can Approve a gem. Paper Scout still auto-buys. Do not raise size. Polymarket still off. GrokBot impersonator mint stays muted / never live.
 
+- 2026-08-27T21:13:00.000Z CHIEF DEPUTY (user): When Taskra is away, Chief handles routine approvals on their behalf. Routine = Scout-queued gem at ≤ maxSolPerTrade, no add-on, not muted. The desk deputy-approves those each tick; Grok still places the buy and must not invent APPROVE. Big/major calls wait for Taskra (size above cap, add-on, raise caps, extra budget, MASTER kill/resume, Polymarket, new wallet, unmute fail-closed) unless standing lessons already say what Taskra would do — then Chief handles it. Keep Taskra on the same page (Home chances + notify).
+
 
 

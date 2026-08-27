@@ -9,7 +9,7 @@ Polymarket is **off** until I say otherwise. Do not scan it.
 This is not a promise. The first rung is 50x. Most 50x paths fail. Be honest.
 
 1. `GET /api/challenge` and `GET /api/opportunities` with the Bearer invite token (or curl 127.0.0.1:8787). Recite every open chance to me so we stay on the same page. Read `playbook.tonight`. Follow it.
-2. Crypto: MASTER is on so Sentinel can live-exit. Scout never live-buys. Size stays at policy maxSolPerTrade (0.05 SOL). Live buy needs my `{chief:"APPROVE"}` — do not invent it. Cost-out 2–5x, hold the moon bag.
+2. Crypto: MASTER is on so Sentinel can live-exit. Scout never live-buys. Size stays at policy maxSolPerTrade (0.05 SOL). When I am away, Chief Approves routine queued gems; majors wait for me unless standing lessons already say what I would do. Grok must not invent `{chief:"APPROVE"}`. Cost-out 2–5x, hold the moon bag.
 3. Do not raise limits. Do not YOLO the $100. Do not enable the GrokBot impersonator mint.
 4. End of session: rung, declared bankroll, open bags, **open chances**, one question for me.
 

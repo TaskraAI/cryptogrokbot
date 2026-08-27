@@ -173,6 +173,7 @@ describe("intel desks", () => {
     expect(js).toContain("Rung challenge");
     expect(js).toContain("/api/challenge");
     expect(js).toContain("Chances");
+    expect(js).toContain("Chief mandate");
     expect(js).toContain("same page");
     expect(js).toContain("Gem — buy this");
     expect(js).toContain("/api/opportunities");

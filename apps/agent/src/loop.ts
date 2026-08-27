@@ -35,6 +35,7 @@ import { auditorPulseDetail } from "./auditor.ts";
 import { tryEnter } from "./entries.ts";
 import { managePosition, rowToPosition } from "./watchman.ts";
 import { chiefChanceNotice, chiefChancePulse, missedGemLesson } from "./chances.ts";
+import { deputyChief } from "./mandate.ts";
 import { sendDeskAlert } from "./mail.ts";
 import { resolveDashboardEmail } from "./auth.ts";
 
@@ -108,6 +109,9 @@ export class AgentRuntime {
 
     await Promise.all([scout, sentinel, scholar]);
     logs.push(...scoutLogs, ...sentinelLogs, ...scholarLogs);
+    const muted = sources.mute.filter((m) => m.type === "mint").map((m) => m.value);
+    this.crew.start("chief", "deputy approvals for routine chances");
+    logs.push(...deputyChief(this.store, this.policy, muted));
     this.crew.idle("auditor", auditorPulseDetail(this.store));
     this.crew.idle("chief", chiefChancePulse(this.store, logs.length));
     return logs;

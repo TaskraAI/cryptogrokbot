@@ -64,6 +64,8 @@ describe("rung challenge", () => {
     expect(book.howToWork.join(" ")).toMatch(/\/api\/opportunities/);
     expect(book.howToWork.join(" ")).toMatch(/same page/);
     expect(book.tonight.join(" ")).toMatch(/Recite every open chance/);
+    expect(book.tonight.join(" ")).toMatch(/deputy-approves routine/);
+    expect(book.howToWork.join(" ")).toMatch(/\/api\/mandate/);
     expect(book.venues.map((v) => v.id)).toEqual(["solana"]);
   });
 });
