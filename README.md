@@ -45,10 +45,10 @@ The dashboard canonical URL is **https://cryptogrokbot.com/**.
 The Worker `ORIGIN` binding must be a **public** hostname the Worker can fetch. `*.cfargotunnel.com` is blocked (Error 1102). A trycloudflare quick tunnel in front of `127.0.0.1:8787` is the working origin on this VM. Keep it alive with:
 
 ```bash
-CLOUDFLARE_API_TOKEN=… python3 scripts/keep-cf-origin.py
+CLOUDFLARE_API_TOKEN_FILE=/tmp/cf-api.token python3 scripts/keep-cf-origin.py
 ```
 
-This cloud VM is **not** a 24/7 VPS — run the agent + tunnel on a durable host.
+Run **one** watcher. Two `--url` tunnels publish competing Worker ORIGIN hostnames and the public site 502s. Health checks use `https://cryptogrokbot.com/health` with a browser User-Agent — Cloudflare 403s Python-urllib’s default UA, and this VM often cannot resolve `*.trycloudflare.com`.
 
 This cloud VM is **not** a 24/7 VPS — run the agent + tunnel on a durable host.
 
