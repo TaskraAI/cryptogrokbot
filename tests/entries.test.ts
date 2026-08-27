@@ -3,9 +3,9 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_POLICY, dayKey } from "@night/shared";
-import { listOpenPositions, listPendingSizeAsks, listOpenOpportunities, openStore } from "@night/storage";
+import { listFills, listOpenPositions, listPendingSizeAsks, listOpenOpportunities, openStore } from "@night/storage";
 import { scoreSentiment } from "@night/tape";
-import { parseChiefApprove, tryEnter } from "../apps/agent/src/entries.ts";
+import { isExplicitGrokBotAdd, parseAddOn, parseChiefApprove, tryEnter } from "../apps/agent/src/entries.ts";
 import { hit, quietHit, token } from "./fixtures.ts";
 
 const paperFlags = {
@@ -118,6 +118,11 @@ describe("paper entries", () => {
     expect(parseChiefApprove({ chief: "APPROVE" })).toBe(true);
     expect(parseChiefApprove({ chiefApprove: true })).toBe(true);
     expect(parseChiefApprove("APPROVE")).toBe(true);
+    expect(parseAddOn({ add: true })).toBe(true);
+    expect(parseAddOn({ addOn: true })).toBe(true);
+    expect(parseAddOn({ mint: "x" })).toBe(false);
+    expect(isExplicitGrokBotAdd({ add: true, grokBotOrder: true, chiefApproved: true })).toBe(true);
+    expect(isExplicitGrokBotAdd({ add: true, grokBotOrder: true })).toBe(false);
   });
 
   it("refuses a size above maxSolPerTrade instead of clipping", async () => {
@@ -250,6 +255,129 @@ describe("high-sentiment auto-buy", () => {
     expect(msg).toMatch(/^bought #/);
     expect(msg).toMatch(/0.01 SOL/);
     expect(getSizeAsk(db, ask.id)?.status).toBe("filled");
+  });
+});
+
+describe("explicit Grok Bot add-on", () => {
+  async function openBag() {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+    });
+    expect(msg).toMatch(/^bought #/);
+    const row = listOpenPositions(db)[0]!;
+    expect(row.sol_spent).toBeCloseTo(0.01);
+    return { db, row };
+  }
+
+  it("a second buy without add still returns already-in", async () => {
+    const { db, row } = await openBag();
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+      sol: 0.01,
+    });
+    expect(msg).toBe(`already in ${token().ticker}`);
+    expect(listOpenPositions(db)).toHaveLength(1);
+    expect(listOpenPositions(db)[0]!.id).toBe(row.id);
+    expect(listOpenPositions(db)[0]!.sol_spent).toBeCloseTo(0.01);
+  });
+
+  it("a second buy with add+chief APPROVE+grokBotOrder succeeds and increases the open bag", async () => {
+    const { db, row } = await openBag();
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+      add: true,
+      sol: 0.01,
+    });
+    expect(msg).toMatch(/^bought #/);
+    expect(msg).toMatch(/add/);
+    expect(msg).not.toMatch(/already in/);
+    const open = listOpenPositions(db);
+    expect(open).toHaveLength(1);
+    expect(open[0]!.id).toBe(row.id);
+    expect(open[0]!.sol_spent).toBeCloseTo(0.02);
+    expect(open[0]!.principal_sol).toBeCloseTo(0.02);
+    expect(open[0]!.tokens_held).toBeGreaterThan(row.tokens_held);
+    const fills = listFills(db, row.id);
+    expect(fills.filter((f) => f.side === "buy")).toHaveLength(2);
+    expect(fills.some((f) => f.reason === "add")).toBe(true);
+  });
+
+  it("Scout/auto without those flags still cannot add", async () => {
+    const { db, row } = await openBag();
+    const scout = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      add: true,
+      sol: 0.01,
+    });
+    expect(scout).toBe(`already in ${token().ticker}`);
+    const liveScout = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: true,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      add: true,
+      sol: 0.01,
+    });
+    expect(liveScout).toBe(`already in ${token().ticker}`);
+    const noChief = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: false,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      add: true,
+      sol: 0.01,
+    });
+    expect(noChief).toBe(`already in ${token().ticker}`);
+    expect(listOpenPositions(db)).toHaveLength(1);
+    expect(listOpenPositions(db)[0]!.sol_spent).toBeCloseTo(row.sol_spent);
   });
 });
 

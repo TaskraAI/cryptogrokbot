@@ -58,6 +58,8 @@ export async function buyChosenMint(opts: {
   grokBotOrder?: boolean;
   /** Live buy: Chief must send chief:"APPROVE". Scout never sets this. */
   chiefApproved?: boolean;
+  /** Add SOL onto an existing open row. Requires grokBotOrder + chiefApproved. */
+  add?: boolean;
 }): Promise<TradeOutcome> {
   const blocked = liveTxBlocked(opts.flags, "buy", Boolean(opts.keypair), opts.grokBotOrder);
   if (blocked) {
@@ -94,6 +96,7 @@ export async function buyChosenMint(opts: {
     sizeAskId: opts.sizeAskId,
     grokBotOrder: opts.grokBotOrder,
     chiefApproved: opts.chiefApproved,
+    add: opts.add,
     connection: opts.connection,
     keypair: opts.keypair,
     pumpApiKey: opts.pumpApiKey,

@@ -144,4 +144,82 @@ describe("paper vs live daily budget", () => {
     expect(liveOpen[0]!.mode).toBe("LIVE");
     expect(liveOpen[0]!.sol_spent).toBeCloseTo(0.05);
   });
+
+  it("LIVE grokBot add-on increases the existing row instead of already-in", async () => {
+    const store = openStore(tmpDb());
+    const day = dayKey();
+    const livePolicy = {
+      ...DEFAULT_POLICY,
+      dailyBudgetSol: 0.5,
+      maxSolPerTrade: 0.05,
+      sizeAskCeilingSol: 0.05,
+    };
+    const t = token({
+      mint: "CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump",
+      ticker: "fone",
+    });
+    const first = await tryEnter({
+      store,
+      policy: livePolicy,
+      flags: liveFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: day,
+      sol: 0.05,
+      grokBotOrder: true,
+      chiefApproved: true,
+    });
+    expect(first).toMatch(/^bought #/);
+    const before = listOpenPositions(store, "LIVE")[0]!;
+    expect(before.sol_spent).toBeCloseTo(0.05);
+
+    const blocked = await tryEnter({
+      store,
+      policy: livePolicy,
+      flags: liveFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: day,
+      sol: 0.05,
+      grokBotOrder: true,
+      chiefApproved: true,
+    });
+    expect(blocked).toMatch(/already in fone/);
+
+    const scout = await tryEnter({
+      store,
+      policy: livePolicy,
+      flags: liveFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: day,
+      sol: 0.05,
+    });
+    expect(scout).toMatch(/already in fone/);
+
+    const added = await tryEnter({
+      store,
+      policy: livePolicy,
+      flags: liveFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: day,
+      sol: 0.05,
+      grokBotOrder: true,
+      chiefApproved: true,
+      add: true,
+    });
+    expect(added).not.toMatch(/already in/);
+    expect(added).toMatch(/^bought #/);
+    expect(added).toMatch(/add/);
+    const liveOpen = listOpenPositions(store, "LIVE");
+    expect(liveOpen).toHaveLength(1);
+    expect(liveOpen[0]!.id).toBe(before.id);
+    expect(liveOpen[0]!.sol_spent).toBeCloseTo(0.1);
+    expect(liveOpen[0]!.tokens_held).toBeGreaterThan(before.tokens_held);
+  });
 });

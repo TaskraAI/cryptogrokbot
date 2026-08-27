@@ -16,6 +16,7 @@ import {
   listOpenPositions,
   markOpportunityFilled,
   markSizeAskFilled,
+  updatePosition,
   upsertBudget,
   type SizeAskRow,
   type Store,
@@ -34,6 +35,25 @@ export function parseChiefApprove(value: unknown): boolean {
   if (body.chiefApprove === true) return true;
   const c = String(body.chief ?? "").trim().toUpperCase();
   return c === "APPROVE" || c === "CHIEF";
+}
+
+/** Taskra-named add-on: body add/addOn true. Default remains no auto-average-down. */
+export function parseAddOn(value: unknown): boolean {
+  if (value === true) return true;
+  if (!value || typeof value !== "object") return false;
+  const body = value as Record<string, unknown>;
+  const flag = body.add ?? body.addOn ?? body.add_on;
+  if (flag === true) return true;
+  if (typeof flag === "string") return flag.trim().toLowerCase() === "true";
+  return false;
+}
+
+export function isExplicitGrokBotAdd(opts: {
+  add?: boolean;
+  grokBotOrder?: boolean;
+  chiefApproved?: boolean;
+}): boolean {
+  return Boolean(opts.add) && Boolean(opts.grokBotOrder) && Boolean(opts.chiefApproved);
 }
 
 /** Trusted hit so a user-chosen mint can pass the multi-source scorer. */
@@ -142,10 +162,14 @@ export async function tryEnter(opts: {
   grokBotOrder?: boolean;
   /** Live buy: Chief must send chief:"APPROVE". Scout auto-loop never sets this. */
   chiefApproved?: boolean;
+  /** Add SOL onto an existing open row. Only honored with grokBotOrder + chiefApproved. */
+  add?: boolean;
 }): Promise<string> {
   const now = opts.now ?? Date.now();
   const open = listOpenPositions(opts.store);
-  if (open.some((p) => p.mint === opts.token.mint)) {
+  const existingOpen = open.find((p) => p.mint === opts.token.mint);
+  const explicitAdd = isExplicitGrokBotAdd(opts) && Boolean(existingOpen);
+  if (existingOpen && !explicitAdd) {
     return `already in ${opts.token.ticker}`;
   }
 
@@ -240,12 +264,17 @@ export async function tryEnter(opts: {
     lastEntryAt: b.last_entry_at,
     extraBudgetSol: b.extra_budget_sol,
   };
+  const modeOpen = listOpenPositions(opts.store, opts.flags.mode);
   const gate = canEnter({
     policy: opts.policy,
     budget,
-    openPositions: listOpenPositions(opts.store, opts.flags.mode).length,
+    // Add-on does not consume a new open slot.
+    openPositions: explicitAdd
+      ? modeOpen.filter((p) => p.mint !== opts.token.mint).length
+      : modeOpen.length,
     flags: opts.flags,
-    now,
+    // Explicit Taskra add is not a spray; skip the auto-desk cooldown.
+    now: explicitAdd ? now + opts.policy.cooldownSeconds * 1000 : now,
     allowExplicitLive: Boolean(opts.grokBotOrder),
   });
   if (!gate.ok) {
@@ -376,22 +405,33 @@ export async function tryEnter(opts: {
     return `buy failed ${opts.token.ticker}: ${result.error}`;
   }
 
-  const id = insertPosition(opts.store, {
-    mint: opts.token.mint,
-    ticker: opts.token.ticker,
-    mode: opts.flags.mode,
-    openedAt: now,
-    entryPriceUsd: opts.token.priceUsd || 1,
-    principalSol: result.sol,
-    tokensHeld: result.tokens,
-    solSpent: result.sol,
-    sourcesJson: JSON.stringify(opts.sources),
-    entryMetricsJson: JSON.stringify(opts.token),
-    thesis: `score ${scored.checks.score ?? scored.score}; cost-out ${costOutMultiple}x then moon bag`,
-    score: scored.score,
-    entryTx: result.signature,
-    costOutMultiple,
-  });
+  let id: number;
+  if (explicitAdd && existingOpen) {
+    id = existingOpen.id;
+    updatePosition(opts.store, id, {
+      tokens_held: existingOpen.tokens_held + result.tokens,
+      tokens_initial: existingOpen.tokens_initial + result.tokens,
+      sol_spent: existingOpen.sol_spent + result.sol,
+      principal_sol: existingOpen.principal_sol + result.sol,
+    });
+  } else {
+    id = insertPosition(opts.store, {
+      mint: opts.token.mint,
+      ticker: opts.token.ticker,
+      mode: opts.flags.mode,
+      openedAt: now,
+      entryPriceUsd: opts.token.priceUsd || 1,
+      principalSol: result.sol,
+      tokensHeld: result.tokens,
+      solSpent: result.sol,
+      sourcesJson: JSON.stringify(opts.sources),
+      entryMetricsJson: JSON.stringify(opts.token),
+      thesis: `score ${scored.checks.score ?? scored.score}; cost-out ${costOutMultiple}x then moon bag`,
+      score: scored.score,
+      entryTx: result.signature,
+      costOutMultiple,
+    });
+  }
   insertFill(opts.store, {
     positionId: id,
     at: now,
@@ -399,7 +439,7 @@ export async function tryEnter(opts: {
     sol: result.sol,
     tokens: result.tokens,
     priceUsd: opts.token.priceUsd || 1,
-    reason: "entry",
+    reason: explicitAdd ? "add" : "entry",
     tx: result.signature,
     paper: result.paper,
   });
@@ -433,9 +473,11 @@ export async function tryEnter(opts: {
     kind: "entry",
     mint: opts.token.mint,
     allowed: true,
-    reason: `bought ${result.paper ? "paper" : "live"} ${result.sol} SOL cost-out ${costOutMultiple}x`,
+    reason: explicitAdd
+      ? `added ${result.paper ? "paper" : "live"} ${result.sol} SOL onto #${id}`
+      : `bought ${result.paper ? "paper" : "live"} ${result.sol} SOL cost-out ${costOutMultiple}x`,
     score: scored.score,
-    payload: { costOutMultiple, sentiment },
+    payload: { costOutMultiple, sentiment, add: explicitAdd },
   });
-  return `bought #${id} ${opts.token.ticker} ${result.sol} SOL ${result.paper ? "PAPER" : result.signature}`;
+  return `bought #${id} ${opts.token.ticker} ${result.sol} SOL${explicitAdd ? " add" : ""} ${result.paper ? "PAPER" : result.signature}`;
 }

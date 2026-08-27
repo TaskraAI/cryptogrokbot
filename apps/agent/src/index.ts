@@ -60,6 +60,7 @@ async function main(): Promise<void> {
         sizeAskId: opts.sizeAskId,
         grokBotOrder: opts.grokBotOrder,
         chiefApproved: opts.chiefApproved,
+        add: opts.add,
         extraRulesPath: cfg.rulesPath,
         dayKey: dayKey(Date.now(), policy.timezone),
         connection: runtime.connection,

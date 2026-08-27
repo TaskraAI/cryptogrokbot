@@ -33,7 +33,7 @@ import { loadExtraRules, setExtraRuleEnabled, effectiveDailyBudgetSol } from "@n
 import { loadSources } from "@night/social";
 import { fetchDexToken } from "@night/signals";
 import type { TradeOutcome } from "./trade.ts";
-import { parseChiefApprove } from "./entries.ts";
+import { parseAddOn, parseChiefApprove } from "./entries.ts";
 import { dashboardHtml } from "./dashboard-html.ts";
 import {
   clearPendingCookieHeader,
@@ -92,6 +92,7 @@ export interface DashboardContext {
     sizeAskId?: number;
     grokBotOrder?: boolean;
     chiefApproved?: boolean;
+    add?: boolean;
   }) => Promise<TradeOutcome>;
   sell: (idOrMint: string, opts?: { grokBotOrder?: boolean }) => Promise<TradeOutcome>;
   repoRoot?: string;
@@ -810,6 +811,7 @@ async function routeAuthed(
       force: Boolean(body.force) && flags.mode === "PAPER",
       grokBotOrder: true,
       chiefApproved,
+      add: parseAddOn(body),
     });
     json(res, result.ok ? 200 : 400, result);
     return;

@@ -80,6 +80,7 @@ async function startCtx(
         sizeAskId: opts.sizeAskId,
         grokBotOrder: opts.grokBotOrder,
         chiefApproved: opts.chiefApproved,
+        add: opts.add,
         dayKey: dayKey(),
       }),
     sell: (idOrMint, opts) =>
@@ -663,6 +664,60 @@ describe("dashboard auth and paper API", () => {
     const bought = (await grokBuy.json()) as { ok?: boolean; message?: string; error?: string };
     expect(JSON.stringify(bought)).not.toMatch(/needs Chief permission/);
     expect(listOpenPositions(store)).toHaveLength(0);
+  });
+
+  it("lets Grok Bot add SOL onto an open bag only with add+chief APPROVE", async () => {
+    const dir = tmp();
+    const { server, url, store, codes } = await startCtx(dir, "add-on-pass");
+    servers.push(server);
+    const cookie = await completeLogin(url, "add-on-pass", "hello@taskra.ai", codes);
+    const bot = await inviteGrokBot(url, cookie);
+    const mint = "AddOnMint11111111111111111111111111111111111";
+    const first = await fetch(`${url}/api/buy`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
+      body: JSON.stringify({ mint, sol: 0.05, chief: "APPROVE" }),
+    });
+    expect(first.status).toBe(200);
+    expect(((await first.json()) as { ok?: boolean }).ok).toBe(true);
+    const before = listOpenPositions(store)[0]!;
+    expect(before.sol_spent).toBeCloseTo(0.05);
+
+    const noAdd = await fetch(`${url}/api/buy`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
+      body: JSON.stringify({ mint, sol: 0.05, chief: "APPROVE" }),
+    });
+    expect(noAdd.status).toBe(400);
+    const noAddBody = (await noAdd.json()) as { ok?: boolean; message?: string };
+    expect(noAddBody.ok).toBe(false);
+    expect(noAddBody.message).toMatch(/already in/);
+    expect(listOpenPositions(store)).toHaveLength(1);
+    expect(listOpenPositions(store)[0]!.sol_spent).toBeCloseTo(0.05);
+
+    const ownerAdd = await fetch(`${url}/api/buy`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ mint, sol: 0.05, chief: "APPROVE", add: true }),
+    });
+    expect(ownerAdd.status).toBe(403);
+    expect(((await ownerAdd.json()) as { error?: string }).error).toMatch(/only Grok Bot/);
+
+    const added = await fetch(`${url}/api/buy`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
+      body: JSON.stringify({ mint, sol: 0.05, chief: "APPROVE", add: true }),
+    });
+    expect(added.status).toBe(200);
+    const addedBody = (await added.json()) as { ok?: boolean; message?: string };
+    expect(addedBody.ok).toBe(true);
+    expect(addedBody.message).not.toMatch(/already in/);
+    expect(addedBody.message).toMatch(/add/);
+    const open = listOpenPositions(store);
+    expect(open).toHaveLength(1);
+    expect(open[0]!.id).toBe(before.id);
+    expect(open[0]!.sol_spent).toBeCloseTo(0.1);
+    expect(open[0]!.tokens_held).toBeGreaterThan(before.tokens_held);
   });
 });
 

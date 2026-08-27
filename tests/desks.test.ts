@@ -73,6 +73,7 @@ async function startCtx(dir: string, password = "test-desks-pass", email = "hell
         force: opts.force,
         grokBotOrder: opts.grokBotOrder,
         chiefApproved: opts.chiefApproved,
+        add: opts.add,
         dayKey: dayKey(),
       }),
     sell: (idOrMint, opts) =>
