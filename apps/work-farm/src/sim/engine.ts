@@ -89,16 +89,16 @@ export class FarmSim {
   snapshot(now = Date.now()): SimSnapshot {
     const working = this.agents.filter((a) => a.status !== "idle").length;
     const stageProgress = Object.fromEntries(
-      STAGES.map((stage) => {
+      STAGES.map((stage, idx) => {
         const atStage = this.agents.filter((a) => a.stage === stage).length;
         const jobsHere = this.jobs.filter(
           (j) => !j.done && STAGES[j.stageIndex] === stage,
         ).length;
         const throughput = this.stageThroughput[stage];
-        // Wave between ~20–95 so bars feel alive and distinct per stage
-        const wave = (Math.sin(now / 4000 + STAGES.indexOf(stage)) + 1) * 12;
-        const base = 22 + throughput * 4 + atStage * 10 + jobsHere * 7 + wave;
-        return [stage, Math.max(12, Math.min(96, Math.round(base)))];
+        const wave = (Math.sin(now / 3500 + idx * 1.1) + 1) * 18;
+        const bias = (idx * 11 + throughput * 3) % 35;
+        const base = 20 + bias + atStage * 9 + jobsHere * 8 + wave;
+        return [stage, Math.max(14, Math.min(94, Math.round(base)))];
       }),
     ) as Record<StageId, number>;
 
