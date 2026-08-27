@@ -150,7 +150,7 @@ describe("paper vs live daily budget", () => {
     const day = dayKey();
     const livePolicy = {
       ...DEFAULT_POLICY,
-      dailyBudgetSol: 0.5,
+      dailyBudgetSol: 0.05,
       maxSolPerTrade: 0.05,
       sizeAskCeilingSol: 0.05,
     };
@@ -173,6 +173,7 @@ describe("paper vs live daily budget", () => {
     expect(first).toMatch(/^bought #/);
     const before = listOpenPositions(store, "LIVE")[0]!;
     expect(before.sol_spent).toBeCloseTo(0.05);
+    expect(getBudget(store, day, "LIVE").spent_sol).toBeCloseTo(0.05);
 
     const blocked = await tryEnter({
       store,
@@ -182,7 +183,7 @@ describe("paper vs live daily budget", () => {
       sources: [quietHit()],
       guardrails: [],
       dayKey: day,
-      sol: 0.05,
+      sol: 0.2,
       grokBotOrder: true,
       chiefApproved: true,
     });
@@ -208,18 +209,45 @@ describe("paper vs live daily budget", () => {
       sources: [quietHit()],
       guardrails: [],
       dayKey: day,
-      sol: 0.05,
+      sol: 0.2,
       grokBotOrder: true,
       chiefApproved: true,
       add: true,
     });
     expect(added).not.toMatch(/already in/);
+    expect(added).not.toMatch(/maxSolPerTrade/);
+    expect(added).not.toMatch(/daily budget/);
     expect(added).toMatch(/^bought #/);
-    expect(added).toMatch(/add/);
+    expect(added).toMatch(/0.2 SOL add/);
     const liveOpen = listOpenPositions(store, "LIVE");
     expect(liveOpen).toHaveLength(1);
     expect(liveOpen[0]!.id).toBe(before.id);
-    expect(liveOpen[0]!.sol_spent).toBeCloseTo(0.1);
+    expect(liveOpen[0]!.sol_spent).toBeCloseTo(0.25);
     expect(liveOpen[0]!.tokens_held).toBeGreaterThan(before.tokens_held);
+  });
+
+  it("a 0.2 LIVE buy without add still refuses oversize on a new mint", async () => {
+    const store = openStore(tmpDb());
+    const livePolicy = {
+      ...DEFAULT_POLICY,
+      dailyBudgetSol: 0.05,
+      maxSolPerTrade: 0.05,
+      sizeAskCeilingSol: 0.05,
+    };
+    const msg = await tryEnter({
+      store,
+      policy: livePolicy,
+      flags: liveFlags,
+      token: token({ mint: "FreshOversizeMint1111111111111111111111111", ticker: "NEW" }),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      sol: 0.2,
+      grokBotOrder: true,
+      chiefApproved: true,
+    });
+    expect(msg).toMatch(/maxSolPerTrade/);
+    expect(msg).not.toMatch(/^bought/);
+    expect(listOpenPositions(store, "LIVE")).toHaveLength(0);
   });
 });

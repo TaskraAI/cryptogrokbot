@@ -668,7 +668,8 @@ describe("dashboard auth and paper API", () => {
 
   it("lets Grok Bot add SOL onto an open bag only with add+chief APPROVE", async () => {
     const dir = tmp();
-    const { server, url, store, codes } = await startCtx(dir, "add-on-pass");
+    const policy = { ...DEFAULT_POLICY, maxSolPerTrade: 0.05, sizeAskCeilingSol: 0.05, dailyBudgetSol: 0.05 };
+    const { server, url, store, codes } = await startCtx(dir, "add-on-pass", "hello@taskra.ai", { ...paperFlags }, policy);
     servers.push(server);
     const cookie = await completeLogin(url, "add-on-pass", "hello@taskra.ai", codes);
     const bot = await inviteGrokBot(url, cookie);
@@ -686,7 +687,7 @@ describe("dashboard auth and paper API", () => {
     const noAdd = await fetch(`${url}/api/buy`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
-      body: JSON.stringify({ mint, sol: 0.05, chief: "APPROVE" }),
+      body: JSON.stringify({ mint, sol: 0.2, chief: "APPROVE" }),
     });
     expect(noAdd.status).toBe(400);
     const noAddBody = (await noAdd.json()) as { ok?: boolean; message?: string };
@@ -698,25 +699,38 @@ describe("dashboard auth and paper API", () => {
     const ownerAdd = await fetch(`${url}/api/buy`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie },
-      body: JSON.stringify({ mint, sol: 0.05, chief: "APPROVE", add: true }),
+      body: JSON.stringify({ mint, sol: 0.2, chief: "APPROVE", add: true }),
     });
     expect(ownerAdd.status).toBe(403);
     expect(((await ownerAdd.json()) as { error?: string }).error).toMatch(/only Grok Bot/);
 
+    const oversize = await fetch(`${url}/api/buy`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
+      body: JSON.stringify({
+        mint: "FreshOversizeMint1111111111111111111111111",
+        sol: 0.2,
+        chief: "APPROVE",
+      }),
+    });
+    expect(oversize.status).toBe(400);
+    expect(((await oversize.json()) as { message?: string }).message).toMatch(/maxSolPerTrade/);
+
     const added = await fetch(`${url}/api/buy`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${bot}` },
-      body: JSON.stringify({ mint, sol: 0.05, chief: "APPROVE", add: true }),
+      body: JSON.stringify({ mint, sol: 0.2, chief: "APPROVE", add: true }),
     });
     expect(added.status).toBe(200);
     const addedBody = (await added.json()) as { ok?: boolean; message?: string };
     expect(addedBody.ok).toBe(true);
     expect(addedBody.message).not.toMatch(/already in/);
+    expect(addedBody.message).not.toMatch(/maxSolPerTrade/);
     expect(addedBody.message).toMatch(/add/);
     const open = listOpenPositions(store);
     expect(open).toHaveLength(1);
     expect(open[0]!.id).toBe(before.id);
-    expect(open[0]!.sol_spent).toBeCloseTo(0.1);
+    expect(open[0]!.sol_spent).toBeCloseTo(0.25);
     expect(open[0]!.tokens_held).toBeGreaterThan(before.tokens_held);
   });
 });

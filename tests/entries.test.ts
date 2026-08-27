@@ -379,6 +379,104 @@ describe("explicit Grok Bot add-on", () => {
     expect(listOpenPositions(db)).toHaveLength(1);
     expect(listOpenPositions(db)[0]!.sol_spent).toBeCloseTo(row.sol_spent);
   });
+
+  it("add 0.2 with the three flags succeeds when cap is 0.05 and daily spent is 0.05", async () => {
+    const db = store();
+    const tight = {
+      ...DEFAULT_POLICY,
+      maxSolPerTrade: 0.05,
+      sizeAskCeilingSol: 0.05,
+      dailyBudgetSol: 0.05,
+    };
+    const t = token({ mint: "CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump", ticker: "fone" });
+    const first = await tryEnter({
+      store: db,
+      policy: tight,
+      flags: paperFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      sol: 0.05,
+    });
+    expect(first).toMatch(/^bought #/);
+    const before = listOpenPositions(db)[0]!;
+    expect(before.sol_spent).toBeCloseTo(0.05);
+
+    const added = await tryEnter({
+      store: db,
+      policy: tight,
+      flags: paperFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+      add: true,
+      sol: 0.2,
+    });
+    expect(added).toMatch(/^bought #/);
+    expect(added).toMatch(/0.2 SOL add/);
+    expect(added).not.toMatch(/maxSolPerTrade/);
+    expect(added).not.toMatch(/daily budget/);
+    const open = listOpenPositions(db);
+    expect(open).toHaveLength(1);
+    expect(open[0]!.id).toBe(before.id);
+    expect(open[0]!.sol_spent).toBeCloseTo(0.25);
+  });
+
+  it("a 0.2 buy WITHOUT add still refuses oversize / already-in as before", async () => {
+    const db = store();
+    const tight = {
+      ...DEFAULT_POLICY,
+      maxSolPerTrade: 0.05,
+      sizeAskCeilingSol: 0.05,
+      dailyBudgetSol: 0.05,
+    };
+    const t = token({ mint: "CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump", ticker: "fone" });
+    const oversize = await tryEnter({
+      store: db,
+      policy: tight,
+      flags: paperFlags,
+      token: token({ mint: "FreshOversizeMint1111111111111111111111111", ticker: "NEW" }),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+      sol: 0.2,
+    });
+    expect(oversize).toMatch(/maxSolPerTrade/);
+    expect(oversize).not.toMatch(/^bought/);
+
+    const first = await tryEnter({
+      store: db,
+      policy: tight,
+      flags: paperFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      sol: 0.05,
+    });
+    expect(first).toMatch(/^bought #/);
+    const noAdd = await tryEnter({
+      store: db,
+      policy: tight,
+      flags: paperFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+      sol: 0.2,
+    });
+    expect(noAdd).toBe("already in fone");
+    expect(listOpenPositions(db)).toHaveLength(1);
+    expect(listOpenPositions(db)[0]!.sol_spent).toBeCloseTo(0.05);
+  });
 });
 
 describe("lessons file", () => {

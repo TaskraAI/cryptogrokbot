@@ -50,6 +50,17 @@ describe("canEnter", () => {
     expect(g.reason).toMatch(/budget/);
   });
 
+  it("skipDailyBudget lets a Taskra add through when the auto-desk cap is spent", () => {
+    const g = canEnter({
+      policy,
+      budget: budget({ spentSol: 0.45 }),
+      openPositions: 0,
+      flags: flags(),
+      skipDailyBudget: true,
+    });
+    expect(g.ok).toBe(true);
+  });
+
   it("does not let extra_budget_sol raise the cap unless allowExtraBudget is on", () => {
     const blocked = canEnter({
       policy,

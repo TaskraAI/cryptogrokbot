@@ -35,6 +35,8 @@ export function canEnter(opts: {
   now?: number;
   /** Grok Bot explicit order: live buy allowed while the auto-desk MASTER kill is off. */
   allowExplicitLive?: boolean;
+  /** Taskra-named Grok Bot add-on: do not apply the auto-desk daily cap. */
+  skipDailyBudget?: boolean;
 }): EntryGate {
   const now = opts.now ?? Date.now();
   if (opts.flags.mode === "LIVE" && !opts.flags.masterEnabled && !opts.allowExplicitLive) {
@@ -47,7 +49,7 @@ export function canEnter(opts: {
     return { ok: false, reason: "Jupiter unhealthy; refusing new buys" };
   }
   const budgetCap = effectiveDailyBudgetSol(opts.policy, opts.budget.extraBudgetSol, Boolean(opts.flags.allowExtraBudget));
-  if (opts.budget.spentSol + opts.policy.maxSolPerTrade > budgetCap.cap + 1e-9) {
+  if (!opts.skipDailyBudget && opts.budget.spentSol + opts.policy.maxSolPerTrade > budgetCap.cap + 1e-9) {
     return { ok: false, reason: `daily budget exhausted (${opts.budget.spentSol.toFixed(3)}/${budgetCap.cap} SOL)` };
   }
   if (opts.budget.trades >= opts.policy.maxTradesPerDay) {

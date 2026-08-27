@@ -276,6 +276,7 @@ export async function tryEnter(opts: {
     // Explicit Taskra add is not a spray; skip the auto-desk cooldown.
     now: explicitAdd ? now + opts.policy.cooldownSeconds * 1000 : now,
     allowExplicitLive: Boolean(opts.grokBotOrder),
+    skipDailyBudget: explicitAdd,
   });
   if (!gate.ok) {
     if (gate.reason.includes("MASTER_ENABLED") && !opts.grokBotOrder) {
@@ -349,7 +350,11 @@ export async function tryEnter(opts: {
   let cap = testSol;
   let fillAskId: number | undefined;
 
-  if (ask && (ask.status === "keep" || ask.status === "increase") && opts.sizeAskId != null) {
+  if (explicitAdd) {
+    // Taskra-named size-up: honor the posted SOL, do not clip to maxSolPerTrade.
+    requested = opts.sol ?? testSol;
+    cap = requested;
+  } else if (ask && (ask.status === "keep" || ask.status === "increase") && opts.sizeAskId != null) {
     const ticket = ticketFromAsk(ask, testSol, ceilingSol);
     requested = ticket.sol;
     cap = ticket.cap;
@@ -363,12 +368,12 @@ export async function tryEnter(opts: {
   if (!Number.isFinite(requested) || requested <= 0) {
     return `blocked ${opts.token.ticker}: invalid SOL size`;
   }
-  if (requested > cap + 1e-12) {
+  if (!explicitAdd && requested > cap + 1e-12) {
     return `blocked ${opts.token.ticker}: size ${requested} exceeds maxSolPerTrade ${cap}`;
   }
 
   const daily = effectiveDailyBudgetSol(opts.policy, budget.extraBudgetSol, Boolean(opts.flags.allowExtraBudget));
-  if (budget.spentSol + requested > daily.cap + 1e-9) {
+  if (!explicitAdd && budget.spentSol + requested > daily.cap + 1e-9) {
     insertDecision(opts.store, {
       at: now,
       kind: "block",
