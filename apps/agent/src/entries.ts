@@ -319,7 +319,7 @@ export async function tryEnter(opts: {
       costOutMultiple,
       testSol,
       now,
-      reason: "Scout never live-buys; needs Chief APPROVE",
+        reason: "needs Chief APPROVE",
     });
   }
   if (opts.flags.mode === "LIVE" && opts.grokBotOrder && !opts.chiefApproved) {
