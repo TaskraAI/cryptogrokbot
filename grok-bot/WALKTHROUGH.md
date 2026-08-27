@@ -185,7 +185,7 @@ x_accounts:
 
 > @Chief run `MODE=PAPER npm run agent -- --once` and paste the last decisions from the log. Do not go LIVE.
 
-**Expect:** A scoring pass, possible fill if a candidate clears `config/policy.json` (test size: 0.05 SOL/day, 5 trades, 0.01 SOL each, min score 60, etc.). Most first ticks do nothing if sources are empty — that is correct.
+**Expect:** A scoring pass, possible fill if a candidate clears `config/policy.json` (live size: 0.1 SOL, daily 0.3 SOL, 5 trades, min score 60, etc.). Most first ticks do nothing if sources are empty — that is correct.
 
 ### 5. Research a mint (Grok)
 
@@ -263,7 +263,7 @@ Chief’s description forbids inventing LIVE/MASTER. If a Bot offers to go live,
 
 Paste `first-tasks/rung-challenge.md` to **Chief**. Attach `skills/challenge.md` on Chief and Grok.
 
-Expect: Home **Rung challenge** card, `GET /api/challenge` playbook. Crypto only. Grok Bot must say 50x is not a plan. Live crypto size stays 0.05 SOL. Polymarket stays off until you say otherwise.
+Expect: Home **Rung challenge** card, `GET /api/challenge` playbook. Crypto only. Grok Bot must say 50x is not a plan. Live crypto size stays 0.1 SOL. Polymarket stays off until you say otherwise.
 
 ## Quick map: who you talk to
 

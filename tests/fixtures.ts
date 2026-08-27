@@ -65,7 +65,7 @@ export function position(partial: Partial<PositionState> = {}): PositionState {
     healthyDipSince: null,
     status: "open",
     sourcesJson: "[]",
-    costOutMultiple: 2,
+    costOutMultiple: 2.5,
     ...partial,
   };
 }

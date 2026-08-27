@@ -341,7 +341,9 @@ function gemsHtml(d) {
     }
     return (
       '<div class="card"><h2 style="margin-top:0">Gem — buy this</h2>' +
-      "<p><b>" + esc(o.ticker) + "</b> hype <b>" + Number(o.sentiment).toFixed(2) +
+      "<p><b>" + esc(o.ticker) + "</b>" +
+      (o.letter ? " · grade <b>" + esc(o.letter) + "</b>" : "") +
+      " hype <b>" + Number(o.sentiment).toFixed(2) +
       "</b> · score " + Number(o.score).toFixed(0) +
       " · vol5m " + Number(o.volume5m).toLocaleString() +
       " · cost-out <b>" + Number(o.costOutMultiple) + "x</b> then moon bag" +
@@ -362,7 +364,7 @@ function gemsHtml(d) {
   }).join("");
   return (
     '<div class="card"><h2 style="margin-top:0">Chances</h2>' +
-    "<p class='muted'>Chief and Grok stay on the same page. When you're away, Chief Approves routine gems (≤ cap). Majors wait for you unless standing lessons already say what you would do.</p>" +
+    "<p class='muted'>Chief and Grok stay on the same page. Grade A/B: Chief tells you right away. When you're away, Chief Approves routine gems (≤ cap). Majors wait for you unless standing lessons already say what you would do.</p>" +
     (open.length ? "" : "<p>No open chances. Scout queues hype+volume here — nothing is hidden from Chief.</p>") +
     "</div>" +
     cards.join("") +
@@ -377,6 +379,7 @@ function mandateHtml(d) {
   return (
     '<div class="card"><h2 style="margin-top:0">Chief mandate</h2>' +
     "<p>" + esc(m.routine || "") + "</p>" +
+    (m.pingTaskra ? "<p><b>" + esc(m.pingTaskra) + "</b></p>" : "") +
     "<p class='muted'>Escalate to you</p><ul style='padding-left:18px'>" + escList(m.escalate) + "</ul></div>"
   );
 }
@@ -538,7 +541,7 @@ async function renderTrade() {
     '<div class="banner">' + pill(d.mode) +
     " Only Grok Bot (Bearer invite token) can place buy/sell. Scout never live-buys. Live buy needs Chief APPROVE. Sentinel live exits need MASTER.</div>" +
     '<div class="card"><label>Mint address</label><input id="buyMint" placeholder="Solana mint"/>' +
-    '<label>Size (SOL)</label><input id="buySol" type="number" step="0.001" min="0.001" value="0.05"/>' +
+    '<label>Size (SOL)</label><input id="buySol" type="number" step="0.001" min="0.001" value="0.1"/>' +
     (String(d.mode) === "LIVE"
       ? '<label>Chief token (live)</label><input id="buyChief" placeholder="APPROVE" autocomplete="off"/>'
       : "") +

@@ -70,4 +70,23 @@ describe("scoreCandidate", () => {
     expect(r.passed).toBe(false);
     expect(r.blockedReason).toMatch(/guardrail/);
   });
+
+  it("grades A at 80+, B at 70+, and scores younger coins higher than stale ones", () => {
+    const young = scoreCandidate({
+      token: token({ ageMinutes: 8 }),
+      sources: [hit()],
+      guardrails: [],
+      policy,
+    });
+    const stale = scoreCandidate({
+      token: token({ ageMinutes: 12 * 60 }),
+      sources: [hit()],
+      guardrails: [],
+      policy,
+    });
+    expect(young.passed).toBe(true);
+    expect(stale.passed).toBe(true);
+    expect(young.score).toBeGreaterThan(stale.score);
+    expect(young.letter).toMatch(/^[AB]$/);
+  });
 });

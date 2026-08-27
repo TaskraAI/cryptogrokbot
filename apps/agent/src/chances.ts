@@ -1,4 +1,5 @@
 import type { Policy } from "@night/shared";
+import { letterGrade } from "@night/risk";
 import {
   listOpenOpportunities,
   listOpportunities,
@@ -13,6 +14,7 @@ export type PublicChance = {
   ticker: string;
   sentiment: number;
   score: number;
+  letter: string;
   volume5m: number;
   priceUsd: number;
   costOutMultiple: number;
@@ -39,6 +41,7 @@ export function publicChance(o: OpportunityRow, policy: Policy, mutedMints?: str
     ticker: o.ticker,
     sentiment: o.sentiment,
     score: o.score,
+    letter: letterGrade(o.score, policy.minScore),
     volume5m: o.volume5m,
     priceUsd: o.price_usd,
     costOutMultiple: o.cost_out_multiple,
@@ -71,9 +74,14 @@ export function chancesPayload(store: Store, policy: Policy, mutedMints?: string
   };
 }
 
-export function chiefChanceNotice(msg: string): string {
+export function chiefChanceNotice(msg: string, opts?: { grade?: string }): string {
+  const g = (opts?.grade ?? "").toUpperCase();
+  const ab = g === "A" || g === "B";
+  const head = ab
+    ? `URGENT Grade ${g} — Chief, tell Taskra right away. Stay on the same page.\n`
+    : `Chance queued for Chief — stay on the same page.\n`;
   return (
-    `Chance queued for Chief — stay on the same page.\n${msg}\n` +
+    `${head}${msg}\n` +
     `Chief: Taskra may be away. If this is a routine queued gem (≤ cap, no add-on, not muted), Approve — you are deputized. The desk also deputy-approves those this tick. Majors wait for Taskra unless standing lessons already say what they would do.\n` +
     `Grok Bot: wait for Chief APPROVE. Do not invent it. Do not live-buy until then.\n` +
     `Home: https://cryptogrokbot.com/`

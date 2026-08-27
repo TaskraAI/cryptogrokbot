@@ -40,6 +40,23 @@ export function classifyPattern(
   return "chop";
 }
 
+/** Tape is still ripping: delay cost-out between 2.5x and 5x to maximize the take. */
+export function strongRally(
+  snap: MarketSnapshot,
+  pattern: Pattern,
+  policy: Policy,
+): boolean {
+  if (pattern === "dump" || pattern === "fade") return false;
+  const volumeAlive =
+    snap.volumeBaseline5m <= 0
+      ? snap.volume5m > 0
+      : snap.volume5m >= (snap.volumeBaseline5m * policy.volumeAlivePctOfBaseline) / 100;
+  const buySide = snap.buySellRatio >= 0.5;
+  const sentimentOk = snap.sentiment >= policy.highSentiment * 0.75;
+  const notExtendedDrawdown = snap.pctFromPeak > -8;
+  return volumeAlive && buySide && sentimentOk && notExtendedDrawdown;
+}
+
 export function decideExit(opts: {
   position: PositionState;
   snap: MarketSnapshot;
@@ -84,8 +101,17 @@ export function decideExit(opts: {
   }
 
   if (!recovered) {
-    const ready = bagValueSol + pos.principalRecoveredSol >= pos.principalSol * costOut;
-    if (ready) return { type: "return_principal", reason: "compound" };
+    const minOut = Math.max(2.5, Number(opts.policy.costOutMinMultiple) || 2.5);
+    const maxOut = Math.max(minOut, Number(opts.policy.costOutMaxMultiple) || 5);
+    const target = Math.min(maxOut, Math.max(minOut, costOut));
+    const multipleNow =
+      pos.principalSol > 0 ? (bagValueSol + pos.principalRecoveredSol) / pos.principalSol : 0;
+    if (multipleNow + 1e-9 < minOut) return { type: "hold", reason: "awaiting_principal" };
+    if (multipleNow + 1e-9 >= maxOut) return { type: "return_principal", reason: "compound" };
+    if (strongRally(opts.snap, opts.pattern, opts.policy)) {
+      return { type: "hold", reason: "strong_rally_let_run" };
+    }
+    if (multipleNow + 1e-9 >= target) return { type: "return_principal", reason: "compound" };
     return { type: "hold", reason: "awaiting_principal" };
   }
 
@@ -137,6 +163,7 @@ export function mergeLlmAction(
   if (!llm) return deterministic;
   if (deterministic.reason === "healthy_dip_hold") return deterministic;
   if (deterministic.reason === "moon_bag") return deterministic;
+  if (deterministic.reason === "strong_rally_let_run") return deterministic;
   if (deterministic.type === "flatten") return deterministic;
   if (deterministic.reason === "awaiting_principal") return deterministic;
   if (deterministic.type === "hold" && llm.action === "sell" && (llm.confidence ?? 0) >= 0.7) {

@@ -45,6 +45,6 @@ Paste new rows under `rules:` (id, type, value, enabled, when, note).
 - Fast JSON: `GROK_MODEL=grok-4-fast`
 - Deep dive: `/research <mint>` uses `grok-4.20-multi-agent` + X/web search
 
-Never raise size or disable hard stops from Grok output unless Taskra explicitly raises buy limits (current live cap: 0.05 SOL in `config/policy.json`). Grok Bot **decides** entries: buy hype+volume at the size cap, cost-out 2–5x, hold the moon bag. Do not ask Taskra first. If they tell Grok Bot in the app to change the desk, implement that.
+Never raise size or disable hard stops from Grok output unless Taskra explicitly raises buy limits (current live cap: 0.1 SOL in `config/policy.json`). Grok Bot **decides** entries: buy hype+volume at the size cap, cost-out 2.5–5x (let a strong rally run), hold the moon bag. Do not ask Taskra first. If they tell Grok Bot in the app to change the desk, implement that.
 
 Rung challenge: `$100 → $5,000 → $10,000` then ~2x to `$1,000,000` on **Solana only**. Skill: [`skills/challenge.md`](skills/challenge.md). `GET /api/challenge` is the session brief. Do not promise 50x. Do not research Polymarket until Taskra enables it.

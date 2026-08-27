@@ -25,6 +25,7 @@ export type StandingIntent = {
   escalate: string[];
   never: string[];
   sizeSol: number;
+  pingTaskra: string;
 };
 
 function mutedSet(extra?: string[]): Set<string> {
@@ -71,7 +72,7 @@ export function standingIntent(policy: Policy): StandingIntent {
   return {
     chiefDeputy: true,
     routine:
-      `When Taskra is away, Chief Approves Scout-queued gems at ≤ ${policy.maxSolPerTrade} SOL (no add-on, not muted). Grok still places the buy.`,
+      `When Taskra is away, Chief Approves Scout-queued gems at ≤ ${policy.maxSolPerTrade} SOL (no add-on, not muted). Grok still places the buy. Grade A and B: tell Taskra right away.`,
     escalate: [
       "Size above maxSolPerTrade",
       "Add-on / average-down",
@@ -87,6 +88,7 @@ export function standingIntent(policy: Policy): StandingIntent {
       "Scout never live-buys",
     ],
     sizeSol: policy.maxSolPerTrade,
+    pingTaskra: "Grade A and B — Chief tells Taskra right away",
   };
 }
 

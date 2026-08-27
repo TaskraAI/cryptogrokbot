@@ -64,7 +64,7 @@ describe("decideExit", () => {
     expect(action).toEqual({ type: "flatten", reason: "hard_stop" });
   });
 
-  it("returns principal at 2x, not 1x, and waits for a 5x gem", () => {
+  it("returns principal at 2.5x, not 1x, lets a strong rally run to 5x, then moons", () => {
     const bag = {
       principalSol: 0.1,
       principalRecoveredSol: 0,
@@ -74,26 +74,56 @@ describe("decideExit", () => {
       everGreen: true,
     };
     const early = decideExit({
-      position: position({ ...bag, costOutMultiple: 2 }),
+      position: position({ ...bag, costOutMultiple: 2.5 }),
       snap: snap({ priceUsd: 1.2, pctFromEntry: 20, pctFromPeak: 0 }),
       pattern: "chop",
       policy,
     });
     expect(early).toEqual({ type: "hold", reason: "awaiting_principal" });
     const ready = decideExit({
-      position: position({ ...bag, costOutMultiple: 2 }),
-      snap: snap({ priceUsd: 2.2, pctFromEntry: 120, pctFromPeak: 0 }),
+      position: position({ ...bag, costOutMultiple: 2.5 }),
+      snap: snap({ priceUsd: 2.6, pctFromEntry: 160, pctFromPeak: 0, sentiment: 0.1 }),
       pattern: "chop",
       policy,
     });
     expect(ready.type).toBe("return_principal");
     const waitFive = decideExit({
       position: position({ ...bag, costOutMultiple: 5 }),
-      snap: snap({ priceUsd: 2.2, pctFromEntry: 120, pctFromPeak: 0 }),
+      snap: snap({ priceUsd: 2.6, pctFromEntry: 160, pctFromPeak: 0, sentiment: 0.1 }),
       pattern: "chop",
       policy,
     });
     expect(waitFive).toEqual({ type: "hold", reason: "awaiting_principal" });
+    const letRun = decideExit({
+      position: position({ ...bag, costOutMultiple: 2.5 }),
+      snap: snap({
+        priceUsd: 2.6,
+        pctFromEntry: 160,
+        pctFromPeak: 0,
+        sentiment: 0.7,
+        volume5m: 8000,
+        volumeBaseline5m: 4000,
+        buySellRatio: 0.62,
+      }),
+      pattern: "chop",
+      policy,
+    });
+    expect(letRun).toEqual({ type: "hold", reason: "strong_rally_let_run" });
+    const capOut = decideExit({
+      position: position({ ...bag, costOutMultiple: 2.5 }),
+      snap: snap({
+        priceUsd: 5.1,
+        pctFromEntry: 410,
+        pctFromPeak: 0,
+        sentiment: 0.7,
+        volume5m: 8000,
+        volumeBaseline5m: 4000,
+        buySellRatio: 0.62,
+      }),
+      pattern: "chop",
+      policy,
+    });
+    expect(capOut.type).toBe("return_principal");
   });
 
   it("holds a live moon bag through climax and skips the time flatten", () => {
@@ -171,6 +201,8 @@ describe("decideExit", () => {
     expect(hold.reason).toBe("healthy_dip_hold");
     const moon = mergeLlmAction({ type: "hold", reason: "moon_bag" }, { action: "sell", confidence: 0.99 });
     expect(moon.reason).toBe("moon_bag");
+    const rally = mergeLlmAction({ type: "hold", reason: "strong_rally_let_run" }, { action: "sell", confidence: 0.99 });
+    expect(rally.reason).toBe("strong_rally_let_run");
     const stop = mergeLlmAction({ type: "flatten", reason: "hard_stop" }, { action: "hold", confidence: 0.99 });
     expect(stop.reason).toBe("hard_stop");
   });

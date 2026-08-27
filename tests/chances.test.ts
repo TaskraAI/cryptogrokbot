@@ -24,6 +24,9 @@ describe("chief chances", () => {
     expect(text).toMatch(/cryptogrokbot\.com/);
     expect(text).toMatch(/wait for Chief APPROVE/);
     expect(text).not.toMatch(/Do not wait for Taskra/);
+    expect(chiefChanceNotice("opportunity #9 FONE grade A: queued", { grade: "A" })).toMatch(
+      /URGENT Grade A — Chief, tell Taskra right away/i,
+    );
     expect(missedGemLesson({ ticker: "FONE", sentiment: 0.8, volume5m: 9000, multiple: 2.4 })).toMatch(
       /do not skip Taskra/i,
     );
@@ -58,6 +61,8 @@ describe("chief chances", () => {
     expect(payload.opportunities[0]?.id).toBe(open.id);
     expect(chiefChancePulse(db, 3)).toMatch(/1 chance\(s\) on Home: OPEN/);
     expect(payload.opportunities[0]?.chiefMayApprove).toBe(true);
+    expect(payload.opportunities[0]?.letter).toBe("C");
     expect(payload.mandate.chiefDeputy).toBe(true);
+    expect(payload.mandate.pingTaskra).toMatch(/Grade A and B/);
   });
 });

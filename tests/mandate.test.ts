@@ -40,6 +40,8 @@ describe("chief deputy mandate", () => {
     expect(major.action).toBe("escalate");
     expect(major.needsTaskra).toBe(true);
     expect(standingIntent(DEFAULT_POLICY).escalate.join(" ")).toMatch(/Add-on/);
+    expect(standingIntent(DEFAULT_POLICY).pingTaskra).toMatch(/Taskra right away/);
+    expect(standingIntent(DEFAULT_POLICY).sizeSol).toBe(0.1);
   });
 
   it("deputy-approves open routine chances and records approved_by=chief", () => {

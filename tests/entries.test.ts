@@ -231,6 +231,41 @@ describe("high-sentiment auto-buy", () => {
     expect(listOpenOpportunities(db)[0]?.chief_approved).toBe(0);
   });
 
+  it("LIVE Scout still queues when daily budget is exhausted so search continues", async () => {
+    const db = store();
+    const { upsertBudget } = await import("@night/storage");
+    const day = dayKey();
+    upsertBudget(db, {
+      day_key: day,
+      mode: "LIVE",
+      spent_sol: 0.3,
+      trades: 3,
+      realized_loss_sol: 0,
+      last_entry_at: 0,
+      extra_budget_sol: 0,
+    });
+    const msg = await tryEnter({
+      store: db,
+      policy: { ...DEFAULT_POLICY, maxSolPerTrade: 0.1, dailyBudgetSol: 0.3 },
+      flags: {
+        mode: "LIVE",
+        masterEnabled: true,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [hit()],
+      guardrails: [],
+      dayKey: day,
+    });
+    expect(msg).toMatch(/^opportunity #/);
+    expect(msg).toMatch(/Scout keeps searching/);
+    expect(msg).toMatch(/grade [A-F]/);
+    expect(listOpenPositions(db)).toHaveLength(0);
+    expect(listOpenOpportunities(db)).toHaveLength(1);
+  });
+
   it("fills an explicit keep size-ask when Grok Bot passes sizeAskId", async () => {
     const db = store();
     const { insertSizeAsk, answerSizeAsk, getSizeAsk } = await import("@night/storage");

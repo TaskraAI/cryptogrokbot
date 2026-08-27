@@ -87,7 +87,7 @@ If none, say none. Restate when we HOLD a dip.
 ```
 @Chief GET /api/challenge and follow playbook.tonight.
 Crypto only. Do not scan Polymarket. Do not promise $1M. Do not raise size.
-Buy hype+volume yourself. Cost-out 2–5x then moon bag.
+Buy hype+volume yourself. Cost-out 2.5–5x then moon bag.
 ```
 
 **Secrets** (you fill the secret card, not chat)

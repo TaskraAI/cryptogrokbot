@@ -146,7 +146,7 @@ describe("compound math", () => {
     ).toBe(false);
   });
 
-  it("picks 2x cost-out on weak names and 5x on strong hype+volume", () => {
+  it("picks 2.5x cost-out on weak names and 5x on strong hype+volume", () => {
     expect(
       pickCostOutMultiple({
         policy,
@@ -156,7 +156,7 @@ describe("compound math", () => {
         liquidityUsd: 6000,
         uniqueSources: 1,
       }),
-    ).toBe(2);
+    ).toBe(2.5);
     expect(
       pickCostOutMultiple({
         policy,

@@ -226,7 +226,7 @@ export class AgentRuntime {
       ...pump.map((p) => p.mint),
       ...trending.map((p) => p.baseToken.address),
     ];
-    for (const mint of [...new Set(candidates)].slice(0, 8)) {
+    for (const mint of [...new Set(candidates)].slice(0, 16)) {
       const hits = hitsForCandidate(socialHits, sourcesCfg, mint);
       if (hits.length === 0) continue;
       const pair = await fetchDexToken(mint);
@@ -251,9 +251,10 @@ export class AgentRuntime {
       this.crew.blocked("grok", msg);
       if (!id || this.notifiedSizeAsks.has(id)) return;
       this.notifiedSizeAsks.add(id);
-      const notice = chiefChanceNotice(msg);
+      const grade = /\bgrade ([A-F])\b/i.exec(msg)?.[1]?.toUpperCase();
+      const notice = chiefChanceNotice(msg, { grade });
       await notify(this.cfg.telegramToken, this.cfg.telegramChatId, notice);
-      await this.alertChief(notice);
+      await this.alertChief(notice, grade);
       return;
     }
     if (!msg.startsWith("ask ")) return;
@@ -268,15 +269,19 @@ export class AgentRuntime {
     );
   }
 
-  private async alertChief(text: string): Promise<void> {
+  private async alertChief(text: string, grade?: string): Promise<void> {
     const em = resolveDashboardEmail({
       envEmail: this.cfg.dashboardEmail,
       filePath: this.cfg.dashboardEmailFile,
       fallback: "hello@taskra.ai",
     });
+    const g = (grade ?? "").toUpperCase();
+    const urgent = g === "A" || g === "B";
     await sendDeskAlert({
       to: em.email,
-      subject: "CryptoGrokBot chance — Chief, stay on the same page",
+      subject: urgent
+        ? `URGENT Grade ${g} chance — tell Taskra right away`
+        : "CryptoGrokBot chance — Chief, stay on the same page",
       text,
       resendKey: this.cfg.resendApiKey,
     });

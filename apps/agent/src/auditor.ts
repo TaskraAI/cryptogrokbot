@@ -141,6 +141,9 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     costOutMinMultiple?: number;
     costOutMaxMultiple?: number;
     maxSolPerTrade?: number;
+    dailyBudgetSol?: number;
+    dailyLossCapSol?: number;
+    sizeAskCeilingSol?: number;
   };
   const chalOk =
     chal.startUsd === 100 &&
@@ -152,18 +155,23 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     board.includes("Polymarket is off until Taskra enables it") &&
     chalSrc.includes("Do not research or trade Polymarket until Taskra says it is time.") &&
     chalSrc.includes("stay on the same page") &&
+    chalSrc.includes("tell Taskra right away") &&
     pm.includes("gamma-api.polymarket.com") &&
     !pm.includes("clob.polymarket.com") &&
     !pm.includes("/order") &&
-    policyJson.returnPrincipalMultiple === 2 &&
-    policyJson.costOutMinMultiple === 2 &&
+    policyJson.returnPrincipalMultiple === 2.5 &&
+    policyJson.costOutMinMultiple === 2.5 &&
     policyJson.costOutMaxMultiple === 5 &&
-    policyJson.maxSolPerTrade === 0.05 &&
+    policyJson.maxSolPerTrade === 0.1 &&
+    policyJson.sizeAskCeilingSol === 0.1 &&
+    policyJson.dailyBudgetSol === 0.3 &&
+    policyJson.dailyLossCapSol === 0.1 &&
     entries.includes("insertOpportunity") &&
     entries.includes("pickCostOutMultiple") &&
     entries.includes("parseChiefApprove") &&
     entries.includes("needs Chief permission") &&
     entries.includes("Scout never live-buys") &&
+    entries.includes("Scout keeps searching") &&
     !entries.includes("Ask Taskra in the Grok Bot app before investing");
   const refuses =
     trade.includes("liveTxBlocked") &&
@@ -176,6 +184,7 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     board.includes("chancesPayload") &&
     loop.includes("chiefChanceNotice") &&
     loop.includes("deputyChief") &&
+    loop.includes("tell Taskra right away") &&
     board.includes("/api/mandate") &&
     !loop.includes("Do not wait for Taskra") &&
     exec.includes("refuseOversizeBuy") &&
@@ -184,6 +193,7 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     exec.includes("grokBotOrder") &&
     risk.includes("allowExtraBudget") &&
     risk.includes("allowExplicitLive") &&
+    risk.includes("letterGrade") &&
     loop.includes("cannot flip PAPER to LIVE") &&
     indexSrc.includes("applyMasterBootPolicy") &&
     masterFlag.includes('setFlag(store, "master", "false")') &&

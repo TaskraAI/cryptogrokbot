@@ -18,9 +18,9 @@ export interface Policy {
   minIndependentSources: number;
   /** Floor for cost-out. Grok Bot may wait up to costOutMaxMultiple on stronger gems. */
   returnPrincipalMultiple: number;
-  /** Take initial SOL back at this multiple (2x) on weaker names. */
+  /** Take initial SOL back at this multiple (2.5x) on weaker names. */
   costOutMinMultiple: number;
-  /** Strong hype+volume names wait until this multiple (5x) before cost-out. */
+  /** Strong rally names wait until this multiple (5x) before cost-out. */
   costOutMaxMultiple: number;
   sentimentPollSeconds: number;
   maxRunnerHoldMinutes: number;
@@ -49,12 +49,12 @@ export const DEFAULT_POLICY: Policy = {
   maxTradesPerDay: 5,
   maxOpenPositions: 3,
   maxSolPerTrade: 0.1,
-  sizeAskCeilingSol: 0.05,
+  sizeAskCeilingSol: 0.1,
   dailyLossCapSol: 0.3,
   cooldownSeconds: 180,
   minIndependentSources: 2,
-  returnPrincipalMultiple: 2.0,
-  costOutMinMultiple: 2,
+  returnPrincipalMultiple: 2.5,
+  costOutMinMultiple: 2.5,
   costOutMaxMultiple: 5,
   sentimentPollSeconds: 180,
   maxRunnerHoldMinutes: 480,
@@ -158,13 +158,14 @@ export type ExitReason =
   | "healthy_dip_hold"
   | "chop_hold"
   | "awaiting_principal"
-  | "moon_bag";
+  | "moon_bag"
+  | "strong_rally_let_run";
 
 export type ExitAction =
   | { type: "flatten"; reason: Extract<ExitReason, "hard_stop" | "rug" | "time_stop" | "sellall" | "max_runner_hold" | "dump"> }
   | { type: "return_principal"; reason: "compound" }
   | { type: "sell_runner"; reason: Extract<ExitReason, "fade" | "climax" | "sentiment"> }
-  | { type: "hold"; reason: Extract<ExitReason, "healthy_dip_hold" | "chop_hold" | "awaiting_principal" | "moon_bag"> };
+  | { type: "hold"; reason: Extract<ExitReason, "healthy_dip_hold" | "chop_hold" | "awaiting_principal" | "moon_bag" | "strong_rally_let_run"> };
 
 export interface PositionState {
   id: number;
@@ -186,7 +187,7 @@ export interface PositionState {
   healthyDipSince: number | null;
   status: "open" | "closed";
   sourcesJson: string;
-  /** Per-bag cost-out target, usually 2–5. */
+  /** Per-bag cost-out target, usually 2.5–5. */
   costOutMultiple: number;
 }
 

@@ -27,7 +27,7 @@ Open the URL on your phone or desktop. Log in with **email + password + email ve
 ```bash
 # CLI still works (same paper ledger)
 npm run trade -- scan
-npm run trade -- buy DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 --sol 0.05
+npm run trade -- buy DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263 --sol 0.1
 npm run trade -- positions
 npm run trade -- sell 1
 ```
@@ -69,7 +69,7 @@ MODE=PAPER MASTER_ENABLED=false npm run agent -- --once
 npm run agent              # loop + dashboard http://127.0.0.1:8787/
 ```
 
-Default policy (`config/policy.json`): **0.05 SOL/day**, 5 trades, **0.05 SOL** live size cap (do not raise), −25% hard stop, cost-out at **2–5x** then moon bag, 15% dip + sentiment ≥ 0.4 holds the runner.
+Default policy (`config/policy.json`): **0.3 SOL/day**, 5 trades, **0.1 SOL** live size cap, −25% hard stop, cost-out at **2.5–5x** (let a strong rally run to 5x) then moon bag, 15% dip + sentiment ≥ 0.4 holds the runner.
 
 ## Paper vs live
 
@@ -124,9 +124,9 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 ## Safety
 
 - Dedicated hot wallet. Never point this at your main wallet.
-- Hitting `dailyBudgetSol`, `maxTradesPerDay`, or `dailyLossCapSol` **stops buys**, not paper exits. Auto live exits also stop when master is off. **Grok Bot Bearer** explicit orders can still live-trade while MASTER is off. **PAPER and LIVE each have their own daily ledger** — paper fills do not consume the live cap.
+- Hitting `dailyBudgetSol`, `maxTradesPerDay`, or `dailyLossCapSol` **stops fills**, not Scout search — chances still queue. Paper exits keep running. Auto live exits also stop when master is off. **Grok Bot Bearer** explicit orders can still live-trade while MASTER is off. **PAPER and LIVE each have their own daily ledger** — paper fills do not consume the live cap.
 - `extra_budget_sol` does **not** raise the daily cap unless `ALLOW_EXTRA_BUDGET=true`.
-- Per-trade size is refused inside `executeBuy` if it exceeds `maxSolPerTrade`. High hype+volume **does** auto-buy at the cap (Grok Bot decides). Cost-out at 2–5x, then moon bag. Do not raise the 0.05 SOL cap.
+- Per-trade size is refused inside `executeBuy` if it exceeds `maxSolPerTrade`. High hype+volume **does** auto-buy at the cap (Grok Bot decides). Cost-out at 2.5–5x (delay if the rally is strong), then moon bag. Do not raise past 0.1 SOL unless Taskra says so.
 - Live buy runs a Jupiter sell-sim first. Freeze / guardrails / `/never` rules are hard denies.
 - LLM cannot disable a hard stop or sell through a `healthy_dip`.
 - Unauthenticated mutating API calls return 401. Owner session cannot buy/sell (403). Only Grok Bot Bearer places orders. The old open crew board is behind the same login.

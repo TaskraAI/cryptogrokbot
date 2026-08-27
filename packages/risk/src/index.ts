@@ -67,9 +67,20 @@ export function canEnter(opts: {
   return { ok: true, reason: "budget and flags allow entry" };
 }
 
+export type LetterGrade = "A" | "B" | "C" | "D" | "F";
+
+export function letterGrade(score: number, minScore = 60): LetterGrade {
+  if (score >= 80) return "A";
+  if (score >= 70) return "B";
+  if (score >= minScore) return "C";
+  if (score >= Math.max(0, minScore - 15)) return "D";
+  return "F";
+}
+
 export interface ScoreResult {
   score: number;
   passed: boolean;
+  letter: LetterGrade;
   blockedReason?: string;
   checks: Record<string, boolean | number | string>;
 }
@@ -95,6 +106,7 @@ export function scoreCandidate(opts: {
     return {
       score: 0,
       passed: false,
+      letter: "F",
       blockedReason: `guardrail ${hit.id}: ${hit.type}=${hit.value}`,
       checks: { guardrail: hit.id },
     };
@@ -109,22 +121,22 @@ export function scoreCandidate(opts: {
   checks.buyImpactPct = opts.token.buyImpactPct;
 
   if (!opts.token.sellSimOk) {
-    return { score: 0, passed: false, blockedReason: "honeypot: sell simulation failed", checks };
+    return { score: 0, passed: false, letter: "F", blockedReason: "honeypot: sell simulation failed", checks };
   }
   if (!opts.token.freezeAuthorityRevoked) {
-    return { score: 5, passed: false, blockedReason: "freeze authority still active", checks };
+    return { score: 5, passed: false, letter: "F", blockedReason: "freeze authority still active", checks };
   }
   if (opts.token.liquidityUsd < opts.policy.minLiquidityUsd && opts.token.graduated) {
-    return { score: 10, passed: false, blockedReason: `liquidity ${opts.token.liquidityUsd} < ${opts.policy.minLiquidityUsd}`, checks };
+    return { score: 10, passed: false, letter: "F", blockedReason: `liquidity ${opts.token.liquidityUsd} < ${opts.policy.minLiquidityUsd}`, checks };
   }
   if (opts.token.creatorPct > opts.policy.maxCreatorPct) {
-    return { score: 15, passed: false, blockedReason: `creator ${opts.token.creatorPct}% > ${opts.policy.maxCreatorPct}%`, checks };
+    return { score: 15, passed: false, letter: "F", blockedReason: `creator ${opts.token.creatorPct}% > ${opts.policy.maxCreatorPct}%`, checks };
   }
   if (opts.token.top10HolderPct > opts.policy.maxTop10HolderPct) {
-    return { score: 20, passed: false, blockedReason: `top10 ${opts.token.top10HolderPct}% > ${opts.policy.maxTop10HolderPct}%`, checks };
+    return { score: 20, passed: false, letter: "F", blockedReason: `top10 ${opts.token.top10HolderPct}% > ${opts.policy.maxTop10HolderPct}%`, checks };
   }
   if (opts.token.buyImpactPct > opts.policy.maxBuyImpactPct) {
-    return { score: 20, passed: false, blockedReason: `buy impact ${opts.token.buyImpactPct}% > ${opts.policy.maxBuyImpactPct}%`, checks };
+    return { score: 20, passed: false, letter: "F", blockedReason: `buy impact ${opts.token.buyImpactPct}% > ${opts.policy.maxBuyImpactPct}%`, checks };
   }
 
   const recent = opts.sources.filter((s) => now - s.at < 30 * 60 * 1000);
@@ -137,6 +149,7 @@ export function scoreCandidate(opts: {
     return {
       score: 25,
       passed: false,
+      letter: "F",
       blockedReason: `need ${opts.policy.minIndependentSources} sources or one trusted (have ${uniqueKeys.size})`,
       checks,
     };
@@ -149,14 +162,20 @@ export function scoreCandidate(opts: {
   score += Math.min(15, trusted.length * 8);
   if (opts.token.creatorPct < 3) score += 7;
   if (opts.token.liquidityUsd > 20_000) score += 5;
-  if (opts.token.ageMinutes > 15 && opts.token.ageMinutes < 24 * 60) score += 4;
+  // Hunt gems early — younger coins score higher so we catch them before they reprice.
+  if (opts.token.ageMinutes < 15) score += 8;
+  else if (opts.token.ageMinutes < 60) score += 5;
+  else if (opts.token.ageMinutes < 180) score += 2;
   score = Math.min(100, score);
+  const letter = letterGrade(score, opts.policy.minScore);
   checks.score = score;
+  checks.letter = letter;
+  checks.ageMinutes = opts.token.ageMinutes;
 
   if (score < opts.policy.minScore) {
-    return { score, passed: false, blockedReason: `score ${score} < ${opts.policy.minScore}`, checks };
+    return { score, passed: false, letter, blockedReason: `score ${score} < ${opts.policy.minScore}`, checks };
   }
-  return { score, passed: true, checks };
+  return { score, passed: true, letter, checks };
 }
 
 /** Fail-closed: extra budget never raises the cap unless an explicit control is on. */
@@ -216,7 +235,7 @@ export function pickCostOutMultiple(opts: {
   liquidityUsd: number;
   uniqueSources: number;
 }): number {
-  const min = Math.max(1, Number(opts.policy.costOutMinMultiple) || 2);
+  const min = Math.max(2.5, Number(opts.policy.costOutMinMultiple) || 2.5);
   const max = Math.max(min, Number(opts.policy.costOutMaxMultiple) || 5);
   let t = 0;
   if (opts.sentiment >= opts.policy.highSentiment) t += 0.35;
@@ -237,5 +256,5 @@ export function pickCostOutMultiple(opts: {
 export function costOutMultipleForPosition(pos: { costOutMultiple?: number }, policy: Policy): number {
   const n = Number(pos.costOutMultiple);
   if (Number.isFinite(n) && n >= 1) return n;
-  return Number(policy.returnPrincipalMultiple) || policy.costOutMinMultiple || 2;
+  return Number(policy.returnPrincipalMultiple) || policy.costOutMinMultiple || 2.5;
 }

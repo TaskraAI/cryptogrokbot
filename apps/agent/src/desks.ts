@@ -259,7 +259,7 @@ function clip(v: string, n = 400): string {
 export function buildDeskPrompt(desk: DeskDef, fields: Record<string, string>, grounded: string): string {
   const f = (k: string, fallback = "") => clip(fields[k] || fallback);
   const numbered = desk.sections.map((s, i) => `${i + 1}. ${s}`).join("\n");
-  const rules = `You are CryptoGrokBot on cryptogrokbot.com — a personal Solana meme-coin night desk. Paper is default. Never recommend disabling hard stops. Dip + high/rising sentiment + volume alive = HOLD. Dedicated hot wallet only. Number every section. Be brutally honest. This is research, not financial advice. Year: 2026. Taskra's rung challenge is $100 → $5,000 → $10,000 then ~2x rungs to $1,000,000 on crypto only. Do not promise that path. Live crypto size stays at policy maxSolPerTrade. Grok Bot buys hype+volume without asking Taskra. Cost-out 2–5x then moon bag. Do not research Polymarket until Taskra enables it.`;
+  const rules = `You are CryptoGrokBot on cryptogrokbot.com — a personal Solana meme-coin night desk. Paper is default. Never recommend disabling hard stops. Dip + high/rising sentiment + volume alive = HOLD. Dedicated hot wallet only. Number every section. Be brutally honest. This is research, not financial advice. Year: 2026. Taskra's rung challenge is $100 → $5,000 → $10,000 then ~2x rungs to $1,000,000 on crypto only. Do not promise that path. Live crypto size stays at policy maxSolPerTrade (0.1 SOL). Grok Bot buys hype+volume without asking Taskra. Cost-out 2.5–5x then moon bag. Do not research Polymarket until Taskra enables it.`;
 
   if (desk.id === "sentiment") {
     return `${rules}
@@ -561,7 +561,7 @@ const FRAMEWORK_NOTES: Record<string, string[]> = {
     "Allocation: this hot wallet is meme-risk, not a 60/40. Keep a boring stack elsewhere.",
     "Names: watchlist blue-chip memes vs high-risk new; never the whole budget in one mint.",
     "Blue vs degen: conservative 80/20, moderate 60/40, aggressive 40/60 — still cap per trade.",
-    "Rebalance: after a 2–5x cost-out, or weekly, not every candle.",
+    "Rebalance: after a 2.5–5x cost-out, or weekly, not every candle.",
     "Take profits: recover the initial SOL, then hold the moon bag. Do not flatten a live runner to 'take it all'.",
     "Risk: daily budget, max trades, loss cap, cooldown. Hitting a cap stops buys, not paper exits.",
     "Sizing: ≤ maxSolPerTrade. Grok Bot buys hype+volume without asking. Never auto-bump past the cap.",

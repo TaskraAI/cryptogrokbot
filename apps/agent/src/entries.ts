@@ -1,5 +1,5 @@
 import type { Policy, RuntimeFlags, SourceHit, TokenMetrics } from "@night/shared";
-import { applyEntryToBudget, canEnter, effectiveDailyBudgetSol, evaluateExtraRules, pickCostOutMultiple, scoreCandidate, type ExtraRule, type Guardrail } from "@night/risk";
+import { applyEntryToBudget, canEnter, effectiveDailyBudgetSol, evaluateExtraRules, letterGrade, pickCostOutMultiple, scoreCandidate, type ExtraRule, type Guardrail } from "@night/risk";
 import { executeBuy } from "@night/execution";
 import { simulateSell } from "@night/signals";
 import { scoreSentiment } from "@night/tape";
@@ -108,6 +108,7 @@ function queueScoutOpportunity(opts: {
   now: number;
   reason: string;
 }): string {
+  const grade = letterGrade(opts.score, 60);
   const opp = insertOpportunity(opts.store, {
     mint: opts.token.mint,
     ticker: opts.token.ticker,
@@ -117,7 +118,7 @@ function queueScoutOpportunity(opts: {
     priceUsd: opts.priceUsd,
     costOutMultiple: opts.costOutMultiple,
     reason: opts.reason,
-    note: `Hype ${opts.sentiment.toFixed(2)} vol5m ${opts.volume5m}. Buy ${opts.testSol} SOL after Chief APPROVE, cost-out ${opts.costOutMultiple}x, moon bag after.`,
+    note: `Grade ${grade}. Hype ${opts.sentiment.toFixed(2)} vol5m ${opts.volume5m}. Buy ${opts.testSol} SOL after Chief APPROVE, cost-out ${opts.costOutMultiple}x, moon bag after.`,
   });
   insertDecision(opts.store, {
     at: opts.now,
@@ -126,12 +127,12 @@ function queueScoutOpportunity(opts: {
     allowed: false,
     reason: `opportunity #${opp.id} queued; needs Chief APPROVE`,
     score: opts.score,
-    payload: { sentiment: opts.sentiment, opportunityId: opp.id, costOutMultiple: opts.costOutMultiple },
+    payload: { sentiment: opts.sentiment, opportunityId: opp.id, costOutMultiple: opts.costOutMultiple, letter: grade },
   });
   return (
-    `opportunity #${opp.id} ${opts.token.ticker}: queued for Chief APPROVE then Grok Bot buy ${opts.testSol} SOL ` +
+    `opportunity #${opp.id} ${opts.token.ticker} grade ${grade}: queued for Chief APPROVE then Grok Bot buy ${opts.testSol} SOL ` +
     `(hype ${opts.sentiment.toFixed(2)}, vol5m ${opts.volume5m}, cost-out ${opts.costOutMultiple}x then moon bag). ` +
-    `Scout never live-buys. ${opts.reason}`
+    `Scout never live-buys. Scout keeps searching. ${opts.reason}`
   );
 }
 
@@ -178,7 +179,7 @@ export async function tryEnter(opts: {
   }
 
   const scored = opts.skipScore
-    ? { passed: true as const, score: 0, blockedReason: undefined as string | undefined, checks: { forced: true } }
+    ? { passed: true as const, score: 0, letter: "F" as const, blockedReason: undefined as string | undefined, checks: { forced: true } }
     : scoreCandidate({
         token: opts.token,
         sources: opts.sources,
@@ -279,7 +280,9 @@ export async function tryEnter(opts: {
     skipDailyBudget: explicitAdd,
   });
   if (!gate.ok) {
-    if (gate.reason.includes("MASTER_ENABLED") && !opts.grokBotOrder) {
+    // Scout keeps hunting even with empty wallet / exhausted daily budget / cooldown.
+    // Only Grok Bot live fills are blocked here — chances still queue for Chief.
+    if (!opts.grokBotOrder) {
       return queueScoutOpportunity({
         store: opts.store,
         token: opts.token,
@@ -290,7 +293,7 @@ export async function tryEnter(opts: {
         costOutMultiple,
         testSol,
         now,
-        reason: gate.reason,
+        reason: `${gate.reason}; Scout keeps searching`,
       });
     }
     insertDecision(opts.store, {

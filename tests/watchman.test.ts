@@ -59,10 +59,11 @@ describe("watchman paper lifecycle", () => {
       store,
       row,
       snap: snap({
-        priceUsd: 2.2,
-        pctFromEntry: 120,
+        priceUsd: 2.6,
+        pctFromEntry: 160,
         pctFromPeak: 0,
         marketCapUsd: 200_000,
+        sentiment: 0.1,
       }),
       policy: DEFAULT_POLICY,
     });
