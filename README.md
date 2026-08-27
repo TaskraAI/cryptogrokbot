@@ -40,7 +40,15 @@ Starter watchlist (BONK, WIF, POPCAT, TRUMP) is in [`config/sources.yaml`](confi
 
 The dashboard canonical URL is **https://cryptogrokbot.com/**.
 
-`www`, `dash`, and `app` redirect there (301). Nameservers are on Cloudflare (`kanye.ns.cloudflare.com` / `stella.ns.cloudflare.com`). A Worker (`workers/cryptogrokbot.js`) fronts the origin; `npm run agent` on port **8787** plus a Cloudflare Tunnel must be running or the site returns 502.
+`www`, `dash`, and `app` redirect there (301). Nameservers are on Cloudflare (`kanye.ns.cloudflare.com` / `stella.ns.cloudflare.com`). A Worker (`workers/cryptogrokbot.js`) fronts the origin; `npm run agent` on port **8787** plus a Cloudflare Tunnel must be running or the site returns 502 / 1016.
+
+The Worker `ORIGIN` binding must be a **public** hostname the Worker can fetch. `*.cfargotunnel.com` is blocked (Error 1102). A trycloudflare quick tunnel in front of `127.0.0.1:8787` is the working origin on this VM. Keep it alive with:
+
+```bash
+CLOUDFLARE_API_TOKEN=… python3 scripts/keep-cf-origin.py
+```
+
+This cloud VM is **not** a 24/7 VPS — run the agent + tunnel on a durable host.
 
 This cloud VM is **not** a 24/7 VPS — run the agent + tunnel on a durable host.
 
