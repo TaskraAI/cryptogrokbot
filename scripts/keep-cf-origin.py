@@ -248,10 +248,6 @@ def main() -> int:
     extras = quick_tunnel_pids()
     if extras:
         print(f"existing quick tunnel pids: {extras}", flush=True)
-        if len(extras) > 1 and public_ok(quiet=True):
-            keep = max(extras)
-            print(f"public healthy; keeping newest quick tunnel pid {keep}", flush=True)
-            kill_quick_tunnels(keep=keep)
 
     if public_ok():
         print("public site already healthy; monitoring until it fails", flush=True)
