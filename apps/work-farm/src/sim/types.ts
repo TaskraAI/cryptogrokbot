@@ -97,13 +97,13 @@ export const MAP_H = 32;
 
 /** World pixel anchors for each stage building door. */
 export const BUILDING_ANCHORS: Record<StageId, { x: number; y: number; labelX: number; labelY: number }> = {
-  research: { x: 8 * TILE, y: 8 * TILE, labelX: 8 * TILE, labelY: 5.2 * TILE },
-  build: { x: 18 * TILE, y: 7 * TILE, labelX: 18 * TILE, labelY: 4.2 * TILE },
-  tools: { x: 28 * TILE, y: 8 * TILE, labelX: 28 * TILE, labelY: 5.2 * TILE },
-  inbox: { x: 38 * TILE, y: 10 * TILE, labelX: 38 * TILE, labelY: 7.2 * TILE },
-  test: { x: 12 * TILE, y: 18 * TILE, labelX: 12 * TILE, labelY: 15.2 * TILE },
-  check: { x: 24 * TILE, y: 20 * TILE, labelX: 24 * TILE, labelY: 17.2 * TILE },
-  delivery: { x: 36 * TILE, y: 19 * TILE, labelX: 36 * TILE, labelY: 16.2 * TILE },
+  research: { x: 14 * TILE, y: 7 * TILE, labelX: 14 * TILE, labelY: 4.2 * TILE },
+  build: { x: 24 * TILE, y: 6 * TILE, labelX: 24 * TILE, labelY: 3.2 * TILE },
+  tools: { x: 34 * TILE, y: 7 * TILE, labelX: 34 * TILE, labelY: 4.2 * TILE },
+  inbox: { x: 38 * TILE, y: 14 * TILE, labelX: 38 * TILE, labelY: 11.2 * TILE },
+  test: { x: 14 * TILE, y: 20 * TILE, labelX: 14 * TILE, labelY: 17.2 * TILE },
+  check: { x: 24 * TILE, y: 22 * TILE, labelX: 24 * TILE, labelY: 19.2 * TILE },
+  delivery: { x: 34 * TILE, y: 20 * TILE, labelX: 34 * TILE, labelY: 17.2 * TILE },
 };
 
 export const PLAZA = { x: 24 * TILE, y: 14 * TILE };
