@@ -1,0 +1,13 @@
+{
+  "name": "cryptotrading",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w grok-bot-work-farm",
+    "build": "npm run build -w grok-bot-work-farm",
+    "preview": "npm run preview -w grok-bot-work-farm"
+  }
+}
