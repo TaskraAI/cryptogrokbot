@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start the cryptogrokbot.com desk on this host: agent on :8787 + named tunnel origin.
+# Start the cryptogrokbot.com desk on this host: agent on :8787 + origin watcher.
 # Never prints secrets. Put CLOUDFLARE_API_TOKEN in /tmp/cf-api.token (0600) and
 # WALLET_SECRET_KEY in gitignored .env so Grok Bot can sign.
 set -euo pipefail

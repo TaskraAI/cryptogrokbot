@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
 """Keep cryptogrokbot.com reachable while this host runs the desk.
 
-Preferred path: named tunnel `cryptogrokbot-dashboard` (remote Cloudflare config)
-plus Worker ORIGIN = https://origin.cryptogrokbot.com (tunnel public hostname,
-not *.cfargotunnel.com — Workers return Error 1102 for those).
+Worker ORIGIN must be a hostname Cloudflare Workers can fetch:
+- `*.cfargotunnel.com` → Error 1102
+- trycloudflare `--url` hostnames from this VM → 530 Origin DNS error
+- `origin.cryptogrokbot.com` → 1016 unless zone DNS is a tunnel CNAME (this
+  API token cannot write DNS records)
 
-trycloudflare `--url` hostnames from this VM return 530 Origin DNS error even
-when cloudflared has a live QUIC connection. Do not publish them as ORIGIN
-unless the named tunnel token cannot be fetched.
+Working path: Worker custom domains on apex/www/dash/app, ORIGIN = a
+localhost.run HTTPS URL reverse-tunnelled to `127.0.0.1:8787`. The named
+tunnel `cryptogrokbot-dashboard` is started as a sidecar for when DNS can
+route to it.
 
 Health checks MUST hit https://cryptogrokbot.com/health with a browser-like
-User-Agent. This VM often cannot resolve *.trycloudflare.com, and Cloudflare
-returns 403 to Python-urllib's default UA even when curl/browsers get 200.
-
-Never run two `--url` quick tunnels at once. Never prints or writes API tokens
-to stdout.
+User-Agent. Never prints API tokens.
 """
 from __future__ import annotations
 
@@ -49,8 +48,16 @@ WORKER_JS = Path(
     )
 )
 URL_RE = re.compile(r"https://[a-z0-9-]+\.trycloudflare.com")
+LHR_RE = re.compile(r"https://[a-z0-9]+\.lhr\.life")
+LHR_LOG = Path(os.environ.get("CF_LHR_LOG", "/tmp/cf-lhr.log"))
 PUBLIC_HEALTH = os.environ.get("CF_PUBLIC_HEALTH", "https://cryptogrokbot.com")
 NAMED_ORIGIN_URL = f"https://{ORIGIN_HOST}"
+CANONICAL_HOSTS = (
+    "cryptogrokbot.com",
+    "www.cryptogrokbot.com",
+    "dash.cryptogrokbot.com",
+    "app.cryptogrokbot.com",
+)
 HEALTH_UA = "Mozilla/5.0 (compatible; CryptoGrokBotOriginWatch/1.0; +https://cryptogrokbot.com/health)"
 ZONE_ID = os.environ.get("CF_ZONE_ID", "b48c25ee8ebe0c890e8fa74d0e285c79")
 
@@ -413,7 +420,84 @@ def start_named_tunnel() -> subprocess.Popen[str]:
         stdout=open(NAMED_LOG, "a"),
         stderr=subprocess.STDOUT,
         text=True,
+        start_new_session=True,
     )
+
+
+def lhr_pids() -> list[int]:
+    found: list[int] = []
+    try:
+        out = subprocess.check_output(["ps", "-eo", "pid=,args="], text=True)
+    except Exception:
+        return []
+    for line in out.splitlines():
+        text = line.strip()
+        if "localhost.run" not in text or "ssh" not in text:
+            continue
+        if "-R" not in text:
+            continue
+        try:
+            found.append(int(text.split(None, 1)[0]))
+        except ValueError:
+            continue
+    return found
+
+
+def current_lhr_url() -> str:
+    if not LHR_LOG.is_file():
+        return ""
+    found = LHR_RE.findall(LHR_LOG.read_text(errors="replace"))
+    return found[-1] if found else ""
+
+
+def start_lhr() -> subprocess.Popen[str]:
+    kill_pids(lhr_pids())
+    LHR_LOG.write_text("")
+    return subprocess.Popen(
+        [
+            "ssh",
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "ServerAliveInterval=30",
+            "-o",
+            "ExitOnForwardFailure=yes",
+            "-R",
+            "80:127.0.0.1:8787",
+            "nokey@localhost.run",
+        ],
+        stdout=open(LHR_LOG, "a"),
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+
+def ensure_worker_domains() -> None:
+    have = {row.get("hostname") for row in list_worker_domains()}
+    for host in CANONICAL_HOSTS:
+        if host in have:
+            continue
+        payload = {
+            "hostname": host,
+            "service": SCRIPT,
+            "environment": "production",
+            "zone_id": ZONE_ID,
+        }
+        body = cf_request(
+            "POST",
+            f"/accounts/{ACCT}/workers/domains",
+            data=json.dumps(payload).encode(),
+        )
+        if not body.get("success"):
+            body = cf_request(
+                "PUT",
+                f"/accounts/{ACCT}/workers/domains",
+                data=json.dumps(payload).encode(),
+            )
+        print(
+            f"worker domain {host} attached={bool(body.get('success'))} {body.get('errors') or ''}",
+            flush=True,
+        )
 
 
 def list_worker_domains() -> list[dict]:
@@ -502,50 +586,59 @@ def monitor_public(proc: subprocess.Popen[str] | None = None) -> None:
         time.sleep(20)
 
 
-def run_named_loop() -> bool:
-    """Return False if named tunnel cannot be used so caller can fall back."""
+def start_named_sidecar() -> None:
+    """Keep the named tunnel up. Do not publish it as Worker ORIGIN — this token
+    cannot write the tunnel CNAME, so origin.cryptogrokbot.com 1016s.
+    """
     if not save_named_tunnel_token():
-        return False
+        return
     ensure_named_origin_hostname()
-    kill_quick_tunnels()
-    detached = False
+    extras = named_tunnel_pids()
+    if extras:
+        print(f"named tunnel already running pids={extras}", flush=True)
+        return
+    print(f"starting named tunnel {TUNNEL_NAME} (sidecar)", flush=True)
+    start_named_tunnel()
+
+
+def run_lhr_loop() -> None:
+    """Worker ORIGIN = localhost.run HTTPS URL in front of :8787.
+
+    trycloudflare --url hostnames from this VM 530 even with a live QUIC
+    connection. origin.cryptogrokbot.com 1016s because the API token cannot
+    create the tunnel CNAME. localhost.run is fetchable by the Worker.
+    """
     proc: subprocess.Popen[str] | None = None
     try:
         while True:
             if proc is None or proc.poll() is not None:
-                print(f"starting named tunnel {TUNNEL_NAME}", flush=True)
-                proc = start_named_tunnel()
-            try:
-                publish(NAMED_ORIGIN_URL, force=True)
-            except Exception as e:
-                print(f"origin update error: {e}", flush=True)
-            print("waiting for https://cryptogrokbot.com/health via named tunnel", flush=True)
-            if wait_until(lambda: public_ok(), timeout=90, interval=3):
-                print("cryptogrokbot.com healthy", flush=True)
-                monitor_public(proc)
-            else:
-                print("public site still 530 with Worker in front of named origin", flush=True)
-                if not detached:
-                    print("detaching Worker custom domains so named tunnel can serve apex", flush=True)
-                    detached = detach_worker_domains()
-                    if wait_until(lambda: public_ok(), timeout=90, interval=3):
-                        print("cryptogrokbot.com healthy via named tunnel", flush=True)
-                        monitor_public(proc)
-                    else:
-                        print("apex still down after detach; restoring Worker domains", flush=True)
-                        reattach_worker_domains()
-                        detached = False
+                print("starting localhost.run origin tunnel", flush=True)
+                proc = start_lhr()
+            url = ""
+            for _ in range(45):
+                url = current_lhr_url()
+                if url:
+                    try:
+                        publish(url, force=True)
+                    except Exception as e:
+                        print(f"origin update error: {e}", flush=True)
+                    break
+                if proc.poll() is not None:
+                    break
+                time.sleep(1)
+            if url:
+                print("waiting for https://cryptogrokbot.com/health via localhost.run", flush=True)
+                if wait_until(lambda: public_ok(), timeout=90, interval=3):
+                    print("cryptogrokbot.com healthy", flush=True)
+                    monitor_public(proc)
                 else:
-                    print("named tunnel up but public still down; restarting connector", flush=True)
+                    print("public site never became healthy; recycling localhost.run", flush=True)
             stop_proc(proc)
-            kill_pids(named_tunnel_pids())
-            print("named tunnel exited; restarting", flush=True)
+            kill_pids(lhr_pids())
+            print("localhost.run exited; restarting", flush=True)
             time.sleep(2)
     finally:
         stop_proc(proc)
-        if detached and not public_ok(quiet=True):
-            reattach_worker_domains()
-    return True
 
 
 def run_quick_loop() -> None:
@@ -592,21 +685,16 @@ def main() -> int:
     signal.signal(signal.SIGINT, stop)
 
     wait_for_token()
+    kill_quick_tunnels()
+    ensure_worker_domains()
+    start_named_sidecar()
 
-    extras = quick_tunnel_pids()
-    if extras:
-        print(f"existing quick tunnel pids: {extras}", flush=True)
-
-    if public_ok():
-        print("public site already healthy; monitoring until it fails", flush=True)
+    if public_ok() and lhr_pids():
+        print("public site already healthy; keeping localhost.run origin", flush=True)
         monitor_public()
 
-    print("public site down; using named tunnel cryptogrokbot-dashboard", flush=True)
-    if run_named_loop():
-        return 0
-
-    print("named tunnel unavailable; last-resort trycloudflare origin", flush=True)
-    run_quick_loop()
+    print("using localhost.run as Worker ORIGIN", flush=True)
+    run_lhr_loop()
     return 0
 
 
