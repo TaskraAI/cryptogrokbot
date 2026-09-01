@@ -99,10 +99,16 @@ def cf_request(method: str, path: str, *, data: bytes | None = None, content_typ
     )
     try:
         with urllib.request.urlopen(req, timeout=60) as res:
-            return json.loads(res.read().decode())
+            raw = res.read().decode("utf-8", "replace")
+            if not raw.strip():
+                return {"success": True}
+            return json.loads(raw)
     except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+        if not raw.strip():
+            return {"success": e.code in (200, 202, 204)}
         try:
-            return json.loads(e.read().decode())
+            return json.loads(raw)
         except Exception:
             return {"success": False, "errors": [{"message": f"HTTP {e.code}"}]}
 
@@ -580,7 +586,6 @@ def main() -> int:
 
     def stop(_signum=None, _frame=None) -> None:
         stop_proc(proc_holder.get("proc"))
-        kill_pids(named_tunnel_pids())
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, stop)
