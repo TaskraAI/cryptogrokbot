@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Start the cryptogrokbot.com desk on this host: agent on :8787 + one trycloudflare origin.
+# Never prints secrets. Put CLOUDFLARE_API_TOKEN in /tmp/cf-api.token (0600) and
+# WALLET_SECRET_KEY in gitignored .env so Grok Bot can sign.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+mkdir -p data
+SESSION_AGENT=dashboard-paper
+SESSION_ORIGIN=cf-origin-watch
+TMUX=(tmux -f /exec-daemon/tmux.portal.conf)
+if ! "${TMUX[@]}" has-session -t "=$SESSION_AGENT" 2>/dev/null; then
+  "${TMUX[@]}" new-session -d -s "$SESSION_AGENT" -c "$PWD" -- "${SHELL:-bash}" -l
+fi
+if ! curl -sf --max-time 2 http://127.0.0.1:8787/health >/dev/null; then
+  "${TMUX[@]}" send-keys -t "$SESSION_AGENT:0.0" C-c
+  sleep 1
+  "${TMUX[@]}" send-keys -t "$SESSION_AGENT:0.0" 'unset MODE MASTER_ENABLED; set -a; source ./.env; set +a; npm run agent' C-m
+fi
+if ! "${TMUX[@]}" has-session -t "=$SESSION_ORIGIN" 2>/dev/null; then
+  "${TMUX[@]}" new-session -d -s "$SESSION_ORIGIN" -c "$PWD" -- "${SHELL:-bash}" -l
+fi
+"${TMUX[@]}" send-keys -t "$SESSION_ORIGIN:0.0" C-c
+sleep 1
+"${TMUX[@]}" send-keys -t "$SESSION_ORIGIN:0.0" 'CLOUDFLARED=/tmp/cloudflared CLOUDFLARE_API_TOKEN_FILE=/tmp/cf-api.token python3 scripts/keep-cf-origin.py' C-m
+echo "agent :8787 + origin watcher started. Public health is https://cryptogrokbot.com/health"

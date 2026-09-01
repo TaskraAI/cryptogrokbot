@@ -50,7 +50,23 @@ def token() -> str:
     path = Path(os.environ.get("CLOUDFLARE_API_TOKEN_FILE", "/tmp/cf-api.token"))
     if path.is_file():
         return path.read_text().strip()
-    raise SystemExit("CLOUDFLARE_API_TOKEN missing")
+    raise FileNotFoundError("CLOUDFLARE_API_TOKEN missing")
+
+
+def wait_for_token(interval: float = 10.0) -> str:
+    """Host VMs come up without secrets. Wait until Taskra drops the token file."""
+    while True:
+        try:
+            tok = token()
+            if tok:
+                return tok
+        except FileNotFoundError:
+            pass
+        print(
+            "waiting for CLOUDFLARE_API_TOKEN or /tmp/cf-api.token to publish Worker ORIGIN",
+            flush=True,
+        )
+        time.sleep(interval)
 
 
 def cf_put_worker(origin: str) -> None:
@@ -245,6 +261,8 @@ def main() -> int:
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
 
+    wait_for_token()
+
     extras = quick_tunnel_pids()
     if extras:
         print(f"existing quick tunnel pids: {extras}", flush=True)
@@ -253,7 +271,49 @@ def main() -> int:
         print("public site already healthy; monitoring until it fails", flush=True)
         monitor_public()
 
+    existing_url = current_url()
+    if extras and existing_url:
+        print(f"reusing live quick tunnel {existing_url}", flush=True)
+        try:
+            publish(existing_url)
+        except Exception as e:
+            print(f"origin update error: {e}", flush=True)
+        print("waiting for https://cryptogrokbot.com/health", flush=True)
+        if wait_until(lambda: public_ok(), timeout=90, interval=3):
+            print("cryptogrokbot.com healthy", flush=True)
+            monitor_public()
+        else:
+            print("public site still down with existing tunnel; will start a new origin", flush=True)
+
     while True:
+        if proc is None or proc.poll() is not None:
+            print("starting quick tunnel", flush=True)
+            proc = start_tunnel()
+        url = ""
+        for _ in range(45):
+            url = current_url()
+            if url:
+                try:
+                    publish(url)
+                except Exception as e:
+                    print(f"origin update error: {e}", flush=True)
+                break
+            if proc.poll() is not None:
+                break
+            time.sleep(1)
+        if url:
+            print("waiting for https://cryptogrokbot.com/health", flush=True)
+            if not wait_until(lambda: public_ok(), timeout=90, interval=3):
+                print("public site never became healthy; recycling", flush=True)
+                stop_proc(proc)
+                kill_quick_tunnels()
+            else:
+                print("cryptogrokbot.com healthy", flush=True)
+                monitor_public(proc)
+                stop_proc(proc)
+                kill_quick_tunnels()
+        print("quick tunnel exited; restarting", flush=True)
+        time.sleep(2)
         if proc is None or proc.poll() is not None:
             print("starting quick tunnel", flush=True)
             proc = start_tunnel()

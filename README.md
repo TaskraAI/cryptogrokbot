@@ -48,7 +48,7 @@ The Worker `ORIGIN` binding must be a **public** hostname the Worker can fetch. 
 CLOUDFLARE_API_TOKEN_FILE=/tmp/cf-api.token python3 scripts/keep-cf-origin.py
 ```
 
-Run **one** watcher. Two `--url` tunnels publish competing Worker ORIGIN hostnames and the public site 502s. Health checks use `https://cryptogrokbot.com/health` with a browser User-Agent — Cloudflare 403s Python-urllib’s default UA, and this VM often cannot resolve `*.trycloudflare.com`.
+Run **one** watcher. Two `--url` tunnels publish competing Worker ORIGIN hostnames and the public site 502s. Health checks use `https://cryptogrokbot.com/health` with a browser User-Agent — Cloudflare 403s Python-urllib’s default UA, and this VM often cannot resolve `*.trycloudflare.com`. If the token file is missing, the watcher waits for `/tmp/cf-api.token` and then publishes. `scripts/start-desk.sh` starts the agent plus that watcher.
 
 This cloud VM is **not** a 24/7 VPS — run the agent + tunnel on a durable host.
 

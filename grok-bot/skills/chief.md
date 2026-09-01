@@ -24,6 +24,8 @@ curl -sS -H "Authorization: Bearer $DASHBOARD_BOT_TOKEN" http://127.0.0.1:8787/a
 
 One process only. If port 8787 is in use, do not start another agent.
 
+If `https://cryptogrokbot.com/health` is 530/1016, this computer is still the origin. Use `http://127.0.0.1:8787` with the invite Bearer (do not wait on the public hostname). Run `scripts/start-desk.sh`. Taskra must place `CLOUDFLARE_API_TOKEN` in `/tmp/cf-api.token` (mode 0600, never chat) so the watcher can republish Worker ORIGIN. Live signs need `WALLET_SECRET_KEY` in gitignored `.env`. Never invent those secrets.
+
 ## Hard rules
 - Follow Taskra on the Grok Bot app. If they tell you to change the desk, do it. Do not invent extra spend.
 - Size is `config/policy.json` `maxSolPerTrade` (**0.1 SOL** live size cap), daily **0.3 SOL**, loss cap **0.1 SOL**. Do not raise past 0.1 unless Taskra says so.
