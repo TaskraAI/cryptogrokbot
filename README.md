@@ -42,13 +42,13 @@ The dashboard canonical URL is **https://cryptogrokbot.com/**.
 
 `www`, `dash`, and `app` redirect there (301). Nameservers are on Cloudflare (`kanye.ns.cloudflare.com` / `stella.ns.cloudflare.com`). A Worker (`workers/cryptogrokbot.js`) fronts the origin; `npm run agent` on port **8787** plus a Cloudflare Tunnel must be running or the site returns 502 / 1016.
 
-The Worker `ORIGIN` binding must be a **public** hostname the Worker can fetch. `*.cfargotunnel.com` is blocked (Error 1102). A trycloudflare quick tunnel in front of `127.0.0.1:8787` is the working origin on this VM. Keep it alive with:
+The Worker `ORIGIN` binding must be a **public** hostname the Worker can fetch. `*.cfargotunnel.com` is blocked (Error 1102). trycloudflare `--url` hostnames from this VM return **530 Origin DNS error** even when `cloudflared` is connected — do not point Worker ORIGIN at those. The working origin is the named tunnel `cryptogrokbot-dashboard` serving `origin.cryptogrokbot.com` (and the apex hostnames) in front of `127.0.0.1:8787`. Keep it alive with:
 
 ```bash
 CLOUDFLARE_API_TOKEN_FILE=/tmp/cf-api.token python3 scripts/keep-cf-origin.py
 ```
 
-Run **one** watcher. Two `--url` tunnels publish competing Worker ORIGIN hostnames and the public site 502s. Health checks use `https://cryptogrokbot.com/health` with a browser User-Agent — Cloudflare 403s Python-urllib’s default UA, and this VM often cannot resolve `*.trycloudflare.com`. If the token file is missing, the watcher waits for `/tmp/cf-api.token` and then publishes. `scripts/start-desk.sh` starts the agent plus that watcher.
+Run **one** watcher. It fetches the named-tunnel token, publishes Worker ORIGIN, and runs `cloudflared tunnel run --token-file`. Health checks use `https://cryptogrokbot.com/health` with a browser User-Agent — Cloudflare 403s Python-urllib’s default UA. If the API token file is missing, the watcher waits for `/tmp/cf-api.token` and then publishes. `scripts/start-desk.sh` starts the agent plus that watcher.
 
 This cloud VM is **not** a 24/7 VPS — run the agent + tunnel on a durable host.
 

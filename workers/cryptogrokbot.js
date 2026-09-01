@@ -31,6 +31,20 @@ export default {
     }
     const target = new URL(incoming.pathname + incoming.search, origin);
     const headers = new Headers(request.headers);
+    // Forwarding Host: cryptogrokbot.com to a trycloudflare/tunnel origin makes
+    // Cloudflare look up that host as the origin and return 530 Origin DNS error.
+    for (const name of [
+      "host",
+      "cf-connecting-ip",
+      "cf-ipcountry",
+      "cf-ray",
+      "cf-visitor",
+      "cf-ew-via",
+      "cf-worker",
+      "cdn-loop",
+    ]) {
+      headers.delete(name);
+    }
     headers.set("x-forwarded-host", incoming.host);
     headers.set("x-forwarded-proto", "https");
     const init = { method: request.method, headers, redirect: "manual" };
