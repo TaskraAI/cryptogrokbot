@@ -345,7 +345,7 @@ function gemsHtml(d) {
   }).join("");
   return (
     '<div class="card"><h2 style="margin-top:0">Chances</h2>' +
-    "<p class='muted'>Chief and Grok stay on the same page. Grade A/B: Chief tells you right away. When you're away, Chief Approves routine gems (≤ cap). Majors wait for you unless standing lessons already say what you would do.</p>" +
+    "<p class='muted'>Chief and Grok stay on the same page. Grade A/B: Chief tells you right away. The desk never Approves and never trades. Taskra, Chief, invited team, or Grok Bot decide. Majors wait for you unless standing lessons already say what you would do.</p>" +
     (open.length ? "" : "<p>No open chances. Scout queues hype+volume here — nothing is hidden from Chief.</p>") +
     "</div>" +
     cards.join("") +
