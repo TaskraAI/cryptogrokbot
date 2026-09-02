@@ -176,8 +176,13 @@ def publish(url: str, *, force: bool = False) -> None:
 
 
 def http_health(url: str, *, quiet: bool = False) -> bool:
+    ok, _code = health_status(url, quiet=quiet)
+    return ok
+
+
+def health_status(url: str, *, quiet: bool = False) -> tuple[bool, int]:
     if not url:
-        return False
+        return False, 0
     req = urllib.request.Request(
         url.rstrip("/") + "/health",
         method="GET",
@@ -192,15 +197,15 @@ def http_health(url: str, *, quiet: bool = False) -> bool:
             ok = res.status == 200 and "cryptogrokbot-dashboard" in body
             if not ok and not quiet:
                 print(f"health {url} status={res.status} body={body[:80]!r}", flush=True)
-            return ok
+            return ok, int(res.status)
     except urllib.error.HTTPError as e:
         if not quiet:
             print(f"health {url} HTTP {e.code}", flush=True)
-        return False
+        return False, int(e.code)
     except Exception as e:
         if not quiet:
             print(f"health {url} {type(e).__name__}: {e}", flush=True)
-        return False
+        return False, 0
 
 
 def public_ok(*, quiet: bool = False) -> bool:
@@ -213,6 +218,20 @@ def wait_until(pred, timeout: float, interval: float = 2.0) -> bool:
     while time.time() < deadline:
         if pred():
             return True
+        time.sleep(interval)
+    return False
+
+
+def wait_consecutive(pred, need: int = 3, timeout: float = 90.0, interval: float = 3.0) -> bool:
+    hits = 0
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if pred():
+            hits += 1
+            if hits >= need:
+                return True
+        else:
+            hits = 0
         time.sleep(interval)
     return False
 
@@ -568,22 +587,25 @@ def reattach_worker_domains() -> None:
             print(f"reattach {host} failed: {body.get('errors')}", flush=True)
 
 
-def monitor_public(proc: subprocess.Popen[str] | None = None) -> None:
-    """Watch the public host. Recycle only after three consecutive misses."""
+def monitor_public(proc: subprocess.Popen[str] | None = None, origin_url: str = "") -> None:
+    """Watch the public host. Recycle immediately on 503 (dead reverse tunnel)."""
     fails = 0
     while True:
         if proc is not None and proc.poll() is not None:
             print("origin process exited", flush=True)
             return
-        if public_ok():
+        if origin_url:
+            http_health(origin_url, quiet=True)
+        ok, code = health_status(PUBLIC_HEALTH, quiet=True)
+        if ok:
             fails = 0
         else:
             fails += 1
-            print(f"public health miss {fails}/3", flush=True)
-            if fails >= 3:
+            print(f"public health miss {fails}/3 HTTP {code}", flush=True)
+            if code == 503 or fails >= 3:
                 print("public site down; recycling origin", flush=True)
                 return
-        time.sleep(20)
+        time.sleep(12)
 
 
 def start_named_sidecar() -> None:
@@ -618,21 +640,25 @@ def run_lhr_loop() -> None:
             for _ in range(45):
                 url = current_lhr_url()
                 if url:
-                    try:
-                        publish(url, force=True)
-                    except Exception as e:
-                        print(f"origin update error: {e}", flush=True)
                     break
                 if proc.poll() is not None:
                     break
                 time.sleep(1)
             if url:
-                print("waiting for https://cryptogrokbot.com/health via localhost.run", flush=True)
-                if wait_until(lambda: public_ok(), timeout=90, interval=3):
-                    print("cryptogrokbot.com healthy", flush=True)
-                    monitor_public(proc)
+                print(f"waiting for origin {url}/health", flush=True)
+                if not wait_until(lambda: http_health(url, quiet=True), timeout=40, interval=1):
+                    print("origin URL never became healthy; recycling", flush=True)
                 else:
-                    print("public site never became healthy; recycling localhost.run", flush=True)
+                    try:
+                        publish(url, force=True)
+                    except Exception as e:
+                        print(f"origin update error: {e}", flush=True)
+                    print("waiting for https://cryptogrokbot.com/health via localhost.run", flush=True)
+                    if wait_consecutive(lambda: public_ok(quiet=True), need=3, timeout=90, interval=3):
+                        print("cryptogrokbot.com healthy", flush=True)
+                        monitor_public(proc, origin_url=url)
+                    else:
+                        print("public site never became healthy; recycling localhost.run", flush=True)
             stop_proc(proc)
             kill_pids(lhr_pids())
             print("localhost.run exited; restarting", flush=True)
