@@ -5,6 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p data
+echo "watching http://127.0.0.1:8787/health — will restart npm run agent if it dies" >&2
 while true; do
   if curl -sf --max-time 2 http://127.0.0.1:8787/health 2>/dev/null | grep -q cryptogrokbot-dashboard; then
     sleep 15
