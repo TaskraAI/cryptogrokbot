@@ -47,7 +47,7 @@ The Worker `ORIGIN` binding must be a hostname the Worker can fetch. `*.cfargotu
 CLOUDFLARE_API_TOKEN_FILE=/tmp/cf-api.token python3 scripts/keep-cf-origin.py
 ```
 
-Run **one** watcher. It attaches Worker custom domains, starts the named tunnel `cryptogrokbot-dashboard` as a sidecar, publishes Worker ORIGIN from localhost.run, and health-checks `https://cryptogrokbot.com/health` with a browser User-Agent. If the API token file is missing, the watcher waits for `/tmp/cf-api.token`. `scripts/start-desk.sh` starts the agent plus that watcher.
+Run **one** watcher. It attaches Worker custom domains, starts the named tunnel `cryptogrokbot-dashboard` as a sidecar, publishes Worker ORIGIN from localhost.run, and health-checks `https://cryptogrokbot.com/health` with a browser User-Agent. A Worker fallback 200 with `"origin":"down"` is **not** healthy — the watcher recycles the tunnel so Grok Bot can still POST fills overnight. If the API token file is missing, the watcher waits for `/tmp/cf-api.token`. `scripts/start-desk.sh` starts `scripts/keep-agent.sh` (restarts `npm run agent` if :8787 dies) plus that watcher.
 
 This cloud VM is **not** a 24/7 VPS — run the agent + tunnel on a durable host.
 

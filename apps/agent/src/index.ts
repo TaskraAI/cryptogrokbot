@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { resolve } from "node:path";
 import { dayKey } from "@night/shared";
-import { openStore } from "@night/storage";
+import { listOpenOpportunities, openStore } from "@night/storage";
 import { createTelegramBot } from "@night/telegram";
 import { loadAppConfig, loadPolicy } from "./config.ts";
 import { AgentRuntime } from "./loop.ts";
@@ -87,6 +87,11 @@ async function main(): Promise<void> {
   );
   console.warn(
     "Not financial advice. Desk does not auto-trade. MASTER is off. Only Taskra, Chief, Grok Bot, and invited team decide. Grok Bot live buy needs chief:APPROVE.",
+  );
+  const queued = listOpenOpportunities(store);
+  const approved = queued.filter((o) => o.chief_approved === 1).length;
+  console.log(
+    `Open chances: ${queued.length} (${approved} approved). Desk does not fill — Grok Bot POST /api/buy after Approve, and npm run agent must stay up.`,
   );
 
   const token = process.env.CLOUDFLARE_API_TOKEN ?? "";

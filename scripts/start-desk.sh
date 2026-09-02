@@ -14,7 +14,7 @@ fi
 if ! curl -sf --max-time 2 http://127.0.0.1:8787/health >/dev/null; then
   "${TMUX[@]}" send-keys -t "$SESSION_AGENT:0.0" C-c
   sleep 1
-  "${TMUX[@]}" send-keys -t "$SESSION_AGENT:0.0" 'unset MODE MASTER_ENABLED; set -a; source ./.env; set +a; npm run agent' C-m
+  "${TMUX[@]}" send-keys -t "$SESSION_AGENT:0.0" 'bash scripts/keep-agent.sh' C-m
 fi
 if ! "${TMUX[@]}" has-session -t "=$SESSION_ORIGIN" 2>/dev/null; then
   "${TMUX[@]}" new-session -d -s "$SESSION_ORIGIN" -c "$PWD" -- "${SHELL:-bash}" -l

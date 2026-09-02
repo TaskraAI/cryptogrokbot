@@ -175,6 +175,17 @@ def publish(url: str, *, force: bool = False) -> None:
     print("origin updated", flush=True)
 
 
+def live_origin_health_body(body: str) -> bool:
+    """Worker fallback returns 200 + origin:down. That is not a live desk."""
+    text = body or ""
+    if "cryptogrokbot-dashboard" not in text:
+        return False
+    compact = text.replace(" ", "")
+    if '"origin":"down"' in compact:
+        return False
+    return True
+
+
 def http_health(url: str, *, quiet: bool = False) -> bool:
     ok, _code = health_status(url, quiet=quiet)
     return ok
@@ -194,7 +205,7 @@ def health_status(url: str, *, quiet: bool = False) -> tuple[bool, int]:
     try:
         with urllib.request.urlopen(req, timeout=12) as res:
             body = res.read().decode("utf-8", "replace")
-            ok = res.status == 200 and "cryptogrokbot-dashboard" in body
+            ok = res.status == 200 and live_origin_health_body(body)
             if not ok and not quiet:
                 print(f"health {url} status={res.status} body={body[:80]!r}", flush=True)
             return ok, int(res.status)
@@ -478,7 +489,9 @@ def start_lhr() -> subprocess.Popen[str]:
             "-o",
             "StrictHostKeyChecking=accept-new",
             "-o",
-            "ServerAliveInterval=30",
+            "ServerAliveInterval=15",
+            "-o",
+            "ServerAliveCountMax=2",
             "-o",
             "ExitOnForwardFailure=yes",
             "-R",
@@ -588,14 +601,17 @@ def reattach_worker_domains() -> None:
 
 
 def monitor_public(proc: subprocess.Popen[str] | None = None, origin_url: str = "") -> None:
-    """Watch the public host. Recycle immediately on 503 (dead reverse tunnel)."""
+    """Watch the public host. Recycle on 503, origin:down fallback, or dead lhr URL."""
     fails = 0
     while True:
         if proc is not None and proc.poll() is not None:
             print("origin process exited", flush=True)
             return
         if origin_url:
-            http_health(origin_url, quiet=True)
+            origin_ok, origin_code = health_status(origin_url, quiet=True)
+            if not origin_ok:
+                print(f"origin URL died HTTP {origin_code}; recycling", flush=True)
+                return
         ok, code = health_status(PUBLIC_HEALTH, quiet=True)
         if ok:
             fails = 0
