@@ -137,6 +137,10 @@ export function requestActor(req: IncomingMessage, ctx: DashboardContext): { kin
   return null;
 }
 
+function canDecideTrades(actor: { kind: AccessKind } | null): boolean {
+  return actor?.kind === "owner" || actor?.kind === "grokbot" || actor?.kind === "human";
+}
+
 function refuseUnlessGrokBot(
   res: ServerResponse,
   actor: { kind: AccessKind } | null,
@@ -519,7 +523,7 @@ async function routeAuthed(
       email: ctx.email,
       actor: actor?.kind ?? null,
       canPlaceOrders,
-      canApproveChief: actor?.kind === "owner" || actor?.kind === "grokbot",
+      canApproveChief: canDecideTrades(actor),
       todos: listTodos(ctx.store).map((t) => ({
         id: t.id,
         title: t.title,
@@ -711,7 +715,7 @@ async function routeAuthed(
     const enable = body.enabled === true || body.enabled === "true";
     if (enable) {
       if (actor?.kind !== "owner") {
-        json(res, 403, { error: "only the owner can resume MASTER", ok: false });
+        json(res, 403, { error: "only Taskra can resume MASTER", ok: false });
         return;
       }
       if (str(body.confirm).toUpperCase() !== "CONFIRM") {
@@ -720,8 +724,8 @@ async function routeAuthed(
       }
       setFlag(ctx.store, "master", "true");
     } else {
-      if (actor?.kind !== "owner" && actor?.kind !== "grokbot") {
-        json(res, 403, { error: "only the owner or Grok Bot can kill MASTER", ok: false });
+      if (!canDecideTrades(actor)) {
+        json(res, 403, { error: "only Taskra, Chief, Grok Bot, or invited team can kill MASTER", ok: false });
         return;
       }
       setFlag(ctx.store, "master", "false");
@@ -968,8 +972,8 @@ async function routeAuthed(
     const body = await readJson(req);
     const action = str(body.action).toLowerCase();
     if (action === "approve") {
-      if (actor?.kind !== "owner" && actor?.kind !== "grokbot") {
-        json(res, 403, { error: "only the owner or Grok Bot can approve", ok: false });
+      if (!canDecideTrades(actor)) {
+        json(res, 403, { error: "only Taskra, Chief, Grok Bot, or invited team can approve", ok: false });
         return;
       }
       const decision = classifyChance({ mint: opp.mint, ticker: opp.ticker, policy: ctx.policy });
@@ -981,7 +985,11 @@ async function routeAuthed(
         json(res, 403, { error: decision.why, ok: false, needsTaskra: true });
         return;
       }
-      const updated = approveOpportunity(ctx.store, opp.id, actor?.kind === "owner" ? "taskra" : "chief");
+      const updated = approveOpportunity(
+        ctx.store,
+        opp.id,
+        actor?.kind === "owner" ? "taskra" : actor?.kind === "human" ? "team" : "chief",
+      );
       json(res, 200, {
         ok: true,
         approved: true,
@@ -992,8 +1000,8 @@ async function routeAuthed(
       return;
     }
     if (action === "skip") {
-      if (actor?.kind !== "owner" && actor?.kind !== "grokbot") {
-        json(res, 403, { error: GROK_BOT_ORDERS_ONLY, ok: false });
+      if (!canDecideTrades(actor)) {
+        json(res, 403, { error: "only Taskra, Chief, Grok Bot, or invited team can skip", ok: false });
         return;
       }
       markOpportunitySkipped(ctx.store, opp.id);

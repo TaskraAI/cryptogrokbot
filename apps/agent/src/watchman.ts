@@ -54,6 +54,8 @@ export async function managePosition(opts: {
   now?: number;
   /** Explicit Grok Bot order: live sell allowed while auto-desk MASTER is off. */
   grokBotOrder?: boolean;
+  /** Night loop: record tape only. Never send a buy or sell. */
+  autoDesk?: boolean;
 }): Promise<string> {
   const now = opts.now ?? Date.now();
   let pos = applyPeakAndGreen(rowToPosition(opts.row), opts.snap.priceUsd);
@@ -112,9 +114,10 @@ export async function managePosition(opts: {
     runner: pos.principalRecoveredSol + 1e-9 >= pos.principalSol ? 1 : 0,
   };
 
-  if (action.type === "hold") {
+  if (action.type === "hold" || (opts.autoDesk && !opts.grokBotOrder && !opts.sellAll)) {
     updatePosition(opts.store, pos.id, patch);
-    return `hold #${pos.id} ${pattern} ${action.reason}`;
+    if (action.type === "hold") return `hold #${pos.id} ${pattern} ${action.reason}`;
+    return `hold #${pos.id} ${pattern} auto-desk does not trade (${action.reason})`;
   }
 
   let tokensToSell = pos.tokensHeld;

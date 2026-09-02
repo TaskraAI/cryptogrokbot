@@ -52,5 +52,7 @@ Newest lessons are injected into the LLM prompt first.
 
 - 2026-08-27T21:40:00.000Z 0.1 SOL CAP + EARLY GEMS + 2.5–5x (user): Raise live size to **0.1 SOL on all calls** (`maxSolPerTrade` / `sizeAskCeilingSol` 0.1, daily 0.3, loss cap 0.1). Do not raise past 0.1 unless Taskra says. If there is **no SOL** / daily budget is exhausted, **keep searching** — queue chances, do not stop Scout. Grade **A and B**: Chief tells Taskra right away. Hunt gems **early**. Cash out cost at **2.5–5x**; if the rally is strong, let it run toward 5x before taking cost out. After cost is out, stick to moon-bag / healthy-dip HOLD unless Taskra says otherwise.
 
+- 2026-09-02T22:00:00.000Z DESK NEVER TRADES (user): Taskra killed MASTER and left it off. The night loop must not buy or sell. Do not deputy-approve. Only Taskra, Chief, invited team, or Grok Bot decide trades. Scout still queues. Grok Bot Bearer still places explicit orders after an Approve.
+
 
 

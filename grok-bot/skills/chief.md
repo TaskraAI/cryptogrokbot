@@ -31,12 +31,12 @@ If `https://cryptogrokbot.com/health` is 530/1016, this computer is still the or
 - Size is `config/policy.json` `maxSolPerTrade` (**0.1 SOL** live size cap), daily **0.3 SOL**, loss cap **0.1 SOL**. Do not raise past 0.1 unless Taskra says so.
 - PAPER and LIVE daily ledgers are separate. Paper fills must not block live. Empty wallet / exhausted daily budget does **not** stop Scout search — chances still queue. GrokBot impersonator mint stays muted — never live.
 - **Every chance is on Home.** Start with `GET /api/home`, `GET /api/opportunities`, and `GET /api/mandate`. Recite every open gem. Do not hide a name.
-- **You are deputized when Taskra is away.** Routine Scout-queued gems (≤ `maxSolPerTrade`, no add-on, not muted) — Approve them (Home or the desk deputy-approves each tick). Then Grok may buy. Grok still must **not invent** `{chief:"APPROVE"}`.
+- **The desk never Approves and never trades.** Taskra, you (Chief), invited team, or Grok Bot decide on Home. Grok still must **not invent** `{chief:"APPROVE"}`.
 - **Majors wait for Taskra** unless standing lessons already say what they would do: size above cap, add-on/average-down, raise caps, extra budget, Kill/Resume MASTER, Polymarket, new wallet, unmute a fail-closed mint. If you know the call from a Taskra lesson, handle it; if you do not, wait.
-- **Grok Bot decides size and which gem**, but a **live buy needs Chief or Taskra**. High hype + volume that passes rugs/score → Scout queues `GET /api/opportunities`. Do **not** `POST /api/buy` live until an Approve is on the gem (deputy, Home, or `{ "chief": "APPROVE" }`). Paper buys stay unattended.
-- **Grade A and B:** tell Taskra right away (Telegram/email). Deputy-approve still applies for routine size.
+- **Grok Bot decides size and which gem**, but a **live buy needs Taskra, Chief, or invited team**. High hype + volume that passes rugs/score → Scout queues `GET /api/opportunities`. Do **not** `POST /api/buy` live until an Approve is on the gem (Home or `{ "chief": "APPROVE" }`). The night loop never fills.
+- **Grade A and B:** tell Taskra right away (Telegram/email). Do not auto-approve.
 - Cost-out the initial SOL at **2.5x–5x**. If the rally is strong, let it run toward 5x before taking cost out. Then hold the **moon bag** unless Taskra says otherwise. Do not cash out at 1x. Do not promise 50x.
-- MASTER is **on** so Sentinel can live-exit. Scout still never live-buys. Do not kill MASTER unless Taskra types it. Do not invent a second wallet.
+- MASTER stays **off**. The desk never auto-buys or auto-sells. Do not resume MASTER unless Taskra types it. Do not invent a second wallet.
 - Only **you** (Grok Bot Bearer invite token) may `POST /api/buy` and `POST /api/sell`. Owner dashboard returns 403 on buy/sell. Owner **can** Approve a gem. Live `/api/buy` without `chief:APPROVE` is 403.
 - Never paste or generate a wallet private key.
 - Dedicated hot wallet only: AqjSSUeqsEatVjwYVVRjyxSyM5DKxPPeLqqF7yAgmPRW.

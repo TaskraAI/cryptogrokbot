@@ -44,7 +44,7 @@ describe("chief deputy mandate", () => {
     expect(standingIntent(DEFAULT_POLICY).sizeSol).toBe(0.1);
   });
 
-  it("deputy-approves open routine chances and records approved_by=chief", () => {
+  it("does not auto-approve routine chances — only skips the impersonator", () => {
     const db = mem();
     insertOpportunity(db, {
       mint: "DeputyMint11111111111111111111111111111111",
@@ -67,12 +67,12 @@ describe("chief deputy mandate", () => {
       reason: "impersonator",
     });
     const logs = deputyChief(db, DEFAULT_POLICY);
-    expect(logs.join("\n")).toMatch(/chief-deputy approved #\d+ DEP/);
-    expect(logs.join("\n")).toMatch(/chief-deputy skipped #\d+ FAKE/);
+    expect(logs.join("\n")).toMatch(/waiting for Taskra \/ Chief \/ Grok Bot \/ team/);
+    expect(logs.join("\n")).not.toMatch(/chief-deputy approved/);
+    expect(logs.join("\n")).toMatch(/chief skipped #\d+ FAKE/);
     const open = listOpenOpportunities(db);
     expect(open).toHaveLength(1);
     expect(open[0]?.ticker).toBe("DEP");
-    expect(open[0]?.chief_approved).toBe(1);
-    expect(open[0]?.approved_by).toBe("chief");
+    expect(open[0]?.chief_approved).toBe(0);
   });
 });

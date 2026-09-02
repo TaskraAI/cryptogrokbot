@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     `Night agent starting mode=${cfg.mode} master=${cfg.masterEnabled} db=${cfg.databasePath} host=${cfg.dashboardHost}`,
   );
   console.warn(
-    "Not financial advice. MASTER on lets Sentinel live-exit. Scout never live-buys. Grok Bot live buy needs chief:APPROVE.",
+    "Not financial advice. Desk does not auto-trade. MASTER is off. Only Taskra, Chief, Grok Bot, and invited team decide. Grok Bot live buy needs chief:APPROVE.",
   );
 
   const token = process.env.CLOUDFLARE_API_TOKEN ?? "";

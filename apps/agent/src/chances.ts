@@ -82,8 +82,8 @@ export function chiefChanceNotice(msg: string, opts?: { grade?: string }): strin
     : `Chance queued for Chief — stay on the same page.\n`;
   return (
     `${head}${msg}\n` +
-    `Chief: Taskra may be away. If this is a routine queued gem (≤ cap, no add-on, not muted), Approve — you are deputized. The desk also deputy-approves those this tick. Majors wait for Taskra unless standing lessons already say what they would do.\n` +
-    `Grok Bot: wait for Chief APPROVE. Do not invent it. Do not live-buy until then.\n` +
+    `Chief / team / Taskra: the desk does not Approve and does not trade. You decide on Home. Majors still wait for Taskra.\n` +
+    `Grok Bot: wait for an Approve. Do not invent it. Do not live-buy until then.\n` +
     `Home: https://cryptogrokbot.com/`
   );
 }
@@ -106,6 +106,6 @@ export function chiefChancePulse(store: Store, tickLines: number): string {
   if (!open.length) return `tick done lines=${tickLines}; no open chances`;
   const names = open.map((o) => `${o.ticker}${o.chief_approved ? "*" : ""}`).join(", ");
   const pending = open.filter((o) => o.chief_approved !== 1).length;
-  if (!pending) return `${open.length} chance(s) on Home: ${names} — Chief deputy done, Grok may buy`;
-  return `${open.length} chance(s) on Home: ${names} — ${pending} still need Taskra`;
+  if (!pending) return `${open.length} chance(s) on Home: ${names} — approved; Grok Bot may buy`;
+  return `${open.length} chance(s) on Home: ${names} — ${pending} waiting for Taskra / Chief / team`;
 }

@@ -12,7 +12,7 @@ Tape and exits. Policy: `config/policy.json`. Extra rules: `config/rules.yaml`.
 
 ## Do
 - Watch crew board Sentinel + lastDecision.
-- If agent not running, ask Chief to start the agent (`MODE=LIVE` on the host). MASTER on lets you live-exit.
+- If agent not running, ask Chief to start the agent (`MODE=LIVE` on the host). MASTER stays off. The night loop never live-exits — only Grok Bot / Taskra / Chief / team decide.
 - Explain the last pattern in one sentence.
 
 ## Don't

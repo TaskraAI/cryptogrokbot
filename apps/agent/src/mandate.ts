@@ -1,6 +1,5 @@
 import type { Policy } from "@night/shared";
 import {
-  approveOpportunity,
   listOpenOpportunities,
   markOpportunitySkipped,
   type OpportunityRow,
@@ -20,7 +19,7 @@ export type ChanceDecision = {
 };
 
 export type StandingIntent = {
-  chiefDeputy: true;
+  chiefDeputy: boolean;
   routine: string;
   escalate: string[];
   never: string[];
@@ -64,15 +63,15 @@ export function classifyChance(opts: {
     action: "approve",
     chiefMayApprove: true,
     needsTaskra: false,
-    why: `routine: queued gem at ≤ ${opts.policy.maxSolPerTrade} SOL, no add-on — Chief is deputized when Taskra is away`,
+    why: `routine: queued gem at ≤ ${opts.policy.maxSolPerTrade} SOL, no add-on — wait for Taskra, Chief, Grok Bot, or invited team`,
   };
 }
 
 export function standingIntent(policy: Policy): StandingIntent {
   return {
-    chiefDeputy: true,
+    chiefDeputy: false,
     routine:
-      `When Taskra is away, Chief Approves Scout-queued gems at ≤ ${policy.maxSolPerTrade} SOL (no add-on, not muted). Grok still places the buy. Grade A and B: tell Taskra right away.`,
+      `The desk never Approves and never trades. Taskra, Chief, invited team, or Grok Bot decide on Home. Size stays ≤ ${policy.maxSolPerTrade} SOL. Grade A and B: tell Taskra right away.`,
     escalate: [
       "Size above maxSolPerTrade",
       "Add-on / average-down",
@@ -102,17 +101,14 @@ export function deputyChief(store: Store, policy: Policy, mutedMints?: string[])
       policy,
       mutedMints,
     });
-    if (decision.action === "approve") {
-      approveOpportunity(store, opp.id, "chief");
-      logs.push(`chief-deputy approved #${opp.id} ${opp.ticker}: ${decision.why}`);
-      continue;
-    }
     if (decision.action === "skip") {
       markOpportunitySkipped(store, opp.id);
-      logs.push(`chief-deputy skipped #${opp.id} ${opp.ticker}: ${decision.why}`);
+      logs.push(`chief skipped #${opp.id} ${opp.ticker}: ${decision.why}`);
       continue;
     }
-    logs.push(`chief-deputy held #${opp.id} ${opp.ticker} for Taskra: ${decision.why}`);
+    logs.push(
+      `chief: #${opp.id} ${opp.ticker} waiting for Taskra / Chief / Grok Bot / team — desk does not auto-approve or trade`,
+    );
   }
   return logs;
 }

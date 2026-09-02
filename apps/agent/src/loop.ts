@@ -110,7 +110,7 @@ export class AgentRuntime {
     await Promise.all([scout, sentinel, scholar]);
     logs.push(...scoutLogs, ...sentinelLogs, ...scholarLogs);
     const muted = sources.mute.filter((m) => m.type === "mint").map((m) => m.value);
-    this.crew.start("chief", "deputy approvals for routine chances");
+    this.crew.start("chief", "waiting for Taskra / Chief / Grok Bot / team — desk does not trade");
     logs.push(...deputyChief(this.store, this.policy, muted));
     this.crew.idle("auditor", auditorPulseDetail(this.store));
     this.crew.idle("chief", chiefChancePulse(this.store, logs.length));
@@ -385,6 +385,7 @@ export class AgentRuntime {
         connection: conn,
         keypair: this.keypair,
         pumpApiKey: this.cfg.pumpApiKey,
+        autoDesk: true,
       });
       logs.push(msg);
       if (msg.startsWith("closed") || msg.startsWith("returned") || msg.startsWith("trimmed")) {

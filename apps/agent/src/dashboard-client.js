@@ -151,7 +151,7 @@ async function renderHome() {
   $("page-home").innerHTML =
     "<h1>Desk</h1>" +
     '<div class="banner">' + pill(d.mode) + " master=" + esc(String(d.masterEnabled)) +
-    " · Sentinel live exits need MASTER · Scout never live-buys · Chief deputized for routine APPROVE when you're away</div>" +
+    " · Desk never auto-trades · Only Taskra, Chief, Grok Bot, and invited team decide</div>" +
     masterCardHtml(d) +
     grokAsksHtml(d) +
     gemsHtml(d) +
@@ -254,8 +254,8 @@ function masterCardHtml(d) {
   return (
     '<div class="card"><h2 style="margin-top:0">MASTER</h2>' +
     "<p>" + (on
-      ? "MASTER on: Sentinel can live-exit. Scout never live-buys — names queue for Chief APPROVE. Grok Bot live buy needs chief:APPROVE in the body."
-      : "MASTER off. Auto live buys and live exits are halted. Only Grok Bot (Bearer invite token) can place buy and sell, and live buys still need Chief APPROVE.") +
+      ? "MASTER on is only a flag. The night loop still never buys or sells. Grok Bot live buy needs chief:APPROVE."
+      : "MASTER off. The desk never initiates a trade. Only Grok Bot (Bearer) can place buy and sell after Taskra, Chief, or invited team Approve.") +
     "</p>" +
     (on
       ? '<button class="danger" id="killMaster" style="width:100%">Kill MASTER</button>'
@@ -520,7 +520,7 @@ async function renderTrade() {
   $("page-trade").innerHTML =
     "<h1>Trade</h1>" +
     '<div class="banner">' + pill(d.mode) +
-    " Only Grok Bot (Bearer invite token) can place buy/sell. Scout never live-buys. Live buy needs Chief APPROVE. Sentinel live exits need MASTER.</div>" +
+    " Only Grok Bot (Bearer invite token) can place buy/sell. The desk never auto-trades. Live buy needs an Approve from Taskra, Chief, or invited team.</div>" +
     '<div class="card"><label>Mint address</label><input id="buyMint" placeholder="Solana mint"/>' +
     '<label>Size (SOL)</label><input id="buySol" type="number" step="0.001" min="0.001" value="0.1"/>' +
     (String(d.mode) === "LIVE"

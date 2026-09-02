@@ -22,7 +22,7 @@ describe("chief chances", () => {
     const text = chiefChanceNotice("opportunity #9 FONE: queued for Chief APPROVE then Grok Bot buy 0.05 SOL");
     expect(text).toMatch(/stay on the same page/);
     expect(text).toMatch(/cryptogrokbot\.com/);
-    expect(text).toMatch(/wait for Chief APPROVE/);
+    expect(text).toMatch(/wait for an Approve/);
     expect(text).not.toMatch(/Do not wait for Taskra/);
     expect(chiefChanceNotice("opportunity #9 FONE grade A: queued", { grade: "A" })).toMatch(
       /URGENT Grade A — Chief, tell Taskra right away/i,
@@ -62,7 +62,7 @@ describe("chief chances", () => {
     expect(chiefChancePulse(db, 3)).toMatch(/1 chance\(s\) on Home: OPEN/);
     expect(payload.opportunities[0]?.chiefMayApprove).toBe(true);
     expect(payload.opportunities[0]?.letter).toBe("C");
-    expect(payload.mandate.chiefDeputy).toBe(true);
+    expect(payload.mandate.chiefDeputy).toBe(false);
     expect(payload.mandate.pingTaskra).toMatch(/Grade A and B/);
   });
 });

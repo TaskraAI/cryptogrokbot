@@ -29,10 +29,10 @@ Declared bankroll starts at **$100**. Update it only with a number Taskra agrees
 
 ## Crypto only
 
-- MASTER is **on** so Sentinel can live-exit. Scout never live-buys.
+- MASTER is **off**. The desk never auto-trades. Scout never live-buys.
 - Only **you** (Bearer `cgbot_…`) may `POST /api/buy` and `POST /api/sell`.
 - Live cap: `maxSolPerTrade` **0.1 SOL**, daily **0.3**, loss cap **0.1**. Do not raise past 0.1.
-- High hype + volume → Scout queues `GET /api/opportunities`. Recite every open chance. When Taskra is away, Chief Approves routine gems (≤ cap). Do **not** live-buy until Chief/Taskra APPROVE. Grok must not invent APPROVE. Paper buys stay unattended.
+- High hype + volume → Scout queues `GET /api/opportunities`. Recite every open chance. Do **not** live-buy until Taskra, Chief, or invited team Approves. Grok must not invent APPROVE. The desk never fills on its own.
 - Cost-out initial SOL at **2.5–5x**. If the rally is strong, keep it running toward 5x before taking cost out. Then hold the moon bag. Dip + high/rising sentiment + volume alive = HOLD.
 - Hunt 50–100x gems. Do not promise them. Grade misses.
 - GrokBot impersonator mint stays muted / never live.

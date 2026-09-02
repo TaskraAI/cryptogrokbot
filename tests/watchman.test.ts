@@ -40,6 +40,33 @@ describe("watchman paper lifecycle", () => {
     expect(getPosition(store, id)?.exit_reason).toBe("hard_stop");
   });
 
+  it("never sends a sell from the night loop even on a hard stop", async () => {
+    const store = memStore();
+    const id = insertPosition(store, {
+      mint: "mintAutoDeskxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      ticker: "HOLD",
+      mode: "LIVE",
+      openedAt: Date.now() - 5_000,
+      entryPriceUsd: 1,
+      principalSol: 0.1,
+      tokensHeld: 100_000,
+      solSpent: 0.1,
+      sourcesJson: "[]",
+      entryMetricsJson: "{}",
+    });
+    const row = getPosition(store, id)!;
+    const msg = await managePosition({
+      store,
+      row,
+      snap: snap({ priceUsd: 0.7, pctFromEntry: -30, pctFromPeak: -30 }),
+      policy: DEFAULT_POLICY,
+      flags: { mode: "LIVE", masterEnabled: true, rpcHealthy: true, jupiterHealthy: true, telegramHealthy: false },
+      autoDesk: true,
+    });
+    expect(msg).toMatch(/auto-desk does not trade/);
+    expect(getPosition(store, id)?.status).toBe("open");
+  });
+
   it("sells only a slice to return principal and leaves a runner", async () => {
     const store = memStore();
     const id = insertPosition(store, {

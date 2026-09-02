@@ -204,7 +204,7 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     id: "live-fail-closed",
     ok,
     detail: ok
-      ? "LIVE auto desk: Scout never live-buys; live /api/buy needs Chief APPROVE; Sentinel live exits need MASTER+wallet; Grok Bot Bearer only; dashboard kill; size cap"
+      ? "LIVE desk: never auto-trades; live /api/buy needs Chief APPROVE; Grok Bot Bearer only; dashboard kill; size cap"
       : "live fail-closed invariants missing",
   };
 }
