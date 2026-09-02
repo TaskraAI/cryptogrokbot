@@ -8,6 +8,19 @@ let page = "home";
 let cache = {};
 let lastHomeFp = "";
 
+function friendlyError(text, status) {
+  const raw = String(text || "");
+  if (/no tunnel here/i.test(raw) || /<html/i.test(raw) || /<h1>/i.test(raw)) {
+    return "Desk is reconnecting. Wait a few seconds and tap Log in again.";
+  }
+  if (status === 502 || status === 503 || status === 530) {
+    return "Desk is reconnecting. Wait a few seconds and tap Log in again.";
+  }
+  const stripped = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  if (!stripped || stripped.length > 160) return "Login failed. Try again.";
+  return stripped;
+}
+
 async function api(path, opts = {}) {
   const res = await fetch(path, {
     credentials: "same-origin",
@@ -18,7 +31,7 @@ async function api(path, opts = {}) {
   let data = {};
   try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
   if (!res.ok) {
-    const err = new Error(data.error || res.statusText || "request failed");
+    const err = new Error(friendlyError(data.error || text, res.status));
     err.status = res.status;
     err.data = data;
     throw err;

@@ -197,6 +197,10 @@ describe("dashboard auth and paper API", () => {
     expect(js).toContain("renderIntel");
     expect(js).toContain('new RegExp("/invite/');
     expect(js).not.toMatch(/match\(\/\/invite/);
+    expect(js).toContain("function friendlyError");
+    expect(js).toContain("Desk is reconnecting. Wait a few seconds and tap Log in again.");
+    expect(js).toContain("no tunnel here");
+    expect(html).toContain("Grok Bot / AI invite — no 2FA");
     expect(() => new Function(js)).not.toThrow();
     const head = await fetch(`${url}/`, { method: "HEAD" });
     expect(head.status).toBe(200);

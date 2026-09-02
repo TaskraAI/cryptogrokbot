@@ -5,6 +5,11 @@ const REDIRECT_HOSTS = new Set([
   "app.cryptogrokbot.com",
 ]);
 
+const TUNNEL_DOWN_JSON = JSON.stringify({
+  ok: false,
+  error: "Desk is reconnecting. Wait a few seconds and try again.",
+});
+
 /** Patch origin HTML so a hung/broken login script cannot leave a blank page. */
 export function repairDashboardHtml(html) {
   return html
@@ -13,6 +18,52 @@ export function repairDashboardHtml(html) {
       "raw.match(//invite/([^/?#]+)/)",
       'raw.match(new RegExp("/invite/([^/?#]+)"))',
     );
+}
+
+/** localhost.run / ngrok HTML must never be shown as a login error. */
+export function looksLikeTunnelHtml(text) {
+  const t = String(text || "");
+  return (
+    /no tunnel here/i.test(t) ||
+    /tunnel.*not found/i.test(t) ||
+    /ngrok/i.test(t) ||
+    /<h1>/i.test(t)
+  );
+}
+
+function sanitizeOriginResponse(incoming, originRes, body) {
+  const path = incoming.pathname;
+  const text = typeof body === "string" ? body : "";
+  const isApi = path.startsWith("/api/");
+  const html = originRes.headers.get("content-type") || "";
+  const originLooksHtml = /html/i.test(html) || looksLikeTunnelHtml(text);
+  if (isApi && (originRes.status >= 500 || originLooksHtml) && (originLooksHtml || looksLikeTunnelHtml(text) || originRes.status === 503)) {
+    return new Response(TUNNEL_DOWN_JSON, {
+      status: 502,
+      headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+  if (originRes.status === 503 && looksLikeTunnelHtml(text)) {
+    if (isApi || path === "/health") {
+      return new Response(TUNNEL_DOWN_JSON, {
+        status: 502,
+        headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+      });
+    }
+    return new Response(
+      "<!doctype html><html><head><meta charset=utf-8><title>CryptoGrokBot</title></head><body style=\"font-family:system-ui;background:#07111d;color:#e8eef7;padding:2rem\"><h1>Desk is reconnecting</h1><p>Wait a few seconds and refresh.</p></body></html>",
+      { status: 502, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } },
+    );
+  }
+  const headers = new Headers(originRes.headers);
+  if (html.includes("text/html") && text) {
+    const repaired = repairDashboardHtml(text);
+    if (repaired !== text) {
+      headers.delete("content-length");
+      return new Response(repaired, { status: originRes.status, headers });
+    }
+  }
+  return new Response(body, { status: originRes.status, headers });
 }
 
 export default {
@@ -29,40 +80,45 @@ export default {
     if (!origin) {
       return new Response("origin not configured", { status: 502, headers: { "content-type": "text/plain" } });
     }
+
     const target = new URL(incoming.pathname + incoming.search, origin);
     const headers = new Headers(request.headers);
-    // Forwarding Host: cryptogrokbot.com to a trycloudflare/tunnel origin makes
-    // Cloudflare look up that host as the origin and return 530 Origin DNS error.
-    for (const name of [
-      "host",
-      "cf-connecting-ip",
-      "cf-ipcountry",
-      "cf-ray",
-      "cf-visitor",
-      "cf-ew-via",
-      "cf-worker",
-      "cdn-loop",
-    ]) {
-      headers.delete(name);
-    }
-    headers.set("x-forwarded-host", incoming.host);
-    headers.set("x-forwarded-proto", "https");
-    const init = { method: request.method, headers, redirect: "manual" };
+    headers.delete("host");
+    headers.delete("cf-connecting-ip");
+    headers.delete("cf-ipcountry");
+    headers.delete("cf-ray");
+    headers.delete("cf-visitor");
+    headers.delete("cdn-loop");
+    headers.delete("x-forwarded-proto");
+    headers.delete("x-real-ip");
+    const init = {
+      method: request.method,
+      headers,
+      redirect: "manual",
+    };
     if (request.method !== "GET" && request.method !== "HEAD") {
       init.body = request.body;
     }
+
+    let originRes;
     try {
-      const res = await fetch(target, init);
-      const ct = res.headers.get("content-type") || "";
-      if (request.method === "GET" && res.ok && ct.includes("text/html")) {
-        const html = repairDashboardHtml(await res.text());
-        const out = new Headers(res.headers);
-        out.delete("content-length");
-        return new Response(html, { status: res.status, statusText: res.statusText, headers: out });
-      }
-      return res;
+      originRes = await fetch(target.toString(), init);
     } catch {
+      if (incoming.pathname.startsWith("/api/")) {
+        return new Response(TUNNEL_DOWN_JSON, {
+          status: 502,
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+        });
+      }
       return new Response("origin unreachable", { status: 502, headers: { "content-type": "text/plain" } });
     }
+
+    const body = await originRes.arrayBuffer();
+    const ctype = originRes.headers.get("content-type") || "";
+    if (ctype.includes("text/html") || incoming.pathname.startsWith("/api/") || incoming.pathname === "/health") {
+      const text = new TextDecoder().decode(body);
+      return sanitizeOriginResponse(incoming, originRes, text);
+    }
+    return new Response(body, { status: originRes.status, headers: originRes.headers });
   },
 };

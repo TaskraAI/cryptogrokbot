@@ -173,6 +173,8 @@ describe("intel desks", () => {
     expect(js).toContain("Chief must APPROVE");
     expect(js).toContain("data-action=\"approve\"");
     expect(js).toContain("Polymarket stays off until you say it is time");
+    expect(js).toContain("function friendlyError");
+    expect(js).toContain("Desk is reconnecting. Wait a few seconds and tap Log in again.");
     expect(() => new Function(js)).not.toThrow();
   });
 

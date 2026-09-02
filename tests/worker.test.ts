@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error worker module is plain JavaScript
-import { repairDashboardHtml } from "../workers/cryptogrokbot.js";
+import { looksLikeTunnelHtml, repairDashboardHtml } from "../workers/cryptogrokbot.js";
 
 describe("cryptogrokbot worker HTML repair", () => {
   it("unhides login and repairs the broken invite regex so the page is not blank", () => {
@@ -14,5 +14,12 @@ describe("cryptogrokbot worker HTML repair", () => {
     expect(fixed).toContain('raw.match(new RegExp("/invite/([^/?#]+)"))');
     expect(fixed).not.toContain("match(//invite");
     expect(() => new Function(fixed.slice(fixed.indexOf("<script>") + 8, fixed.indexOf("</script>")))).not.toThrow();
+  });
+});
+
+describe("tunnel HTML must not leak into login errors", () => {
+  it("detects localhost.run 503 pages", () => {
+    expect(looksLikeTunnelHtml("<h1>no tunnel here :(</h1>")).toBe(true);
+    expect(looksLikeTunnelHtml('{"ok":false,"error":"Invalid email or password."}')).toBe(false);
   });
 });
