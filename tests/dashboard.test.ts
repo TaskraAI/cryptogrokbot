@@ -125,7 +125,7 @@ async function completeLogin(
   url: string,
   password: string,
   email: string,
-  codes: string[],
+  _codes?: string[],
 ): Promise<string> {
   const login = await fetch(`${url}/api/login`, {
     method: "POST",
@@ -133,20 +133,9 @@ async function completeLogin(
     body: JSON.stringify({ email, password }),
   });
   expect(login.status).toBe(200);
-  const body = (await login.json()) as { step?: string; ok?: boolean };
   const jar = cookiesOf(login);
-  if (body.ok) return jar;
-  expect(body.step).toBe("email");
-  const code = codes.at(-1);
-  expect(code).toBeTruthy();
-  const verify = await fetch(`${url}/api/email/verify`, {
-    method: "POST",
-    headers: { "content-type": "application/json", cookie: jar },
-    body: JSON.stringify({ code }),
-  });
-  expect(verify.status).toBe(200);
-  expect(cookiesOf(verify)).toMatch(/cg_dash=/);
-  return cookiesOf(verify);
+  expect(jar).toMatch(/cg_dash=/);
+  return jar;
 }
 
 describe("dashboard auth and paper API", () => {
@@ -175,7 +164,7 @@ describe("dashboard auth and paper API", () => {
     expect(res.status).toBe(401);
   });
 
-  it("serves an email + password + email-code login page", async () => {
+  it("serves an email + password login page with Grok Bot invite (no 2FA)", async () => {
     const { server, url } = await startCtx(tmp());
     servers.push(server);
     const res = await fetch(`${url}/`);
@@ -184,13 +173,13 @@ describe("dashboard auth and paper API", () => {
     expect(html).toContain('id="email"');
     expect(html).toContain('value="hello@taskra.ai"');
     expect(html).toContain('id="pw"');
-    expect(html).toContain("Email code");
+    expect(html).not.toContain("Email code");
     expect(html).toContain("Join with invite");
     expect(html).toContain("Log in");
     expect(html).toContain('data-page="intel"');
     expect(html).toContain(">Intel<");
     expect(html).toContain('<form id="loginStepCreds">');
-    expect(html).toContain('<form id="loginStepEmail"');
+    expect(html).not.toContain("loginStepEmail");
     expect(html).toContain('type="submit"');
     expect(html).toContain('id="login" class="login"');
     expect(html).not.toContain('id="login" class="login hidden"');
@@ -266,8 +255,8 @@ describe("dashboard auth and paper API", () => {
     expect(((await res.json()) as { error?: string }).error).toBe("Wrong email or password");
   });
 
-  it("login sends an email code then verify sets session", async () => {
-    const { server, url, codes } = await startCtx(tmp(), "pw-mail");
+  it("login with email and password sets a session (no 2FA)", async () => {
+    const { server, url } = await startCtx(tmp(), "pw-mail");
     servers.push(server);
     const first = await fetch(`${url}/api/login`, {
       method: "POST",
@@ -275,32 +264,22 @@ describe("dashboard auth and paper API", () => {
       body: JSON.stringify({ email: "hello@taskra.ai", password: "pw-mail" }),
     });
     expect(first.status).toBe(200);
-    const body = (await first.json()) as { step?: string; email?: string; secret?: string };
-    expect(body.step).toBe("email");
-    expect(body.email).toBe("hello@taskra.ai");
-    expect(body.secret).toBeUndefined();
-    expect(codes.at(-1)).toMatch(/^\d{6}$/);
-    expect(cookiesOf(first)).toMatch(/cg_pending=/);
-    const session = await fetch(`${url}/api/session`, { headers: { cookie: cookiesOf(first) } });
-    expect(session.status).toBe(401);
-    const bad = await fetch(`${url}/api/email/verify`, {
+    const body = (await first.json()) as { ok?: boolean; step?: string; twoFactor?: string };
+    expect(body.ok).toBe(true);
+    expect(body.step).toBeUndefined();
+    expect(body.twoFactor).toBe("off");
+    expect(cookiesOf(first)).toMatch(/cg_dash=/);
+    const me = await fetch(`${url}/api/session`, { headers: { cookie: cookiesOf(first) } });
+    expect(me.status).toBe(200);
+    const meBody = (await me.json()) as { email?: string; twoFactor?: string };
+    expect(meBody.email).toBe("hello@taskra.ai");
+    expect(meBody.twoFactor).toBe("off");
+    const gone = await fetch(`${url}/api/email/verify`, {
       method: "POST",
       headers: { "content-type": "application/json", cookie: cookiesOf(first) },
       body: JSON.stringify({ code: "000000" }),
     });
-    expect(bad.status).toBe(401);
-    const done = await fetch(`${url}/api/email/verify`, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie: cookiesOf(first) },
-      body: JSON.stringify({ code: codes.at(-1) }),
-    });
-    expect(done.status).toBe(200);
-    expect(cookiesOf(done)).toMatch(/cg_dash=/);
-    const me = await fetch(`${url}/api/session`, { headers: { cookie: cookiesOf(done) } });
-    expect(me.status).toBe(200);
-    const meBody = (await me.json()) as { email?: string; twoFactor?: string };
-    expect(meBody.email).toBe("hello@taskra.ai");
-    expect(meBody.twoFactor).toBe("email");
+    expect(gone.status).toBe(410);
   });
 
   it("does not set Secure on HTTP cookies even when dashboardSecureCookie is true", async () => {
@@ -317,7 +296,7 @@ describe("dashboard auth and paper API", () => {
       typeof first.headers.getSetCookie === "function"
         ? first.headers.getSetCookie()
         : [first.headers.get("set-cookie") ?? ""];
-    expect(cookies.join("\n")).toMatch(/cg_pending=/);
+    expect(cookies.join("\n")).toMatch(/cg_dash=/);
     for (const cookie of cookies.filter(Boolean)) {
       const attrs = cookie.split(";").slice(1).join(";").toLowerCase();
       expect(attrs).not.toContain("secure");
@@ -340,7 +319,7 @@ describe("dashboard auth and paper API", () => {
       typeof first.headers.getSetCookie === "function"
         ? first.headers.getSetCookie().join("\n")
         : (first.headers.get("set-cookie") ?? "");
-    expect(raw).toMatch(/cg_pending=/);
+    expect(raw).toMatch(/cg_dash=/);
     expect(raw).toMatch(/Secure/);
   });
 
@@ -378,7 +357,7 @@ describe("dashboard auth and paper API", () => {
     expect(cookiesOf(viaPost)).toMatch(/cg_dash=/);
   });
 
-  it("invited email can log in with email verification and no owner password", async () => {
+  it("invited email joins with the invite URL (no 2FA code)", async () => {
     const { server, url, codes } = await startCtx(tmp(), "pw-owner");
     servers.push(server);
     const cookie = await completeLogin(url, "pw-owner", "hello@taskra.ai", codes);
@@ -388,20 +367,18 @@ describe("dashboard auth and paper API", () => {
       body: JSON.stringify({ kind: "human", email: "ops@taskra.ai" }),
     });
     expect(invited.status).toBe(200);
+    const grant = (await invited.json()) as { token?: string; url?: string };
+    const viaUrl = await fetch(grant.url!, { redirect: "manual" });
+    expect(viaUrl.status).toBe(302);
+    expect(cookiesOf(viaUrl)).toMatch(/cg_dash=/);
     const guest = await fetch(`${url}/api/login`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: "ops@taskra.ai", password: "" }),
     });
     expect(guest.status).toBe(200);
-    expect(((await guest.json()) as { step?: string }).step).toBe("email");
-    const verify = await fetch(`${url}/api/email/verify`, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie: cookiesOf(guest) },
-      body: JSON.stringify({ code: codes.at(-1) }),
-    });
-    expect(verify.status).toBe(200);
-    expect(cookiesOf(verify)).toMatch(/cg_dash=/);
+    expect(((await guest.json()) as { ok?: boolean }).ok).toBe(true);
+    expect(cookiesOf(guest)).toMatch(/cg_dash=/);
   });
 
   it("logs in, paper-buys via Grok Bot Bearer, and never returns a wallet secret", async () => {
@@ -481,7 +458,7 @@ describe("dashboard auth and paper API", () => {
     const html = await page.text();
     expect(html).toMatch(/bottom: 0/);
     expect(html).toMatch(/type="email"/);
-    expect(html).toMatch(/Email code/);
+    expect(html).not.toMatch(/Email code/);
     const health = await fetch(`${url}/health`);
     expect(health.status).toBe(200);
     expect(JSON.stringify(await health.json())).not.toMatch(/cfat_|WALLET_SECRET/);

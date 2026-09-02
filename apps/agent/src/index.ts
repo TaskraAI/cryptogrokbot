@@ -36,7 +36,7 @@ async function main(): Promise<void> {
     console.log("Dashboard login: DASHBOARD_PASSWORD is set (not printed)");
   }
   console.log(`Dashboard login email: ${em.email}`);
-  console.log("Dashboard 2FA: email verification code (authenticator not required)");
+  console.log("Dashboard login: email + password (no 2FA). Grok Bot uses an invite token or Bearer.");
 
   const dash: DashboardContext = {
     store,

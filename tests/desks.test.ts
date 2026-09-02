@@ -108,7 +108,7 @@ function cookiesOf(res: Response): string {
     .join("; ");
 }
 
-async function completeLogin(url: string, password: string, email: string, codes: string[]): Promise<string> {
+async function completeLogin(url: string, password: string, email: string, _codes: string[]): Promise<string> {
   const login = await fetch(`${url}/api/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -116,15 +116,8 @@ async function completeLogin(url: string, password: string, email: string, codes
   });
   expect(login.status).toBe(200);
   const jar = cookiesOf(login);
-  const code = codes.at(-1);
-  expect(code).toBeTruthy();
-  const verify = await fetch(`${url}/api/email/verify`, {
-    method: "POST",
-    headers: { "content-type": "application/json", cookie: jar },
-    body: JSON.stringify({ code }),
-  });
-  expect(verify.status).toBe(200);
-  return cookiesOf(verify);
+  expect(jar).toMatch(/cg_dash=/);
+  return jar;
 }
 
 describe("intel desks", () => {

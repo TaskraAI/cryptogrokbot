@@ -94,20 +94,11 @@ export function dashboardHtml(opts?: { ownerEmail?: string }): string {
     <input id="pw" name="password" type="password" autocomplete="current-password" />
     <p id="loginErr" class="bad"></p>
     <button id="loginBtn" type="submit" style="width:100%;margin-top:12px">Log in</button>
-    <p class="muted" style="margin-top:20px">Grok Bot invite</p>
+    <p class="muted" style="margin-top:20px">Grok Bot / AI invite — no 2FA</p>
     <label for="inviteToken">Invite token or URL</label>
     <input id="inviteToken" name="invite" autocomplete="off" placeholder="cgbot_… or https://…/invite/…" />
     <p id="inviteErr" class="bad"></p>
     <button id="inviteBtn" type="button" class="ghost" style="width:100%;margin-top:8px">Join with invite</button>
-  </form>
-  <form id="loginStepEmail" class="hidden">
-    <p class="muted">Enter the 6-digit code sent to <b id="emailTo"></b>.</p>
-    <p class="mint hidden" id="devCodeBox"></p>
-    <label for="emailCode">Email code</label>
-    <input id="emailCode" name="emailCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" />
-    <p id="emailErr" class="bad"></p>
-    <button id="emailBtn" type="submit" style="width:100%;margin-top:12px">Verify email</button>
-    <button id="emailBack" type="button" class="ghost" style="width:100%;margin-top:8px">Back</button>
   </form>
 </div>
 <div id="app" class="hidden">

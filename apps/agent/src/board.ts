@@ -41,17 +41,11 @@ import {
   clearPendingCookieHeader,
   clearSessionCookieHeader,
   emailsEqual,
-  hashEmailCode,
-  makeEmailCode,
   parseCookies,
   passwordsEqual,
-  PENDING_COOKIE,
-  pendingCookieHeader,
   SESSION_COOKIE,
   sessionCookieHeader,
-  signPending,
   signSession,
-  verifyPending,
   verifySession,
 } from "./auth.ts";
 import {
@@ -66,7 +60,7 @@ import {
   revokeGrant,
   type AccessKind,
 } from "./access.ts";
-import { sendLoginCode, type SendCodeFn } from "./mail.ts";
+import type { SendCodeFn } from "./mail.ts";
 import { addWallet, listPublicWallets, removeWallet } from "./wallets.ts";
 import { auditorPulseDetail, runAuditorScan } from "./auditor.ts";
 import { getDesk, lastDeskMeta, lastDeskRun, listDesks, runDeskAnalysis } from "./desks.ts";
@@ -190,17 +184,6 @@ function redirectAliasHost(
   res.writeHead(301, { location: loc, "cache-control": "no-store" });
   res.end();
   return true;
-}
-
-async function deliverCode(ctx: DashboardContext, to: string, code: string) {
-  if (ctx.sendCode) return ctx.sendCode(to, code);
-  return sendLoginCode({
-    to,
-    code,
-    resendKey: ctx.cfg.resendApiKey,
-    telegramToken: ctx.cfg.telegramToken,
-    telegramChatId: ctx.cfg.telegramChatId,
-  });
 }
 
 async function readBody(req: IncomingMessage, limit = 256_000): Promise<string> {
@@ -373,50 +356,18 @@ export async function handleDashboardRequest(
       json(res, 401, { error: "Wrong email or password" });
       return;
     }
-    const code = makeEmailCode();
-    const extra = `${hashEmailCode(code, ctx.password)}|${loginEmail}`;
-    const token = signPending(ctx.password, "email", extra);
-    const sent = await deliverCode(ctx, loginEmail, code);
     const secure = isSecure(req, ctx.cfg);
-    json(
-      res,
-      200,
-      {
-        ok: false,
-        step: "email",
-        email: loginEmail,
-        sent: sent.delivered,
-        via: sent.via,
-        ...(sent.delivered ? {} : { devCode: code }),
-      },
-      [pendingCookieHeader(token, secure), clearSessionCookieHeader(secure)],
-    );
+    const session = signSession(ctx.password);
+    json(res, 200, { ok: true, email: loginEmail, twoFactor: "off" }, [
+      sessionCookieHeader(session, secure),
+      clearPendingCookieHeader(secure),
+    ]);
     return;
   }
 
   if (path === "/api/email/verify" && method === "POST") {
-    let body: Record<string, unknown> = {};
-    try {
-      body = await readJson(req);
-    } catch {
-      json(res, 400, { error: "invalid json" });
-      return;
-    }
-    const pending = parseCookies(req.headers.cookie)[PENDING_COOKIE] ?? "";
-    const checked = verifyPending(pending, ctx.password, "email");
-    if (!checked.ok || !checked.extra) {
-      json(res, 401, { error: "Email code expired — log in again" });
-      return;
-    }
-    const [wantHash] = checked.extra.split("|");
-    const got = hashEmailCode(str(body.code), ctx.password);
-    if (!wantHash || !passwordsEqual(got, wantHash)) {
-      json(res, 401, { error: "Wrong email code" });
-      return;
-    }
-    const secure = isSecure(req, ctx.cfg);
-    const session = signSession(ctx.password);
-    json(res, 200, { ok: true }, [sessionCookieHeader(session, secure), clearPendingCookieHeader(secure)]);
+    await readBody(req).catch(() => "");
+    json(res, 410, { error: "2FA is off — log in with email and password, or a Grok Bot invite token" });
     return;
   }
 
@@ -493,7 +444,7 @@ async function routeAuthed(
       masterEnabled: flags.masterEnabled,
       host: ctx.cfg.dashboardHost,
       email: ctx.email,
-      twoFactor: "email",
+      twoFactor: "off",
       actor: actor?.kind ?? null,
       canPlaceOrders,
     });

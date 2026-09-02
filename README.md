@@ -15,12 +15,11 @@ npm test
 npm run agent                 # dashboard + night loop; http://127.0.0.1:8787/
 ```
 
-Open the URL on your phone or desktop. Log in with **email + password + email verification**.
+Open the URL on your phone or desktop. Log in with **email + password** (no 2FA).
 
 - Email: `DASHBOARD_EMAIL` (default `hello@taskra.ai` if unset; stored in gitignored `data/.dashboard-email`)
 - Password: `DASHBOARD_PASSWORD`, or a one-time generated value in `data/.dashboard-password`
-- Email code: after password, a 6-digit code is sent to that inbox (`RESEND_API_KEY` optional). If email sending is not configured, the code is printed in the agent log and shown on the login screen.
-- Grok Bot: after you log in, Home → **Invite Grok Bot** gives a URL/token. The bot opens `/invite/<token>` or pastes the token on the login screen. Bearer `Authorization: Bearer cgbot_…` also works for `/api/*`.
+- Grok Bot / AI: Home → **Invite Grok Bot** gives a URL/token. The bot opens `/invite/<token>` or pastes the token on the login screen — no email code. Bearer `Authorization: Bearer cgbot_…` also works for `/api/*`.
 - Intel: after login, open **Intel** (or Home → Open Intel). Eight desks — X sentiment, early gems, project eval, whales, entry/exit timing, narratives, portfolio, scam radar. Set `XAI_API_KEY` for live Grok + X search; without it each desk still returns a grounded framework. Research only — they do not override hard stops or the HOLD rule.
 - Rung challenge: Home card + `GET /api/challenge`. $100 → $5,000 → $10,000 then ~2x to $1,000,000 on **Solana only** (Grok Bot Bearer). Polymarket stays off until enabled. Not a promise. Live size stays at `maxSolPerTrade`.
 
@@ -56,7 +55,7 @@ On the durable host:
 
 1. Run `npm run agent` and `cloudflared tunnel run` with the named tunnel `cryptogrokbot-dashboard`.
 2. Set `DASHBOARD_SECURE_COOKIE=true` behind HTTPS. Set `DASHBOARD_EMAIL` and `DASHBOARD_PASSWORD` in `.env` on that host only.
-3. Login uses email verification. Invite Grok Bot from the Home Access card.
+3. Login is email + password (no 2FA). Invite Grok Bot from the Home Access card.
 
 `CLOUDFLARE_API_TOKEN` is used to look up the zone / manage the tunnel and Worker. Never commit it. Placeholders are in `.env.example`.
 
@@ -130,7 +129,7 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 - Live buy runs a Jupiter sell-sim first. Freeze / guardrails / `/never` rules are hard denies.
 - LLM cannot disable a hard stop or sell through a `healthy_dip`.
 - Unauthenticated mutating API calls return 401. Owner session cannot buy/sell (403). Only Grok Bot Bearer places orders. The old open crew board is behind the same login.
-- Dashboard login is email + password + TOTP 2FA. Wallet secrets are never returned after save. Default bind is localhost.
+- Dashboard login is email + password (no 2FA). Grok Bot / AI use an invite token or Bearer. Wallet secrets are never returned after save. Default bind is localhost.
 - Auditor (6th crew agent) records scans in SQLite: paper default, secrets not in git, live fail-closed (Grok Bot-only orders, dashboard kill, size cap, extra budget off, localhost bind).
 
 ## Telegram

@@ -166,17 +166,10 @@ describe("challenge dashboard API", () => {
       .filter(Boolean)
       .map((c) => c.split(";")[0]!)
       .join("; ");
-    const verify = await fetch(`${url}/api/email/verify`, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie: cookies },
-      body: JSON.stringify({ code: codes.at(-1) }),
-    });
-    const jar = (verify.headers.getSetCookie?.() ?? [verify.headers.get("set-cookie") ?? ""])
-      .filter(Boolean)
-      .map((c) => c.split(";")[0]!)
-      .join("; ");
+    expect(login.status).toBe(200);
+    expect(cookies).toMatch(/cg_dash=/);
 
-    const chal = await fetch(`${url}/api/challenge`, { headers: { cookie: jar } });
+    const chal = await fetch(`${url}/api/challenge`, { headers: { cookie: cookies } });
     expect(chal.status).toBe(200);
     const body = (await chal.json()) as {
       bankrollUsd: number;
@@ -194,7 +187,7 @@ describe("challenge dashboard API", () => {
 
     const idea = await fetch(`${url}/api/challenge/ideas`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie: jar },
+      headers: { "content-type": "application/json", cookie: cookies },
       body: JSON.stringify({
         venue: "solana",
         title: "Paper BONK clip inside 0.05 SOL",
@@ -210,14 +203,14 @@ describe("challenge dashboard API", () => {
     expect(saved.idea.venue).toBe("solana");
     const patch = await fetch(`${url}/api/challenge/ideas/${saved.idea.id}`, {
       method: "PATCH",
-      headers: { "content-type": "application/json", cookie: jar },
+      headers: { "content-type": "application/json", cookie: cookies },
       body: JSON.stringify({ status: "killed" }),
     });
     expect(patch.status).toBe(200);
 
     const pmIdea = await fetch(`${url}/api/challenge/ideas`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie: jar },
+      headers: { "content-type": "application/json", cookie: cookies },
       body: JSON.stringify({
         venue: "polymarket",
         title: "Will Bitcoin reach $100k in August?",
@@ -231,11 +224,11 @@ describe("challenge dashboard API", () => {
     expect(pmIdea.status).toBe(400);
     expect(((await pmIdea.json()) as { error: string }).error).toMatch(/crypto only/i);
 
-    const pmApi = await fetch(`${url}/api/polymarket`, { headers: { cookie: jar } });
+    const pmApi = await fetch(`${url}/api/polymarket`, { headers: { cookie: cookies } });
     expect(pmApi.status).toBe(403);
     expect(((await pmApi.json()) as { error: string; events: unknown[] }).events).toEqual([]);
 
-    const desks = await fetch(`${url}/api/desks`, { headers: { cookie: jar } });
+    const desks = await fetch(`${url}/api/desks`, { headers: { cookie: cookies } });
     expect(desks.status).toBe(200);
     const deskIds = ((await desks.json()) as { desks: { id: string }[] }).desks.map((d) => d.id);
     expect(deskIds).not.toContain("polymarket");
@@ -247,7 +240,7 @@ describe("challenge dashboard API", () => {
     setBankrollUsd(store, 120);
     const bank = await fetch(`${url}/api/challenge`, {
       method: "POST",
-      headers: { "content-type": "application/json", cookie: jar },
+      headers: { "content-type": "application/json", cookie: cookies },
       body: JSON.stringify({ bankrollUsd: 120 }),
     });
     expect(bank.status).toBe(200);

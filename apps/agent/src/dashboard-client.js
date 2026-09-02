@@ -38,53 +38,22 @@ function go(name) {
 document.querySelectorAll(".nav button").forEach((b) => b.addEventListener("click", () => go(b.dataset.page)));
 
 $("loginStepCreds").addEventListener("submit", (e) => { e.preventDefault(); login(); });
-$("loginStepEmail").addEventListener("submit", (e) => { e.preventDefault(); verifyEmailStep(); });
-$("emailBack").addEventListener("click", () => showLoginStep("creds"));
 $("inviteBtn").addEventListener("click", joinInvite);
 $("inviteToken").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); joinInvite(); }
 });
 
-function showLoginStep(step) {
-  $("loginStepCreds").classList.toggle("hidden", step !== "creds");
-  $("loginStepEmail").classList.toggle("hidden", step !== "email");
-}
-
 async function login() {
   $("loginErr").textContent = "";
   try {
-    const data = await api("/api/login", {
+    await api("/api/login", {
       method: "POST",
       body: JSON.stringify({ email: $("email").value, password: $("pw").value }),
     });
     $("pw").value = "";
-    if (data.step === "email") {
-      $("emailTo").textContent = data.email || $("email").value;
-      if (data.devCode) {
-        $("devCodeBox").classList.remove("hidden");
-        $("devCodeBox").textContent = "Code (email sending not configured): " + data.devCode;
-      } else {
-        $("devCodeBox").classList.add("hidden");
-        $("devCodeBox").textContent = "";
-      }
-      showLoginStep("email");
-      $("emailCode").focus();
-      return;
-    }
     showApp();
   } catch (e) {
     $("loginErr").textContent = e.message || "login failed";
-  }
-}
-
-async function verifyEmailStep() {
-  $("emailErr").textContent = "";
-  try {
-    await api("/api/email/verify", { method: "POST", body: JSON.stringify({ code: $("emailCode").value }) });
-    $("emailCode").value = "";
-    showApp();
-  } catch (e) {
-    $("emailErr").textContent = e.message || "email verify failed";
   }
 }
 
@@ -115,7 +84,6 @@ async function showApp() {
 function showLogin() {
   $("app").classList.add("hidden");
   $("login").classList.remove("hidden");
-  showLoginStep("creds");
 }
 
 function esc(s) {
@@ -187,7 +155,7 @@ async function renderHome() {
     '<div class="card"><h2 style="margin-top:0">Intel</h2><p class="muted">Eight Grok desks: X sentiment, gems, project eval, whales, timing, narratives, portfolio, scam radar.</p>' +
     '<button id="goIntel" style="width:100%">Open Intel</button></div>' +
     '<div class="card" id="accessCard"><h2 style="margin-top:0">Access</h2>' +
-    "<p class='muted'>Owner: " + esc(d.email || "") + " · email verification</p>" +
+    "<p class='muted'>Owner: " + esc(d.email || "") + " · password login, no 2FA. Grok Bot uses an invite token.</p>" +
     '<button id="inviteGrok" style="width:100%">Invite Grok Bot</button>' +
     '<label style="margin-top:12px">Invite by email</label>' +
     '<div class="row"><input id="inviteEmail" type="email" placeholder="teammate@email"/><button class="ghost" id="inviteHuman">Send invite</button></div>' +
