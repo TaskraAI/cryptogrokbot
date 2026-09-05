@@ -11,6 +11,11 @@ while true; do
     sleep 15
     continue
   fi
+  if [[ ! -f .env ]]; then
+    echo "waiting for gitignored .env (WALLET_SECRET_KEY) before starting the agent" >&2
+    sleep 10
+    continue
+  fi
   echo "agent :8787 down; starting npm run agent" >&2
   unset MODE MASTER_ENABLED WALLET_SECRET_KEY
   set -a

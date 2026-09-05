@@ -5,6 +5,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p data
+if [[ ! -f .env ]]; then
+  echo "NOTE: .env missing — agent will wait. Drop it here to sign (MASTER_ENABLED=false)."
+fi
+if [[ ! -s /tmp/cf-api.token ]]; then
+  echo "NOTE: /tmp/cf-api.token missing — public site stays 502 until the token file exists."
+fi
 SESSION_AGENT=dashboard-paper
 SESSION_ORIGIN=cf-origin-watch
 TMUX=(tmux -f /exec-daemon/tmux.portal.conf)
