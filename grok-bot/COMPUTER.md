@@ -9,8 +9,9 @@ git clone https://github.com/TaskraAI/CryptoTrading.git
 cd CryptoTrading
 git checkout cursor/solana-meme-night-agent-1f38   # until PR #1 is merged
 npm install
-test -f .env || cp .env.example .env
+test -f .env || bash scripts/prepare-restore.sh
 # Taskra fills secrets in .env. Never invent keys. Never set LIVE/MASTER.
+# Fresh disk (no .env / no /tmp/cf-api.token): see RESTORE.md, then desk-status + bring-origin-back.
 MODE=PAPER npm run agent
 ```
 
@@ -45,3 +46,13 @@ Empty `x_accounts` is fine. Paper auto-entry uses the `watchlist:` mints in `con
 
 Grok Bot sign-in ≠ `XAI_API_KEY`.  
 `/research` and LLM theses need a key from https://console.x.ai in `.env` on this computer.
+
+## Fresh disk / origin:down
+
+Git never stores `.env`, `/tmp/cf-api.token`, or `data/`. A new Agent Computer does not inherit the last one.
+
+1. Taskra drops secrets on **this** box (secure secret card or local editor). Never paste them in chat. Guide: [`RESTORE.md`](RESTORE.md).
+2. `bash scripts/desk-status.sh` — env present, wallet SET if you need live signs, cf api token present.
+3. `bash scripts/bring-origin-back.sh` — public health must be LIVE, not `"origin":"down"`.
+
+Chief must not invent `WALLET_SECRET_KEY`, a Cloudflare token, or `chief:APPROVE`.

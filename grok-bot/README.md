@@ -70,6 +70,8 @@ Optional: give each a distinct emoji / color in Edit Profile so the group chat i
 
 Open **Chief**. Paste the entire contents of `first-tasks/bring-up-paper.md`.
 
+If the public site is `origin:down` / 502 (fresh disk), paste `first-tasks/restore-desk.md` instead and follow [`RESTORE.md`](RESTORE.md).
+
 That task: clone → `npm install` → `MODE=PAPER npm run agent` → screenshot the terminal and open `http://127.0.0.1:8787/`.
 
 **Do not** paste `LIVE`, `MASTER_ENABLED=true`, or any private key into Grok Bot unless you later decide to fund a dedicated hot wallet. Paper is the demo.
@@ -99,6 +101,8 @@ Turn the routine **off** if you are not watching. Grok Bot computer sessions are
 | `.env` **on the Agent Computer** after clone (see `../.env.example`) | Private keys, Telegram bot token, RPC keys in **Edit Profile** text (that text can be shared / logged) |
 | `XAI_API_KEY` in `.env` so **Grok** can call `/research` | `MASTER_ENABLED=true` until you have graded paper fills |
 
+Fresh disk (no `.env`, no `/tmp/cf-api.token`): follow [`RESTORE.md`](RESTORE.md). Path A = copy the last Agent Computer files. Path B = rebuild from Phantom / Cloudflare / dashboards. Never paste values in chat. Then `bash scripts/desk-status.sh` and `bash scripts/bring-origin-back.sh`.
+
 Grok Bot **cannot** reach `localhost` MCP on your Mac. The agent in this repo is started **on Grok Bot’s cloud computer**, which is the right place.
 
 ---
@@ -109,3 +113,4 @@ Grok Bot **cannot** reach `localhost` MCP on your Mac. The agent in this repo is
 - **Board blank**: wait one tick, or `npm run agent -- --once` then refresh `/crew.json`.
 - **Grok says no API key**: add `XAI_API_KEY` to `.env` on the computer (xAI console, not the Grok Bot login).
 - **Two agents fighting**: `pkill -f "apps/agent"` then start one process only.
+- **cryptogrokbot.com origin:down / 502**: secrets are not on **this** disk. [`RESTORE.md`](RESTORE.md) then `bring-origin-back.sh`.

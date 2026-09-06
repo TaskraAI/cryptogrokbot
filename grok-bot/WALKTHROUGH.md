@@ -72,7 +72,7 @@ If clone returns 404, the plugin did not get that repo.
 | (none for Solana RPC) | Put `HELIUS_RPC_URL` in `.env` via the **secure secret card**, never in chat |
 | Telegram | Not a substitute for `TELEGRAM_BOT_TOKEN` in `.env` |
 
-Never paste wallet keys, Telegram tokens, or API keys into a Bot chat. Use Grok Bot’s **secure secret card**, then have Chief write them into `/workspace/CryptoTrading/.env` on the **Agent Computer**.
+Never paste wallet keys, Telegram tokens, or API keys into a Bot chat. Use Grok Bot’s **secure secret card**, then have Chief write them into `/workspace/CryptoTrading/.env` (and the Cloudflare token into `/tmp/cf-api.token`) on the **Agent Computer**. After a fresh disk, follow [`RESTORE.md`](RESTORE.md) — tell Chief only “secrets are on the card / on disk.”
 
 ### A7. What this does *not* connect
 
@@ -290,5 +290,6 @@ Expect: Home **Rung challenge** card, `GET /api/challenge` playbook. Crypto only
 | Two agents fighting | `@Chief pkill -f apps/agent` then start one |
 | Grok cannot research | `XAI_API_KEY` in `.env` via secret card |
 | Scout idle | Fill `config/sources.yaml` |
+| Public site `origin:down` / 502 | Secrets missing on **this** disk. [`RESTORE.md`](RESTORE.md) then `bash scripts/bring-origin-back.sh` |
 
 Computer broken: **Settings → Beta → Recover Agent Computer** before Reset. Clone again if `/workspace` was wiped.

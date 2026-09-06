@@ -96,3 +96,11 @@ Buy hype+volume yourself. Cost-out 2.5–5x then moon bag.
 @Chief I will add XAI_API_KEY via the secure secret card. Write it only into /workspace/CryptoTrading/.env.
 Do not echo the value. Restart the paper agent after.
 ```
+
+**Fresh disk / origin:down** (never paste secret values)
+
+```
+@Chief secrets are on the card. Write WALLET_SECRET_KEY and the other .env lines into /workspace/.env
+(MASTER_ENABLED=false). Write the Cloudflare token into /tmp/cf-api.token (chmod 0600).
+Do not echo values. Follow grok-bot/RESTORE.md then bash scripts/bring-origin-back.sh.
+```

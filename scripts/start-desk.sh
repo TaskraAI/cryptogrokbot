@@ -6,7 +6,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p data
 if [[ ! -f .env ]]; then
-  echo "NOTE: .env missing — agent will wait. Drop it here to sign (MASTER_ENABLED=false)."
+  echo "NOTE: .env missing — seeding skeleton via prepare-restore.sh (no wallet key written)."
+  bash scripts/prepare-restore.sh || true
+fi
+if [[ ! -s /tmp/cf-api.token ]]; then
+  bash scripts/sync-cf-token-from-env.sh || true
+fi
+if [[ ! -f .env ]]; then
+  echo "NOTE: .env missing — agent will wait. See grok-bot/RESTORE.md."
 fi
 if [[ ! -s /tmp/cf-api.token ]]; then
   echo "NOTE: /tmp/cf-api.token missing — public site stays 502 until the token file exists."

@@ -7,7 +7,7 @@ Clone my private GitHub repo TaskraAI/CryptoTrading. Checkout branch `cursor/sol
 Then on this Agent Computer:
 
 1. `npm install`
-2. Copy `.env.example` to `.env` if needed. Leave MODE=PAPER. Do **not** set MASTER_ENABLED or LIVE. Do **not** create a wallet.
+2. `bash scripts/prepare-restore.sh` if `.env` is missing (or copy `.env.example`). Leave MODE=PAPER. Do **not** set MASTER_ENABLED or LIVE. Do **not** create a wallet. Fresh-disk secrets: see `grok-bot/RESTORE.md`.
 3. Start `MODE=PAPER npm run agent` and keep it running.
 4. Open the browser to `http://127.0.0.1:8787/` and show me the crew board (Chief, Scout, Sentinel, Grok, Scholar ticking).
 5. Show me the terminal so I can see the five desks in the log.

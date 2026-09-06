@@ -23,7 +23,35 @@ else
 fi
 say "public body   ${pub_body:-"(empty)"}"
 
-if [[ -f .env ]]; then say "env           present"; else say "env           MISSING  — drop gitignored .env (MASTER_ENABLED=false, WALLET_SECRET_KEY to sign)"; fi
-if [[ -s /tmp/cf-api.token ]]; then say "cf api token  present"; else say "cf api token  MISSING  — write CLOUDFLARE_API_TOKEN to /tmp/cf-api.token (mode 0600)"; fi
+if [[ -f .env ]]; then
+  say "env           present"
+  MODE_LINE=$(grep -E '^MODE=' .env 2>/dev/null | tail -n1 | cut -d= -f2- || true)
+  MASTER_LINE=$(grep -E '^MASTER_ENABLED=' .env 2>/dev/null | tail -n1 | cut -d= -f2- || true)
+  BIND_LINE=$(grep -E '^DASHBOARD_BIND=' .env 2>/dev/null | tail -n1 | cut -d= -f2- || true)
+  HOST_LINE=$(grep -E '^DASHBOARD_HOST=' .env 2>/dev/null | tail -n1 | cut -d= -f2- || true)
+  EMAIL_LINE=$(grep -E '^DASHBOARD_EMAIL=' .env 2>/dev/null | tail -n1 | cut -d= -f2- || true)
+  if grep -qE '^WALLET_SECRET_KEY=.+' .env 2>/dev/null; then
+    WALLET_LINE=SET
+  else
+    WALLET_LINE=EMPTY
+  fi
+  say "  MODE        ${MODE_LINE:-unset}"
+  say "  MASTER      ${MASTER_LINE:-unset}  (must stay false)"
+  say "  wallet      $WALLET_LINE  (never printed)"
+  say "  bind/host   ${BIND_LINE:-unset} / ${HOST_LINE:-unset}"
+  say "  email       ${EMAIL_LINE:-unset}"
+else
+  say "env           MISSING  — see grok-bot/RESTORE.md (Path A or B)"
+fi
+if [[ -s /tmp/cf-api.token ]]; then say "cf api token  present"; else say "cf api token  MISSING  — see grok-bot/RESTORE.md (Workers Edit token, mode 0600)"; fi
 if [[ -x /tmp/cloudflared ]] || command -v cloudflared >/dev/null; then say "cloudflared   present"; else say "cloudflared   MISSING"; fi
-if [[ -d data ]]; then say "data/         present"; else say "data/         MISSING  — fresh book; old sqlite did not survive this disk"; fi
+if [[ -d data ]]; then
+  if [[ -f data/night-agent.db || -f data/dashboard-access.json || -f data/.dashboard-password ]]; then
+    say "data/         present (book or password file on this disk)"
+  else
+    say "data/         empty  — fresh book; re-invite Grok Bot after login"
+  fi
+else
+  say "data/         MISSING  — fresh book; old sqlite did not survive this disk"
+fi
+say "restore guide grok-bot/RESTORE.md"
