@@ -11,10 +11,10 @@ let lastHomeFp = "";
 function friendlyError(text, status) {
   const raw = String(text || "");
   if (/no tunnel here/i.test(raw) || /<html/i.test(raw) || /<h1>/i.test(raw)) {
-    return "Desk is reconnecting. Wait a few seconds and tap Log in again.";
+    return "Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.";
   }
   if (status === 502 || status === 503 || status === 530) {
-    return "Desk is reconnecting. Wait a few seconds and tap Log in again.";
+    return "Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.";
   }
   const stripped = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   if (!stripped || stripped.length > 160) return "Login failed. Try again.";
@@ -59,6 +59,11 @@ $("inviteToken").addEventListener("keydown", (e) => {
 async function login() {
   $("loginErr").textContent = "";
   try {
+    const health = await fetch("/health", { cache: "no-store" }).then((r) => r.json()).catch(() => ({}));
+    if (health && health.origin === "down") {
+      $("loginErr").textContent = "Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.";
+      return;
+    }
     await api("/api/login", {
       method: "POST",
       body: JSON.stringify({ email: $("email").value, password: $("pw").value }),

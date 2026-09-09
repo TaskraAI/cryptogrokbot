@@ -29,6 +29,8 @@ describe("fallback desk page stays up when the origin is down", () => {
     const html = fallbackDeskHtml();
     expect(html).toContain("Auto-trade is off");
     expect(html).toContain("MASTER is killed");
+    expect(html).toContain("originLive");
+    expect(html).toContain("Desk host is offline");
     expect(html).toContain("Grok Bot / AI invite — no 2FA");
     expect(html).toContain("function friendlyError");
     expect(html).toContain("hello@taskra.ai");

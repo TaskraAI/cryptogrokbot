@@ -5,9 +5,12 @@ const REDIRECT_HOSTS = new Set([
   "app.cryptogrokbot.com",
 ]);
 
+const HOST_OFFLINE =
+  "Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.";
+
 const TUNNEL_DOWN_JSON = JSON.stringify({
   ok: false,
-  error: "Desk is reconnecting. Wait a few seconds and try again.",
+  error: HOST_OFFLINE,
 });
 
 const ORIGIN_DOWN_HEALTH = JSON.stringify({
@@ -66,7 +69,7 @@ export function fallbackDeskHtml() {
 <div class="login">
   <h1>CryptoGrokBot</h1>
   <p class="muted">cryptogrokbot.com</p>
-  <div class="banner"><span class="ok">Auto-trade is off.</span> MASTER is killed. The desk never buys or sells on its own. Only Taskra, Chief, Grok Bot, and invited team decide trades. This page stays up even while the origin reconnects.</div>
+  <div class="banner"><span class="ok">Auto-trade is off.</span> MASTER is killed. The desk never buys or sells on its own. Only Taskra, Chief, Grok Bot, and invited team decide trades. <span id="originHint">This Cloud Agent is the origin — login and Grok Bot buys fail while it is offline.</span></div>
   <form id="loginStepCreds">
     <label for="email">Email</label>
     <input id="email" name="email" type="email" autocomplete="username" value="hello@taskra.ai"/>
@@ -85,7 +88,7 @@ export function fallbackDeskHtml() {
 function friendlyError(text, status) {
   var raw = String(text || "");
   if (/no tunnel here/i.test(raw) || /<html/i.test(raw) || /<h1>/i.test(raw) || status === 502 || status === 503 || status === 530) {
-    return "Desk is reconnecting. Wait a few seconds and tap Log in again.";
+    return "Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.";
   }
   var stripped = raw.replace(/<[^>]+>/g, " ").replace(/\\s+/g, " ").trim();
   if (!stripped || stripped.length > 160) return "Login failed. Try again.";
@@ -112,6 +115,27 @@ document.getElementById("loginStepCreds").addEventListener("submit", async funct
     document.getElementById("loginErr").textContent = err.message || "login failed";
   }
 });
+async function originLive() {
+  try {
+    var res = await fetch("/health", { cache: "no-store" });
+    var data = await res.json();
+    return !!(data && data.ok && data.service === "cryptogrokbot-dashboard" && data.origin !== "down");
+  } catch (e) {
+    return false;
+  }
+}
+async function paintOriginHint() {
+  var hint = document.getElementById("originHint");
+  var err = document.getElementById("loginErr");
+  if (await originLive()) {
+    if (hint) hint.textContent = "Desk is back. Tap Log in.";
+    if (err && /host is offline/i.test(err.textContent || "")) err.textContent = "Desk is back. Tap Log in.";
+  } else if (hint) {
+    hint.textContent = "This Cloud Agent is the origin — login and Grok Bot buys fail while it is offline.";
+  }
+}
+paintOriginHint();
+setInterval(paintOriginHint, 5000);
 document.getElementById("inviteBtn").addEventListener("click", async function () {
   document.getElementById("inviteErr").textContent = "";
   var raw = (document.getElementById("inviteToken").value || "").trim();

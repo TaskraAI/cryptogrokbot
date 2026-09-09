@@ -43,7 +43,7 @@ Same file as the last Agent Computer when you still have it. Minimum for the pub
 
 The token needs **Workers Scripts: Edit** on this account (script name `cryptogrokbot`). Zone DNS write is not required.
 
-If `CLOUDFLARE_API_TOKEN` is set in `.env`, `bring-origin-back.sh` copies it to `/tmp/cf-api.token` (never prints it). The named-tunnel sidecar token is re-downloaded from the API; you do not need to find `/tmp/cf-tunnel.token`.
+If `CLOUDFLARE_API_TOKEN` is set in `.env`, `bring-origin-back.sh` copies it to `/tmp/cf-api.token` and `data/.cf-api.token` (never prints it). The durable copy survives a `/tmp` wipe on the same disk. The named-tunnel sidecar token is re-downloaded from the API; you do not need to find `/tmp/cf-tunnel.token`.
 
 ### 3. Optional old `data/`
 

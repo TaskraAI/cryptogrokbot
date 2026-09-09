@@ -174,7 +174,7 @@ describe("intel desks", () => {
     expect(js).toContain("data-action=\"approve\"");
     expect(js).toContain("Polymarket stays off until you say it is time");
     expect(js).toContain("function friendlyError");
-    expect(js).toContain("Desk is reconnecting. Wait a few seconds and tap Log in again.");
+    expect(js).toContain("Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.");
     expect(() => new Function(js)).not.toThrow();
   });
 

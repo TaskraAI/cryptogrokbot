@@ -66,9 +66,24 @@ def token() -> str:
     env = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
     if env:
         return env
-    path = Path(os.environ.get("CLOUDFLARE_API_TOKEN_FILE", "/tmp/cf-api.token"))
-    if path.is_file():
-        return path.read_text().strip()
+    root = Path(__file__).resolve().parents[1]
+    paths = [
+        Path(os.environ.get("CLOUDFLARE_API_TOKEN_FILE", "/tmp/cf-api.token")),
+        root / "data" / ".cf-api.token",
+        Path("/tmp/cf-api.token"),
+    ]
+    for path in paths:
+        if path.is_file():
+            tok = path.read_text().strip()
+            if tok:
+                return tok
+    env_file = root / ".env"
+    if env_file.is_file():
+        for ln in env_file.read_text().splitlines():
+            if ln.startswith("CLOUDFLARE_API_TOKEN="):
+                tok = ln.split("=", 1)[1].strip().strip("'").strip('"')
+                if tok:
+                    return tok
     raise FileNotFoundError("CLOUDFLARE_API_TOKEN missing")
 
 
@@ -82,7 +97,7 @@ def wait_for_token(interval: float = 10.0) -> str:
         except FileNotFoundError:
             pass
         print(
-            "waiting for CLOUDFLARE_API_TOKEN or /tmp/cf-api.token to publish Worker ORIGIN",
+            "waiting for CLOUDFLARE_API_TOKEN, data/.cf-api.token, or /tmp/cf-api.token to publish Worker ORIGIN",
             flush=True,
         )
         time.sleep(interval)

@@ -43,7 +43,11 @@ if [[ -f .env ]]; then
 else
   say "env           MISSING  — see grok-bot/RESTORE.md (Path A or B)"
 fi
-if [[ -s /tmp/cf-api.token ]]; then say "cf api token  present"; else say "cf api token  MISSING  — see grok-bot/RESTORE.md (Workers Edit token, mode 0600)"; fi
+if [[ -s /tmp/cf-api.token || -s data/.cf-api.token ]]; then
+  say "cf api token  present"
+else
+  say "cf api token  MISSING  — see grok-bot/RESTORE.md (Workers Edit token, mode 0600)"
+fi
 if [[ -x /tmp/cloudflared ]] || command -v cloudflared >/dev/null; then say "cloudflared   present"; else say "cloudflared   MISSING"; fi
 if [[ -d data ]]; then
   if [[ -f data/night-agent.db || -f data/dashboard-access.json || -f data/.dashboard-password ]]; then
