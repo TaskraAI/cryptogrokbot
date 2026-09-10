@@ -1,0 +1,16 @@
+[Unit]
+Description=CryptoGrokBot Cloudflare origin watcher
+After=network-online.target cryptogrokbot-agent.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/cryptogrokbot
+Environment=CLOUDFLARED=/usr/local/bin/cloudflared
+Environment=CLOUDFLARE_API_TOKEN_FILE=/opt/cryptogrokbot/data/.cf-api.token
+ExecStart=/usr/bin/python3 scripts/keep-cf-origin.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

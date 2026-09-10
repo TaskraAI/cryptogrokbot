@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error worker module is plain JavaScript
-import { fallbackDeskHtml, looksLikeTunnelHtml, repairDashboardHtml } from "../workers/cryptogrokbot.js";
+import { fallbackDeskHtml, looksLikeTunnelHtml, repairDashboardHtml, shouldRetryOriginFetch } from "../workers/cryptogrokbot.js";
 
 describe("cryptogrokbot worker HTML repair", () => {
   it("unhides login and repairs the broken invite regex so the page is not blank", () => {
@@ -21,6 +21,16 @@ describe("tunnel HTML must not leak into login errors", () => {
   it("detects localhost.run 503 pages", () => {
     expect(looksLikeTunnelHtml("<h1>no tunnel here :(</h1>")).toBe(true);
     expect(looksLikeTunnelHtml('{"ok":false,"error":"Invalid email or password."}')).toBe(false);
+  });
+});
+
+describe("origin fetch retries", () => {
+  it("retries GET/HEAD tunnel failures and never retries POST", () => {
+    expect(shouldRetryOriginFetch("GET", 503)).toBe(true);
+    expect(shouldRetryOriginFetch("HEAD", 530)).toBe(true);
+    expect(shouldRetryOriginFetch("GET", 200)).toBe(false);
+    expect(shouldRetryOriginFetch("POST", 503)).toBe(false);
+    expect(shouldRetryOriginFetch("POST", 0)).toBe(false);
   });
 });
 

@@ -49,7 +49,7 @@ CLOUDFLARE_API_TOKEN_FILE=/tmp/cf-api.token python3 scripts/keep-cf-origin.py
 
 Run **one** watcher. It attaches Worker custom domains, starts the named tunnel `cryptogrokbot-dashboard` as a sidecar, publishes Worker ORIGIN from localhost.run, and health-checks `https://cryptogrokbot.com/health` with a browser User-Agent. A Worker fallback 200 with `"origin":"down"` is **not** healthy — the watcher recycles the tunnel so Grok Bot can still POST fills overnight. If the API token file is missing, the watcher waits for `/tmp/cf-api.token`. `scripts/start-desk.sh` starts `scripts/keep-agent.sh` (restarts `npm run agent` if :8787 dies) plus that watcher. If the public site says `502 Desk is reconnecting` or `/health` has `"origin":"down"`, this host lost the tunnel (or this is a fresh disk with no `.env` / `/tmp/cf-api.token`). How to get those files (Path A backup or Path B dashboards, never paste secrets in chat): [`grok-bot/RESTORE.md`](grok-bot/RESTORE.md). Then `bash scripts/desk-status.sh` and `bash scripts/bring-origin-back.sh`. Do not treat a fallback 200 as live.
 
-This cloud VM is **not** a 24/7 VPS — run the agent + tunnel on a durable host.
+This cloud VM is **not** a 24/7 VPS — Grok Bot cannot trade while it is asleep. Before live fills, put the desk on a durable host: [`grok-bot/HOSTING.md`](grok-bot/HOSTING.md).
 
 On the durable host:
 

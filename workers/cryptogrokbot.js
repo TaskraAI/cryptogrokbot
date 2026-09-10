@@ -215,6 +215,13 @@ function originDownResponse(incoming) {
   return htmlResponse(fallbackDeskHtml(), 200);
 }
 
+/** GET/HEAD only — never retry POST so a buy/sell cannot fire twice. */
+export function shouldRetryOriginFetch(method, status) {
+  const m = String(method || "GET").toUpperCase();
+  if (m !== "GET" && m !== "HEAD") return false;
+  return !status || status === 502 || status === 503 || status === 530;
+}
+
 function sanitizeOriginResponse(incoming, originRes, body) {
   const path = incoming.pathname;
   const text = typeof body === "string" ? body : "";
@@ -272,10 +279,24 @@ export default {
       init.body = request.body;
     }
 
+    const method = (request.method || "GET").toUpperCase();
+    const tries = method === "GET" || method === "HEAD" ? 3 : 1;
     let originRes;
-    try {
-      originRes = await fetch(target.toString(), init);
-    } catch {
+    let lastFetchErr = null;
+    for (let i = 0; i < tries; i++) {
+      try {
+        originRes = await fetch(target.toString(), init);
+        if (i + 1 < tries && shouldRetryOriginFetch(method, originRes.status)) {
+          continue;
+        }
+        lastFetchErr = null;
+        break;
+      } catch (err) {
+        lastFetchErr = err;
+        if (i + 1 >= tries) break;
+      }
+    }
+    if (!originRes) {
       return originDownResponse(incoming);
     }
 

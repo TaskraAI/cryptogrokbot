@@ -2,6 +2,8 @@
 
 The public site is only a Cloudflare Worker. It can show a login page while the **origin** (this Linux box on port 8787) is missing. Signing and fills need that origin.
 
+A Cloud Agent disk is not 24/7. Restore secrets here to get login working **now**; for overnight trading follow [`HOSTING.md`](HOSTING.md) on a VPS.
+
 Git never stores `.env`, `/tmp/cf-api.token`, or `data/`. A new Cloud Agent disk does not inherit the last one. Chief must not invent `WALLET_SECRET_KEY`, a Cloudflare token, or `chief:APPROVE`.
 
 ```text

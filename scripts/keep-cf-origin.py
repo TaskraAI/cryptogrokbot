@@ -181,15 +181,13 @@ def current_url() -> str:
 
 
 def publish(url: str, *, force: bool = False) -> None:
+    """Point the Worker at `url`. Confirm via public /health, not this VM.
+
+    This VM often 503s localhost.run while Cloudflare can still fetch it.
+    Refusing to publish on a local 503 leaves the Worker on a dead URL.
+    """
     if not url or not url.startswith("https://"):
         print(f"refusing to publish invalid origin {url!r}", flush=True)
-        return
-    ok, code = health_status(url, quiet=True)
-    if not ok:
-        time.sleep(2)
-        ok, code = health_status(url, quiet=True)
-    if not ok:
-        print(f"refusing to publish unhealthy origin {url} HTTP {code}", flush=True)
         return
     last = URL_FILE.read_text().strip() if URL_FILE.is_file() else ""
     if not force and last == url:
@@ -244,9 +242,14 @@ def health_status(url: str, *, quiet: bool = False) -> tuple[bool, int]:
         return False, 0
 
 
-def public_ok(*, quiet: bool = False) -> bool:
-    """This VM often cannot resolve trycloudflare DNS; the Worker can. Use the public host."""
-    return http_health(PUBLIC_HEALTH, quiet=quiet)
+def public_ok(*, quiet: bool = False, attempts: int = 3) -> bool:
+    """Public /health without origin:down. One flap is not a down origin."""
+    for i in range(max(1, attempts)):
+        if http_health(PUBLIC_HEALTH, quiet=quiet):
+            return True
+        if i + 1 < attempts:
+            time.sleep(1)
+    return False
 
 
 def wait_until(pred, timeout: float, interval: float = 2.0) -> bool:
@@ -498,36 +501,37 @@ def lhr_pids() -> list[int]:
     return found
 
 
-def current_lhr_url() -> str:
-    if not LHR_LOG.is_file():
+def current_lhr_url(log: Path | None = None) -> str:
+    path = log or LHR_LOG
+    if not path.is_file():
         return ""
-    found = LHR_RE.findall(LHR_LOG.read_text(errors="replace"))
+    found = LHR_RE.findall(path.read_text(errors="replace"))
     return found[-1] if found else ""
 
 
-def start_lhr(*, replace: bool = False) -> subprocess.Popen[str]:
-    if replace:
-        kill_pids(lhr_pids())
-        LHR_LOG.write_text("")
-    return subprocess.Popen(
+def start_lhr() -> tuple[subprocess.Popen[str], Path]:
+    """Start a new localhost.run SSH. Never kill an existing healthy tunnel."""
+    log = Path(f"/tmp/cf-lhr-{int(time.time())}-{os.getpid()}.log")
+    proc = subprocess.Popen(
         [
             "ssh",
             "-o",
             "StrictHostKeyChecking=accept-new",
             "-o",
-            "ServerAliveInterval=15",
+            "ServerAliveInterval=30",
             "-o",
-            "ServerAliveCountMax=2",
+            "ServerAliveCountMax=6",
             "-o",
             "ExitOnForwardFailure=yes",
             "-R",
             "80:127.0.0.1:8787",
             "nokey@localhost.run",
         ],
-        stdout=open(LHR_LOG, "a"),
+        stdout=open(log, "w"),
         stderr=subprocess.STDOUT,
         text=True,
     )
+    return proc, log
 
 
 def ensure_worker_domains() -> None:
@@ -647,8 +651,8 @@ def monitor_public(proc: subprocess.Popen[str] | None = None, origin_url: str = 
             fails = 0
         else:
             fails += 1
-            print(f"public health miss {fails}/5 HTTP {code}", flush=True)
-            if fails >= 5:
+            print(f"public health miss {fails}/8 HTTP {code}", flush=True)
+            if fails >= 8:
                 print("public site down; recycling origin", flush=True)
                 return
         time.sleep(15)
@@ -682,37 +686,33 @@ def run_lhr_loop() -> None:
         while True:
             prev = url
             print("starting localhost.run origin tunnel", flush=True)
-            incoming = start_lhr(replace=proc is None)
+            incoming, incoming_log = start_lhr()
             next_url = ""
             for _ in range(45):
-                found = current_lhr_url()
+                found = current_lhr_url(incoming_log)
                 if found and found != prev:
                     next_url = found
                     break
                 if incoming.poll() is not None:
                     break
                 time.sleep(1)
-            if next_url:
-                print(f"waiting for origin {next_url}/health", flush=True)
-                if not wait_until(lambda: http_health(next_url, quiet=True), timeout=40, interval=1):
-                    print("origin URL never became healthy; recycling", flush=True)
-                    stop_proc(incoming)
-                else:
-                    try:
-                        publish(next_url, force=True)
-                    except Exception as e:
-                        print(f"origin update error: {e}", flush=True)
-                    print("waiting for https://cryptogrokbot.com/health via localhost.run", flush=True)
-                    if wait_consecutive(lambda: public_ok(quiet=True), need=3, timeout=90, interval=3):
-                        print("cryptogrokbot.com healthy", flush=True)
-                        if proc is not None and proc is not incoming:
-                            stop_proc(proc)
-                        proc = incoming
-                        url = next_url
-                        monitor_public(proc, origin_url=url)
-                        continue
-                    print("public site never became healthy; recycling localhost.run", flush=True)
-                    stop_proc(incoming)
+            if next_url and incoming.poll() is None:
+                print(f"publishing origin {next_url} (confirm via public /health)", flush=True)
+                try:
+                    publish(next_url, force=True)
+                except Exception as e:
+                    print(f"origin update error: {e}", flush=True)
+                print("waiting for https://cryptogrokbot.com/health via localhost.run", flush=True)
+                if wait_until(lambda: public_ok(quiet=True, attempts=2), timeout=60, interval=2):
+                    print("cryptogrokbot.com healthy", flush=True)
+                    if proc is not None and proc is not incoming:
+                        stop_proc(proc)
+                    proc = incoming
+                    url = next_url
+                    monitor_public(proc, origin_url=url)
+                    continue
+                print("public site never became healthy; leaving old tunnel, dropping this one", flush=True)
+                stop_proc(incoming)
             else:
                 stop_proc(incoming)
             print("localhost.run exited; restarting", flush=True)
@@ -769,9 +769,20 @@ def main() -> int:
     ensure_worker_domains()
     start_named_sidecar()
 
-    if public_ok() and lhr_pids():
+    if http_health(NAMED_ORIGIN_URL, quiet=True):
+        print(f"named origin {NAMED_ORIGIN_URL} is reachable; using it as Worker ORIGIN", flush=True)
+        try:
+            publish(NAMED_ORIGIN_URL, force=True)
+        except Exception as e:
+            print(f"named origin publish failed: {e}", flush=True)
+        if public_ok(attempts=5):
+            print("cryptogrokbot.com healthy via named tunnel", flush=True)
+            monitor_public(origin_url=NAMED_ORIGIN_URL)
+
+    if public_ok(attempts=5) and lhr_pids():
         print("public site already healthy; keeping localhost.run origin", flush=True)
-        monitor_public()
+        saved = URL_FILE.read_text().strip() if URL_FILE.is_file() else ""
+        monitor_public(origin_url=saved)
 
     print("using localhost.run as Worker ORIGIN", flush=True)
     run_lhr_loop()

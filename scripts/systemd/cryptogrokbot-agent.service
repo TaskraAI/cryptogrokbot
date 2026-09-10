@@ -1,0 +1,15 @@
+[Unit]
+Description=CryptoGrokBot dashboard (npm run agent on :8787)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/cryptogrokbot
+ExecStart=/usr/bin/bash scripts/keep-agent.sh
+Restart=always
+RestartSec=3
+# Secrets stay in gitignored .env on this disk. Never put them in this unit.
+
+[Install]
+WantedBy=multi-user.target

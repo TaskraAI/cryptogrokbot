@@ -2,6 +2,7 @@
 # Start the cryptogrokbot.com desk on this host: agent on :8787 + origin watcher.
 # Never prints secrets. Put CLOUDFLARE_API_TOKEN in /tmp/cf-api.token (0600) and
 # WALLET_SECRET_KEY in gitignored .env so Grok Bot can sign.
+# Does not kill a healthy watcher or an existing localhost.run tunnel.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p data
@@ -24,19 +25,20 @@ TMUX=(tmux -f /exec-daemon/tmux.portal.conf)
 if ! "${TMUX[@]}" has-session -t "=$SESSION_AGENT" 2>/dev/null; then
   "${TMUX[@]}" new-session -d -s "$SESSION_AGENT" -c "$PWD" -- "${SHELL:-bash}" -l
 fi
-if ! curl -sf --max-time 2 http://127.0.0.1:8787/health >/dev/null; then
-  "${TMUX[@]}" send-keys -t "$SESSION_AGENT:0.0" C-c
-  sleep 1
+agent_loop="$(pgrep -n -f '[b]ash scripts/keep-agent.sh' || true)"
+if [[ -z "$agent_loop" ]]; then
   "${TMUX[@]}" send-keys -t "$SESSION_AGENT:0.0" 'bash scripts/keep-agent.sh' C-m
+else
+  echo "keep-agent already running pid=$agent_loop"
 fi
 if ! "${TMUX[@]}" has-session -t "=$SESSION_ORIGIN" 2>/dev/null; then
   "${TMUX[@]}" new-session -d -s "$SESSION_ORIGIN" -c "$PWD" -- "${SHELL:-bash}" -l
 fi
-# Never C-c a live Python watcher. Stop it by PID, then start a new one.
 watch_pid="$(pgrep -n -f '[p]ython3 scripts/keep-cf-origin.py' || true)"
 if [[ -n "$watch_pid" ]]; then
-  kill "$watch_pid" || true
-  sleep 1
+  echo "origin watcher already running pid=$watch_pid"
+else
+  "${TMUX[@]}" send-keys -t "$SESSION_ORIGIN:0.0" 'CLOUDFLARED=/tmp/cloudflared CLOUDFLARE_API_TOKEN_FILE=/tmp/cf-api.token python3 scripts/keep-cf-origin.py' C-m
 fi
-"${TMUX[@]}" send-keys -t "$SESSION_ORIGIN:0.0" 'CLOUDFLARED=/tmp/cloudflared CLOUDFLARE_API_TOKEN_FILE=/tmp/cf-api.token python3 scripts/keep-cf-origin.py' C-m
 echo "agent :8787 + origin watcher started. Public health is https://cryptogrokbot.com/health"
+echo "This Cloud Agent is not 24/7. See grok-bot/HOSTING.md before live trading."
