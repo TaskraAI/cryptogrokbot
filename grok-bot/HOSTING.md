@@ -25,7 +25,9 @@ Do **not** turn `MASTER` on or go LIVE until the desk runs on a machine that sta
 
 ## What is fragile (hosting)
 
-The Worker cannot fetch `*.cfargotunnel.com` (1102). trycloudflare `--url` from this VM 530s. The API token here **cannot write DNS**, so `origin.cryptogrokbot.com` 1016s.
+The Worker cannot fetch `*.cfargotunnel.com` (1102). trycloudflare `--url` from this VM 530s.
+
+`origin.cryptogrokbot.com` **1033** means the DNS CNAME is on Cloudflare, but **no `cloudflared` connector is online** (or the tunnel has no public hostname for `origin`). 1016 means the CNAME is still missing. Do not point Worker `ORIGIN` at `https://origin.cryptogrokbot.com` until that hostname’s `/health` returns dashboard JSON.
 
 The path that works **while this VM is awake**:
 
@@ -47,13 +49,16 @@ localhost.run hostnames rotate and sometimes 503. The watcher must not kill a tu
    - Target: `1a38795c-af25-4f8c-8dd1-7167da5b673c.cfargotunnel.com`
    - Proxied: on
 
-4. On the VPS, install `cloudflared` and run the named tunnel `cryptogrokbot-dashboard` plus `npm run agent`.
-5. Set Worker `ORIGIN` **once** to `https://origin.cryptogrokbot.com` (the watcher will do this if that hostname’s `/health` is live).
-6. Install the systemd units in `scripts/systemd/` so a reboot brings the desk back.
-7. Re-invite Grok Bot from Home if `data/dashboard-access.json` is new.
-8. External monitor: alert if `https://cryptogrokbot.com/health` contains `"origin":"down"` for more than two minutes.
+4. In Zero Trust → Networks → Tunnels → **cryptogrokbot-dashboard**, add a public hostname:
+   - Hostname: `origin.cryptogrokbot.com`
+   - Service: `http://127.0.0.1:8787`
+5. On the VPS, install `cloudflared` and `cloudflared tunnel run` that named tunnel, plus `npm run agent`. `https://origin.cryptogrokbot.com/health` must return `{"ok":true,"service":"cryptogrokbot-dashboard"}` with **no** `"origin":"down"`. A 1033 page means the connector is still off.
+6. Set Worker `ORIGIN` **once** to `https://origin.cryptogrokbot.com` (the watcher will do this if that hostname’s `/health` is live). Do this only after step 5 is green.
+7. Install the systemd units in `scripts/systemd/` so a reboot brings the desk back.
+8. Re-invite Grok Bot from Home if `data/dashboard-access.json` is new.
+9. External monitor: alert if `https://cryptogrokbot.com/health` contains `"origin":"down"` for more than two minutes.
 
-Until steps 1–6 are done, treat the public desk as **awake-only**. Paper is fine. Live fills are not.
+Until the named origin `/health` is LIVE and Worker ORIGIN points at it, treat the public desk as **awake-only** (localhost.run on this Cloud Agent). Paper is fine. Live fills are not.
 
 ## Commands on whatever host is currently awake
 

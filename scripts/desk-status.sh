@@ -23,6 +23,16 @@ else
 fi
 say "public body   ${pub_body:-"(empty)"}"
 
+named_code="$(curl -sS --max-time 12 -A "$UA" -o /tmp/named-origin.health -w '%{http_code}' https://origin.cryptogrokbot.com/health 2>/dev/null || echo 000)"
+named_body="$(cat /tmp/named-origin.health 2>/dev/null || true)"
+if printf '%s' "$named_body" | grep -q cryptogrokbot-dashboard && ! printf '%s' "$named_body" | grep -q '"origin":"down"'; then
+  say "named origin  LIVE  https://origin.cryptogrokbot.com"
+elif printf '%s' "$named_body" | grep -qE '1033|530|1016'; then
+  say "named origin  DOWN  HTTP $named_code — DNS may exist, but cloudflared is not connected (1033/530). See grok-bot/HOSTING.md"
+else
+  say "named origin  DOWN  HTTP $named_code ${named_body:-(empty)}"
+fi
+
 if [[ -f .env ]]; then
   say "env           present"
   MODE_LINE=$(grep -E '^MODE=' .env 2>/dev/null | tail -n1 | cut -d= -f2- || true)
