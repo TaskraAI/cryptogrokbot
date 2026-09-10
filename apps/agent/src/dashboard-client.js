@@ -144,11 +144,11 @@ async function login() {
   if (btn) btn.disabled = true;
   try {
     let lastErr = "Still connecting. Tap Log in again.";
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 8; i++) {
       const health = await fetch("/health", { cache: "no-store" }).then((r) => r.json()).catch(() => ({}));
       if (health && health.origin === "down") {
         lastErr = "Still connecting. Tap Log in again.";
-        await new Promise((r) => setTimeout(r, 1500));
+        await new Promise((r) => setTimeout(r, 2000));
         continue;
       }
       try {
@@ -162,7 +162,7 @@ async function login() {
       } catch (e) {
         lastErr = e.message || lastErr;
         if (e.status && e.status !== 502 && e.status !== 503 && e.status !== 530) throw e;
-        await new Promise((r) => setTimeout(r, 1500));
+        await new Promise((r) => setTimeout(r, 2000));
       }
     }
     $("loginErr").textContent = lastErr;

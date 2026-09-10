@@ -181,6 +181,16 @@ def current_url() -> str:
 
 
 def publish(url: str, *, force: bool = False) -> None:
+    if not url or not url.startswith("https://"):
+        print(f"refusing to publish invalid origin {url!r}", flush=True)
+        return
+    ok, code = health_status(url, quiet=True)
+    if not ok:
+        time.sleep(2)
+        ok, code = health_status(url, quiet=True)
+    if not ok:
+        print(f"refusing to publish unhealthy origin {url} HTTP {code}", flush=True)
+        return
     last = URL_FILE.read_text().strip() if URL_FILE.is_file() else ""
     if not force and last == url:
         return
@@ -637,11 +647,11 @@ def monitor_public(proc: subprocess.Popen[str] | None = None, origin_url: str = 
             fails = 0
         else:
             fails += 1
-            print(f"public health miss {fails}/3 HTTP {code}", flush=True)
-            if fails >= 3:
+            print(f"public health miss {fails}/5 HTTP {code}", flush=True)
+            if fails >= 5:
                 print("public site down; recycling origin", flush=True)
                 return
-        time.sleep(12)
+        time.sleep(15)
 
 
 def start_named_sidecar() -> None:

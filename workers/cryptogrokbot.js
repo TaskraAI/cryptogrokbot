@@ -112,6 +112,7 @@ async function api(path, opts) {
   try { data = text ? JSON.parse(text) : {}; } catch (e) { data = { error: text }; }
   if (!res.ok) {
     var err = new Error(friendlyError(data.error || text, res.status));
+    err.status = res.status;
     throw err;
   }
   return data;
@@ -127,11 +128,32 @@ function showLoginOnly() {
 document.getElementById("loginStepCreds").addEventListener("submit", async function (e) {
   e.preventDefault();
   document.getElementById("loginErr").textContent = "";
+  var btn = document.getElementById("loginBtn");
+  if (btn) btn.disabled = true;
+  var lastErr = "Still connecting. Tap Log in again.";
   try {
-    await api("/api/login", { method: "POST", body: JSON.stringify({ email: document.getElementById("email").value, password: document.getElementById("pw").value }) });
-    location.reload();
+    for (var i = 0; i < 8; i++) {
+      var health = await fetch("/health", { cache: "no-store" }).then(function (r) { return r.json(); }).catch(function () { return {}; });
+      if (health && health.origin === "down") {
+        lastErr = "Still connecting. Tap Log in again.";
+        await new Promise(function (r) { setTimeout(r, 2000); });
+        continue;
+      }
+      try {
+        await api("/api/login", { method: "POST", body: JSON.stringify({ email: document.getElementById("email").value, password: document.getElementById("pw").value }) });
+        location.reload();
+        return;
+      } catch (err) {
+        lastErr = err.message || lastErr;
+        if (err.status && err.status !== 502 && err.status !== 503 && err.status !== 530) throw err;
+        await new Promise(function (r) { setTimeout(r, 2000); });
+      }
+    }
+    document.getElementById("loginErr").textContent = lastErr;
   } catch (err) {
     document.getElementById("loginErr").textContent = err.message || "login failed";
+  } finally {
+    if (btn) btn.disabled = false;
   }
 });
 document.getElementById("showForgot").addEventListener("click", function (e) { e.preventDefault(); showForgotForm(); });

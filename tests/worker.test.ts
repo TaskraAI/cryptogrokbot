@@ -31,6 +31,8 @@ describe("fallback desk page stays up when the origin is down", () => {
     expect(html).toContain("Forgot password");
     expect(html).toContain("/api/forgot-password");
     expect(html).toContain("function friendlyError");
+    expect(html).toContain("Still connecting. Tap Log in again.");
+    expect(html).toContain("health.origin === \"down\"");
     expect(html).toContain("hello@taskra.ai");
     expect(html).not.toContain("Email code");
     expect(html).not.toContain("Auto-trade is off");

@@ -32,7 +32,11 @@ fi
 if ! "${TMUX[@]}" has-session -t "=$SESSION_ORIGIN" 2>/dev/null; then
   "${TMUX[@]}" new-session -d -s "$SESSION_ORIGIN" -c "$PWD" -- "${SHELL:-bash}" -l
 fi
-"${TMUX[@]}" send-keys -t "$SESSION_ORIGIN:0.0" C-c
-sleep 1
+# Never C-c a live Python watcher. Stop it by PID, then start a new one.
+watch_pid="$(pgrep -n -f '[p]ython3 scripts/keep-cf-origin.py' || true)"
+if [[ -n "$watch_pid" ]]; then
+  kill "$watch_pid" || true
+  sleep 1
+fi
 "${TMUX[@]}" send-keys -t "$SESSION_ORIGIN:0.0" 'CLOUDFLARED=/tmp/cloudflared CLOUDFLARE_API_TOKEN_FILE=/tmp/cf-api.token python3 scripts/keep-cf-origin.py' C-m
 echo "agent :8787 + origin watcher started. Public health is https://cryptogrokbot.com/health"
