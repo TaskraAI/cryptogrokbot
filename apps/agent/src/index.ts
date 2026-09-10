@@ -55,6 +55,7 @@ async function main(): Promise<void> {
         to,
         code,
         resendKey: cfg.resendApiKey,
+        resendFrom: cfg.resendFrom,
         telegramToken: cfg.telegramToken,
         telegramChatId: cfg.telegramChatId,
       }),

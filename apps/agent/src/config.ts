@@ -29,6 +29,7 @@ export interface AppConfig {
   dashboardSecureCookie: boolean;
   allowExtraBudget: boolean;
   resendApiKey: string;
+  resendFrom: string;
   walletSecretsPath: string;
   databasePath: string;
   configDir: string;
@@ -83,6 +84,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     dashboardSecureCookie: resolveDashboardSecureCookie(env, dashboardBind),
     allowExtraBudget: env.ALLOW_EXTRA_BUDGET === "true",
     resendApiKey: env.RESEND_API_KEY ?? "",
+    resendFrom: env.RESEND_FROM?.trim() || "CryptoGrokBot <hello@taskra.ai>",
     walletSecretsPath: resolve(env.WALLET_SECRETS_PATH ?? "./data/wallet-secrets.json"),
     databasePath: resolve(env.DATABASE_PATH ?? "./data/night-agent.db"),
     configDir,

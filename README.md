@@ -107,7 +107,8 @@ Dashboard wallets: add a **label + public key** and optionally a secret. The sec
 | `DASHBOARD_SECURE_COOKIE` | no | auto-on when bind is not loopback; set `true` behind HTTPS |
 | `DASHBOARD_EMAIL` | no | login email (default `hello@taskra.ai`; persisted to `data/.dashboard-email`) |
 | `DASHBOARD_PASSWORD` | no | login; else generated into `data/.dashboard-password` |
-| `RESEND_API_KEY` | no | send login codes by email; else code is logged / shown |
+| `RESEND_API_KEY` | no | password-reset email via Resend; else code is logged |
+| `RESEND_FROM` | no | verified Resend from-address (default `CryptoGrokBot <hello@taskra.ai>`) |
 | `DASHBOARD_HOST` | no | default `cryptogrokbot.com` |
 | `CREW_PORT` | no | dashboard port (default 8787) |
 | `WALLET_SECRETS_PATH` | no | gitignored JSON map of wallet secrets |

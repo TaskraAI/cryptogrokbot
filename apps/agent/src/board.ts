@@ -187,6 +187,7 @@ function sendResetCode(ctx: DashboardContext, to: string, code: string): Promise
     to,
     code,
     resendKey: ctx.cfg.resendApiKey,
+    resendFrom: ctx.cfg.resendFrom,
     telegramToken: ctx.cfg.telegramToken,
     telegramChatId: ctx.cfg.telegramChatId,
   });
