@@ -1,0 +1,525 @@
+import { describe, expect, it } from "vitest";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DEFAULT_POLICY, dayKey } from "@night/shared";
+import { listFills, listOpenPositions, listPendingSizeAsks, listOpenOpportunities, openStore } from "@night/storage";
+import { scoreSentiment } from "@night/tape";
+import { isExplicitGrokBotAdd, parseAddOn, parseChiefApprove, tryEnter } from "../apps/agent/src/entries.ts";
+import { hit, quietHit, token } from "./fixtures.ts";
+
+const paperFlags = {
+  mode: "PAPER" as const,
+  masterEnabled: false,
+  rpcHealthy: true,
+  jupiterHealthy: true,
+  telegramHealthy: false,
+};
+
+const testPolicy = {
+  ...DEFAULT_POLICY,
+  maxSolPerTrade: 0.01,
+  sizeAskCeilingSol: 0.05,
+  dailyBudgetSol: 0.5,
+};
+
+function store() {
+  const dir = join(tmpdir(), `ent-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+  mkdirSync(dir, { recursive: true });
+  return openStore(join(dir, "t.db"));
+}
+
+describe("paper entries", () => {
+  it("records a paper buy when filters pass and sentiment is not high", async () => {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: DEFAULT_POLICY,
+      flags: paperFlags,
+      token: token({ priceUsd: 0.002 }),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+    });
+    expect(msg).toMatch(/^bought #/);
+    expect(msg).toMatch(/PAPER/);
+  });
+
+  it("does not buy live without master even if the score passes", async () => {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: DEFAULT_POLICY,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: false,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+    });
+    expect(msg).toMatch(/MASTER_ENABLED/);
+  });
+
+  it("lets an explicit Grok Bot live order past MASTER when Chief APPROVE is set", async () => {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: DEFAULT_POLICY,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: false,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+    });
+    expect(msg).not.toMatch(/MASTER_ENABLED is off/);
+    expect(msg).not.toMatch(/needs Chief permission/);
+    expect(msg).not.toMatch(/^bought/);
+    expect(msg).toMatch(/honeypot|WALLET_SECRET_KEY|wallet or RPC missing|buy failed/);
+  });
+
+  it("blocks a Grok Bot live order without Chief APPROVE", async () => {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: DEFAULT_POLICY,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: true,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+    });
+    expect(msg).toMatch(/needs Chief permission/);
+    expect(listOpenPositions(db)).toHaveLength(0);
+  });
+
+  it("does not treat CONFIRM as Chief APPROVE", () => {
+    expect(parseChiefApprove("CONFIRM")).toBe(false);
+    expect(parseChiefApprove({ chief: "CONFIRM" })).toBe(false);
+    expect(parseChiefApprove({ chief: "APPROVE" })).toBe(true);
+    expect(parseChiefApprove({ chiefApprove: true })).toBe(true);
+    expect(parseChiefApprove("APPROVE")).toBe(true);
+    expect(parseAddOn({ add: true })).toBe(true);
+    expect(parseAddOn({ addOn: true })).toBe(true);
+    expect(parseAddOn({ mint: "x" })).toBe(false);
+    expect(isExplicitGrokBotAdd({ add: true, grokBotOrder: true, chiefApproved: true })).toBe(true);
+    expect(isExplicitGrokBotAdd({ add: true, grokBotOrder: true })).toBe(false);
+  });
+
+  it("refuses a size above maxSolPerTrade instead of clipping", async () => {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: DEFAULT_POLICY,
+      flags: paperFlags,
+      token: token(),
+      sources: [hit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      sol: 9.9,
+    });
+    expect(msg).toMatch(/maxSolPerTrade/);
+    expect(msg).not.toMatch(/^bought/);
+  });
+});
+
+describe("high-sentiment auto-buy", () => {
+  it("scores the default bullish fixture above the high-sentiment gate", () => {
+    expect(scoreSentiment([hit()])).toBeGreaterThanOrEqual(testPolicy.highSentiment);
+    expect(scoreSentiment([quietHit()])).toBeLessThan(testPolicy.highSentiment);
+  });
+
+  it("buys hype+volume immediately instead of asking Taskra", async () => {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [hit()],
+      guardrails: [],
+      dayKey: dayKey(),
+    });
+    expect(msg).toMatch(/^bought #/);
+    expect(msg).toMatch(/0.01 SOL/);
+    expect(listOpenPositions(db)).toHaveLength(1);
+    expect(listOpenPositions(db)[0]?.cost_out_multiple).toBeGreaterThanOrEqual(2);
+    expect(listPendingSizeAsks(db)).toHaveLength(0);
+  });
+
+  it("still auto-enters at test size when sentiment is not high", async () => {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+    });
+    expect(msg).toMatch(/^bought #/);
+    expect(msg).toMatch(/0.01 SOL/);
+    expect(listPendingSizeAsks(db)).toHaveLength(0);
+  });
+
+  it("queues a Grok Bot opportunity when auto live is MASTER-blocked", async () => {
+    const db = store();
+    const { listOpenOpportunities } = await import("@night/storage");
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: false,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [hit()],
+      guardrails: [],
+      dayKey: dayKey(),
+    });
+    expect(msg).toMatch(/^opportunity #/);
+    expect(msg).toMatch(/Chief APPROVE/);
+    expect(listOpenPositions(db)).toHaveLength(0);
+    expect(listOpenOpportunities(db)).toHaveLength(1);
+    expect(listOpenOpportunities(db)[0]?.ticker).toBe("MEME");
+  });
+
+  it("queues a Grok Bot opportunity when MASTER is on but Scout has no Chief APPROVE", async () => {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: true,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [hit()],
+      guardrails: [],
+      dayKey: dayKey(),
+    });
+    expect(msg).toMatch(/^opportunity #/);
+    expect(msg).toMatch(/Scout never live-buys/);
+    expect(listOpenPositions(db)).toHaveLength(0);
+    expect(listOpenOpportunities(db)).toHaveLength(1);
+    expect(listOpenOpportunities(db)[0]?.chief_approved).toBe(0);
+  });
+
+  it("LIVE Scout still queues when daily budget is exhausted so search continues", async () => {
+    const db = store();
+    const { upsertBudget } = await import("@night/storage");
+    const day = dayKey();
+    upsertBudget(db, {
+      day_key: day,
+      mode: "LIVE",
+      spent_sol: 0.3,
+      trades: 3,
+      realized_loss_sol: 0,
+      last_entry_at: 0,
+      extra_budget_sol: 0,
+    });
+    const msg = await tryEnter({
+      store: db,
+      policy: { ...DEFAULT_POLICY, maxSolPerTrade: 0.1, dailyBudgetSol: 0.3 },
+      flags: {
+        mode: "LIVE",
+        masterEnabled: true,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [hit()],
+      guardrails: [],
+      dayKey: day,
+    });
+    expect(msg).toMatch(/^opportunity #/);
+    expect(msg).toMatch(/Scout keeps searching/);
+    expect(msg).toMatch(/grade [A-F]/);
+    expect(listOpenPositions(db)).toHaveLength(0);
+    expect(listOpenOpportunities(db)).toHaveLength(1);
+  });
+
+  it("fills an explicit keep size-ask when Grok Bot passes sizeAskId", async () => {
+    const db = store();
+    const { insertSizeAsk, answerSizeAsk, getSizeAsk } = await import("@night/storage");
+    const ask = insertSizeAsk(db, {
+      mint: token().mint,
+      ticker: token().ticker,
+      sentiment: 0.77,
+      testSol: 0.01,
+      note: "legacy",
+    });
+    answerSizeAsk(db, ask.id, { status: "keep", chosenSol: 0.01 });
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [hit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      sizeAskId: ask.id,
+    });
+    expect(msg).toMatch(/^bought #/);
+    expect(msg).toMatch(/0.01 SOL/);
+    expect(getSizeAsk(db, ask.id)?.status).toBe("filled");
+  });
+});
+
+describe("explicit Grok Bot add-on", () => {
+  async function openBag() {
+    const db = store();
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+    });
+    expect(msg).toMatch(/^bought #/);
+    const row = listOpenPositions(db)[0]!;
+    expect(row.sol_spent).toBeCloseTo(0.01);
+    return { db, row };
+  }
+
+  it("a second buy without add still returns already-in", async () => {
+    const { db, row } = await openBag();
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+      sol: 0.01,
+    });
+    expect(msg).toBe(`already in ${token().ticker}`);
+    expect(listOpenPositions(db)).toHaveLength(1);
+    expect(listOpenPositions(db)[0]!.id).toBe(row.id);
+    expect(listOpenPositions(db)[0]!.sol_spent).toBeCloseTo(0.01);
+  });
+
+  it("a second buy with add+chief APPROVE+grokBotOrder succeeds and increases the open bag", async () => {
+    const { db, row } = await openBag();
+    const msg = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+      add: true,
+      sol: 0.01,
+    });
+    expect(msg).toMatch(/^bought #/);
+    expect(msg).toMatch(/add/);
+    expect(msg).not.toMatch(/already in/);
+    const open = listOpenPositions(db);
+    expect(open).toHaveLength(1);
+    expect(open[0]!.id).toBe(row.id);
+    expect(open[0]!.sol_spent).toBeCloseTo(0.02);
+    expect(open[0]!.principal_sol).toBeCloseTo(0.02);
+    expect(open[0]!.tokens_held).toBeGreaterThan(row.tokens_held);
+    const fills = listFills(db, row.id);
+    expect(fills.filter((f) => f.side === "buy")).toHaveLength(2);
+    expect(fills.some((f) => f.reason === "add")).toBe(true);
+  });
+
+  it("Scout/auto without those flags still cannot add", async () => {
+    const { db, row } = await openBag();
+    const scout = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: paperFlags,
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      add: true,
+      sol: 0.01,
+    });
+    expect(scout).toBe(`already in ${token().ticker}`);
+    const liveScout = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: true,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      add: true,
+      sol: 0.01,
+    });
+    expect(liveScout).toBe(`already in ${token().ticker}`);
+    const noChief = await tryEnter({
+      store: db,
+      policy: testPolicy,
+      flags: {
+        mode: "LIVE",
+        masterEnabled: false,
+        rpcHealthy: true,
+        jupiterHealthy: true,
+        telegramHealthy: true,
+      },
+      token: token(),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      add: true,
+      sol: 0.01,
+    });
+    expect(noChief).toBe(`already in ${token().ticker}`);
+    expect(listOpenPositions(db)).toHaveLength(1);
+    expect(listOpenPositions(db)[0]!.sol_spent).toBeCloseTo(row.sol_spent);
+  });
+
+  it("add 0.2 with the three flags succeeds when cap is 0.05 and daily spent is 0.05", async () => {
+    const db = store();
+    const tight = {
+      ...DEFAULT_POLICY,
+      maxSolPerTrade: 0.05,
+      sizeAskCeilingSol: 0.05,
+      dailyBudgetSol: 0.05,
+    };
+    const t = token({ mint: "CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump", ticker: "fone" });
+    const first = await tryEnter({
+      store: db,
+      policy: tight,
+      flags: paperFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      sol: 0.05,
+    });
+    expect(first).toMatch(/^bought #/);
+    const before = listOpenPositions(db)[0]!;
+    expect(before.sol_spent).toBeCloseTo(0.05);
+
+    const added = await tryEnter({
+      store: db,
+      policy: tight,
+      flags: paperFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+      add: true,
+      sol: 0.2,
+    });
+    expect(added).toMatch(/^bought #/);
+    expect(added).toMatch(/0.2 SOL add/);
+    expect(added).not.toMatch(/maxSolPerTrade/);
+    expect(added).not.toMatch(/daily budget/);
+    const open = listOpenPositions(db);
+    expect(open).toHaveLength(1);
+    expect(open[0]!.id).toBe(before.id);
+    expect(open[0]!.sol_spent).toBeCloseTo(0.25);
+  });
+
+  it("a 0.2 buy WITHOUT add still refuses oversize / already-in as before", async () => {
+    const db = store();
+    const tight = {
+      ...DEFAULT_POLICY,
+      maxSolPerTrade: 0.05,
+      sizeAskCeilingSol: 0.05,
+      dailyBudgetSol: 0.05,
+    };
+    const t = token({ mint: "CTPoyCwkjMvoJwU4xvZZqoD8tiYk6yDchySiN5gGpump", ticker: "fone" });
+    const oversize = await tryEnter({
+      store: db,
+      policy: tight,
+      flags: paperFlags,
+      token: token({ mint: "FreshOversizeMint1111111111111111111111111", ticker: "NEW" }),
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+      sol: 0.2,
+    });
+    expect(oversize).toMatch(/maxSolPerTrade/);
+    expect(oversize).not.toMatch(/^bought/);
+
+    const first = await tryEnter({
+      store: db,
+      policy: tight,
+      flags: paperFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      sol: 0.05,
+    });
+    expect(first).toMatch(/^bought #/);
+    const noAdd = await tryEnter({
+      store: db,
+      policy: tight,
+      flags: paperFlags,
+      token: t,
+      sources: [quietHit()],
+      guardrails: [],
+      dayKey: dayKey(),
+      grokBotOrder: true,
+      chiefApproved: true,
+      sol: 0.2,
+    });
+    expect(noAdd).toBe("already in fone");
+    expect(listOpenPositions(db)).toHaveLength(1);
+    expect(listOpenPositions(db)[0]!.sol_spent).toBeCloseTo(0.05);
+  });
+});
+
+describe("lessons file", () => {
+  it("appends a lesson", async () => {
+    const { appendLesson, loadLessons } = await import("@night/learning");
+    const path = join(tmpdir(), `les-${Date.now()}.md`);
+    writeFileSync(path, "# Lessons\n");
+    appendLesson(path, "skip dex boost only");
+    expect(loadLessons(path)).toMatch(/skip dex boost only/);
+  });
+});

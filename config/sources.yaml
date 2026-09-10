@@ -1,0 +1,65 @@
+# Starter watchlist — well-known, liquid Solana memes.
+# Edit this file. The night agent (MODE=PAPER by default) may paper-buy a mint
+# listed here when DexScreener or Pump.fun shows a live Solana market AND
+# scoring + config/rules.yaml pass. Real transactions require MODE=LIVE,
+# MASTER_ENABLED=true, and WALLET_SECRET_KEY (dedicated hot wallet only).
+#
+# Add your own coins like this:
+#   - mint: "<Solana mint address>"
+#     ticker: TICKER
+#     weight: trusted    # trusted | watch  (use trusted so one listing is enough)
+#     notes: "why you listed it"
+#
+# Optional: X / Telegram / Discord / RSS below. Those need extra API tokens.
+# Watchlist mints do not need X_BEARER_TOKEN.
+
+watchlist:
+  - mint: DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263
+    ticker: BONK
+    weight: trusted
+    notes: "Bonk — large, liquid Solana meme"
+  - mint: EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm
+    ticker: WIF
+    weight: trusted
+    notes: "dogwifhat (WIF)"
+  - mint: 7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr
+    ticker: POPCAT
+    weight: trusted
+    notes: "POPCAT"
+  - mint: 6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN
+    ticker: TRUMP
+    weight: trusted
+    notes: "Official Trump (TRUMP)"
+
+x_accounts:
+  # - handle: "@example"
+  #   weight: trusted   # trusted | watch
+  #   notes: ""
+
+x_queries:
+  # - query: "pumpfun CA"
+
+telegram:
+  # - name: alpha
+  #   id_or_username: "@yourchannel"
+  #   weight: watch
+
+discord:
+  # - server: your-server
+  #   channel: calls
+  #   weight: watch
+
+sites:
+  # - url: https://api.dexscreener.com/latest/dex/search?q=solana
+  #   type: dexscreener
+  #   notes: trending
+
+wallets:
+  # - address: ""
+  #   action: copy   # copy | ignore | fade
+  #   notes: ""
+
+mute:
+  - type: mint
+    value: GeSfrQiscfsEv4Hx2TKaB9Nfid12qND1YYRYS1vSpump
+    # GrokBot impersonator — paper exception only; never live
