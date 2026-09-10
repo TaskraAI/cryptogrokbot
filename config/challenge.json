@@ -1,0 +1,11 @@
+{
+  "title": "Rung challenge",
+  "startUsd": 100,
+  "goalUsd": 1000000,
+  "rungsUsd": [100, 5000, 10000, 20000, 40000, 80000, 160000, 320000, 640000, 1000000],
+  "polymarketEnabled": false,
+  "venues": [
+    { "id": "solana", "label": "Solana memes (CryptoGrokBot)", "weight": 1 }
+  ],
+  "disclaimer": "Not financial advice. Most 50x paths fail. Survive first. Grok Bot does not promise $1M. Crypto only until Taskra enables Polymarket."
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@night/learning",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@night/shared": "*",
+    "@night/storage": "*"
+  }
+}

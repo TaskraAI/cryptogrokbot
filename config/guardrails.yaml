@@ -1,0 +1,10 @@
+# Hard denies. Sentiment cannot override these.
+# Add via Telegram /never or edit this file.
+
+rules:
+  - id: never-grokbot-impersonator
+    type: mint
+    value: GeSfrQiscfsEv4Hx2TKaB9Nfid12qND1YYRYS1vSpump
+    origin: manual
+    createdAt: 1787698500000
+    note: "LIVE never — impersonator mint; paper exception only"

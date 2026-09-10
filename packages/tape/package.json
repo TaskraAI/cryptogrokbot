@@ -1,0 +1,10 @@
+{
+  "name": "@night/tape",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@night/shared": "*"
+  }
+}

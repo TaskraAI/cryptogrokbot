@@ -1,13 +1,29 @@
 {
-  "name": "cryptotrading",
+  "name": "crypto-trading",
   "private": true,
-  "version": "0.1.0",
+  "type": "module",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w grok-bot-work-farm",
-    "build": "npm run build -w grok-bot-work-farm",
-    "preview": "npm run preview -w grok-bot-work-farm"
+    "agent": "tsx apps/agent/src/index.ts",
+    "dashboard": "tsx apps/agent/src/index.ts",
+    "trade": "tsx apps/agent/src/cli.ts",
+    "dev": "tsx apps/agent/src/index.ts",
+    "farm": "npm run dev -w grok-bot-work-farm",
+    "farm:build": "npm run build -w grok-bot-work-farm",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
   }
 }

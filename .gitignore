@@ -4,3 +4,14 @@ dist
 *.local
 .env
 .env.*
+data
+*.db
+*.sqlite
+coverage
+.turbo
+*.log
+.dashboard-password
+.dashboard-email
+.dashboard-totp
+dashboard-access.json
+wallet-secrets.json

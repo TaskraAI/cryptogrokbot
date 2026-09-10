@@ -1,0 +1,86 @@
+export type MailResult = { delivered: boolean; via: "resend" | "telegram" | "log" };
+
+export type SendCodeFn = (to: string, code: string) => Promise<MailResult>;
+
+export async function sendLoginCode(opts: {
+  to: string;
+  code: string;
+  resendKey?: string;
+  telegramToken?: string;
+  telegramChatId?: string;
+}): Promise<MailResult> {
+  const text = `Your CryptoGrokBot password reset code is ${opts.code}. It expires in 5 minutes.`;
+
+  const key = opts.resendKey?.trim() ?? "";
+  if (key) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${key}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "CryptoGrokBot <login@cryptogrokbot.com>",
+          to: [opts.to],
+          subject: "CryptoGrokBot password reset",
+          text,
+        }),
+      });
+      if (res.ok) return { delivered: true, via: "resend" };
+    } catch {
+      // fall through
+    }
+  }
+
+  const tg = opts.telegramToken?.trim() ?? "";
+  const chat = opts.telegramChatId?.trim() ?? "";
+  if (tg && chat) {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${tg}/sendMessage`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chat_id: chat, text: `CryptoGrokBot reset code for ${opts.to}: ${opts.code}` }),
+      });
+      if (res.ok) return { delivered: true, via: "telegram" };
+    } catch {
+      // fall through
+    }
+  }
+
+  console.log(`Dashboard email code for ${opts.to}: ${opts.code}`);
+  return { delivered: false, via: "log" };
+}
+
+/** Email Chief when a chance queues. Telegram is sent separately by the agent loop. */
+export async function sendDeskAlert(opts: {
+  to: string;
+  subject: string;
+  text: string;
+  resendKey?: string;
+}): Promise<MailResult> {
+  const to = opts.to.trim();
+  const key = opts.resendKey?.trim() ?? "";
+  if (key && to.includes("@")) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${key}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "CryptoGrokBot <login@cryptogrokbot.com>",
+          to: [to],
+          subject: opts.subject.slice(0, 120),
+          text: opts.text.slice(0, 4000),
+        }),
+      });
+      if (res.ok) return { delivered: true, via: "resend" };
+    } catch {
+      // fall through
+    }
+  }
+  console.log(`Desk alert for ${to || "chief"}: ${opts.subject}\n${opts.text}`);
+  return { delivered: false, via: "log" };
+}

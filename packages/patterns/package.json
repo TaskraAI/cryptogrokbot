@@ -1,0 +1,10 @@
+{
+  "name": "@night/patterns",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@night/shared": "*"
+  }
+}
