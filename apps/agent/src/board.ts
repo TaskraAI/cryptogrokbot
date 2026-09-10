@@ -594,6 +594,27 @@ async function routeAuthed(
     return;
   }
 
+  if (path === "/api/farm" && method === "GET") {
+    const flags = ctx.flags();
+    const scan = lastAuditorScan(ctx.store);
+    const chances = chancesPayload(ctx.store, ctx.policy);
+    json(res, 200, {
+      mode: flags.mode,
+      masterEnabled: flags.masterEnabled,
+      pulses: ctx.crew.snapshot().map((p) => ({ ...p, job: CREW_META[p.id]?.job })),
+      log: ctx.crew.recentLog(40),
+      pnl: pnlPayload(ctx.store),
+      positions: listRecentPositions(ctx.store).map(publicPosition),
+      openCount: listOpenPositions(ctx.store).length,
+      opportunities: chances.opportunities ?? [],
+      recentOpportunities: chances.recentOpportunities ?? [],
+      auditor: scan
+        ? { ok: scan.ok === 1, summary: scan.summary, at: scan.at }
+        : null,
+    });
+    return;
+  }
+
   if (path === "/api/home" && method === "GET") {
     const flags = ctx.flags();
     const scan = lastAuditorScan(ctx.store);
