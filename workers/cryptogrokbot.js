@@ -62,14 +62,15 @@ export function fallbackDeskHtml() {
     label { display: block; font-size: 13px; color: #8b93a1; margin: 10px 0 6px; }
     input { width: 100%; min-height: 52px; background: #0b0e13; border: 1px solid #2a3140; border-radius: 12px; padding: 10px 12px; color: inherit; box-sizing: border-box; }
     button { min-height: 52px; border-radius: 12px; border: 0; background: #5eead4; color: #042f2e; font-weight: 700; width: 100%; margin-top: 12px; }
-    .banner { background: #111827; border: 1px solid #2a3140; border-radius: 12px; padding: 10px 12px; font-size: 13px; margin: 8px 0 16px; }
+    button.ghost { background: transparent; color: #eef1f4; border: 1px solid #2a3140; }
+    a { color: #5eead4; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
 <div class="login">
   <h1>CryptoGrokBot</h1>
   <p class="muted">cryptogrokbot.com</p>
-  <div class="banner"><span class="ok">Auto-trade is off.</span> MASTER is killed. The desk never buys or sells on its own. Only Taskra, Chief, Grok Bot, and invited team decide trades. <span id="originHint">This Cloud Agent is the origin — login and Grok Bot buys fail while it is offline.</span></div>
   <form id="loginStepCreds">
     <label for="email">Email</label>
     <input id="email" name="email" type="email" autocomplete="username" value="hello@taskra.ai"/>
@@ -77,11 +78,22 @@ export function fallbackDeskHtml() {
     <input id="pw" name="password" type="password" autocomplete="current-password"/>
     <p id="loginErr" class="bad"></p>
     <button id="loginBtn" type="submit">Log in</button>
-    <p class="muted" style="margin-top:20px">Grok Bot / AI invite — no 2FA</p>
-    <label for="inviteToken">Invite token or URL</label>
-    <input id="inviteToken" name="invite" autocomplete="off" placeholder="cgbot_… or https://…/invite/…"/>
-    <p id="inviteErr" class="bad"></p>
-    <button id="inviteBtn" type="button" style="background:transparent;color:#eef1f4;border:1px solid #2a3140">Join with invite</button>
+    <p style="margin-top:16px;text-align:center"><a href="#forgot" id="showForgot">Forgot password</a></p>
+  </form>
+  <form id="forgotStep" class="hidden">
+    <label for="forgotEmail">Email</label>
+    <input id="forgotEmail" type="email" autocomplete="username" value="hello@taskra.ai"/>
+    <button id="forgotSend" type="button" class="ghost">Send reset code</button>
+    <label for="forgotCode">Reset code</label>
+    <input id="forgotCode" inputmode="numeric" autocomplete="one-time-code"/>
+    <label for="forgotPw">New password</label>
+    <input id="forgotPw" type="password" autocomplete="new-password"/>
+    <label for="forgotPw2">Confirm password</label>
+    <input id="forgotPw2" type="password" autocomplete="new-password"/>
+    <p id="forgotErr" class="bad"></p>
+    <p id="forgotOk" class="ok"></p>
+    <button id="forgotReset" type="submit">Reset password</button>
+    <p style="margin-top:16px;text-align:center"><a href="#login" id="showLoginForm">Back to log in</a></p>
   </form>
 </div>
 <script>
@@ -105,6 +117,14 @@ async function api(path, opts) {
   }
   return data;
 }
+function showForgotForm() {
+  document.getElementById("loginStepCreds").classList.add("hidden");
+  document.getElementById("forgotStep").classList.remove("hidden");
+}
+function showLoginOnly() {
+  document.getElementById("forgotStep").classList.add("hidden");
+  document.getElementById("loginStepCreds").classList.remove("hidden");
+}
 document.getElementById("loginStepCreds").addEventListener("submit", async function (e) {
   e.preventDefault();
   document.getElementById("loginErr").textContent = "";
@@ -115,38 +135,31 @@ document.getElementById("loginStepCreds").addEventListener("submit", async funct
     document.getElementById("loginErr").textContent = err.message || "login failed";
   }
 });
-async function originLive() {
+document.getElementById("showForgot").addEventListener("click", function (e) { e.preventDefault(); showForgotForm(); });
+document.getElementById("showLoginForm").addEventListener("click", function (e) { e.preventDefault(); showLoginOnly(); });
+document.getElementById("forgotSend").addEventListener("click", async function () {
+  document.getElementById("forgotErr").textContent = "";
+  document.getElementById("forgotOk").textContent = "";
   try {
-    var res = await fetch("/health", { cache: "no-store" });
-    var data = await res.json();
-    return !!(data && data.ok && data.service === "cryptogrokbot-dashboard" && data.origin !== "down");
-  } catch (e) {
-    return false;
+    await api("/api/forgot-password", { method: "POST", body: JSON.stringify({ email: document.getElementById("forgotEmail").value }) });
+    document.getElementById("forgotOk").textContent = "If that email is the owner account, we sent a reset code.";
+  } catch (err) {
+    document.getElementById("forgotErr").textContent = err.message || "Could not send a reset code";
   }
-}
-async function paintOriginHint() {
-  var hint = document.getElementById("originHint");
-  var err = document.getElementById("loginErr");
-  if (await originLive()) {
-    if (hint) hint.textContent = "Desk is back. Tap Log in.";
-    if (err && /host is offline/i.test(err.textContent || "")) err.textContent = "Desk is back. Tap Log in.";
-  } else if (hint) {
-    hint.textContent = "This Cloud Agent is the origin — login and Grok Bot buys fail while it is offline.";
-  }
-}
-paintOriginHint();
-setInterval(paintOriginHint, 5000);
-document.getElementById("inviteBtn").addEventListener("click", async function () {
-  document.getElementById("inviteErr").textContent = "";
-  var raw = (document.getElementById("inviteToken").value || "").trim();
-  var m = raw.match(new RegExp("/invite/([^/?#]+)"));
-  if (m) raw = decodeURIComponent(m[1]);
-  if (!raw) { document.getElementById("inviteErr").textContent = "Paste the invite token"; return; }
+});
+document.getElementById("forgotStep").addEventListener("submit", async function (e) {
+  e.preventDefault();
+  document.getElementById("forgotErr").textContent = "";
+  document.getElementById("forgotOk").textContent = "";
+  var next = document.getElementById("forgotPw").value || "";
+  var confirm = document.getElementById("forgotPw2").value || "";
+  if (next.length < 8) { document.getElementById("forgotErr").textContent = "Use at least 8 characters."; return; }
+  if (next !== confirm) { document.getElementById("forgotErr").textContent = "Passwords do not match."; return; }
   try {
-    await api("/api/bot-token", { method: "POST", body: JSON.stringify({ token: raw }) });
+    await api("/api/reset-password", { method: "POST", body: JSON.stringify({ email: document.getElementById("forgotEmail").value, code: document.getElementById("forgotCode").value, password: next }) });
     location.reload();
   } catch (err) {
-    document.getElementById("inviteErr").textContent = err.message || "invite failed";
+    document.getElementById("forgotErr").textContent = err.message || "Reset failed";
   }
 });
 </script>

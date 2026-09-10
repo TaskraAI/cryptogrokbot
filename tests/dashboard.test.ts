@@ -48,6 +48,9 @@ async function startCtx(
     }),
     lessonsPath,
     walletSecretsPath: join(dir, "wallet-secrets.json"),
+    dashboardPasswordFile: join(dir, ".dashboard-password"),
+    dashboardEmailFile: join(dir, ".dashboard-email"),
+    dashboardAccessFile: join(dir, "dashboard-access.json"),
   };
   const crew = new CrewBoard();
   const codes: string[] = [];
@@ -164,7 +167,7 @@ describe("dashboard auth and paper API", () => {
     expect(res.status).toBe(401);
   });
 
-  it("serves an email + password login page with Grok Bot invite (no 2FA)", async () => {
+  it("serves an email + password login page with forgot password", async () => {
     const { server, url } = await startCtx(tmp());
     servers.push(server);
     const res = await fetch(`${url}/`);
@@ -174,8 +177,12 @@ describe("dashboard auth and paper API", () => {
     expect(html).toContain('value="hello@taskra.ai"');
     expect(html).toContain('id="pw"');
     expect(html).not.toContain("Email code");
-    expect(html).toContain("Join with invite");
     expect(html).toContain("Log in");
+    expect(html).toContain("Forgot password");
+    expect(html).toContain('id="forgotStep"');
+    expect(html).not.toContain("Join with invite");
+    expect(html).not.toContain("no 2FA");
+    expect(html).not.toContain("Auto-trade is off");
     expect(html).toContain('data-page="intel"');
     expect(html).toContain(">Intel<");
     expect(html).toContain('<form id="loginStepCreds">');
@@ -201,7 +208,9 @@ describe("dashboard auth and paper API", () => {
     expect(js).toContain("Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.");
     expect(js).toContain("no tunnel here");
     expect(js).toContain("Desk never auto-trades");
-    expect(html).toContain("Grok Bot / AI invite — no 2FA");
+    expect(js).toContain("/api/forgot-password");
+    expect(js).toContain("/api/reset-password");
+    expect(html).not.toContain("Grok Bot / AI invite — no 2FA");
     expect(() => new Function(js)).not.toThrow();
     const head = await fetch(`${url}/`, { method: "HEAD" });
     expect(head.status).toBe(200);
@@ -285,6 +294,53 @@ describe("dashboard auth and paper API", () => {
       body: JSON.stringify({ code: "000000" }),
     });
     expect(gone.status).toBe(410);
+  });
+
+  it("lets the owner reset the password with a emailed code", async () => {
+    const dir = tmp();
+    const { server, url, codes, ctx } = await startCtx(dir, "old-pass-word");
+    servers.push(server);
+    const asked = await fetch(`${url}/api/forgot-password`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "hello@taskra.ai" }),
+    });
+    expect(asked.status).toBe(200);
+    expect(codes.length).toBe(1);
+    const cookie = cookiesOf(asked);
+    expect(cookie).toMatch(/cg_pending=/);
+    const reset = await fetch(`${url}/api/reset-password`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ email: "hello@taskra.ai", code: codes[0], password: "new-pass-word" }),
+    });
+    expect(reset.status).toBe(200);
+    expect(cookiesOf(reset)).toMatch(/cg_dash=/);
+    expect(ctx.password).toBe("new-pass-word");
+    const oldLogin = await fetch(`${url}/api/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "hello@taskra.ai", password: "old-pass-word" }),
+    });
+    expect(oldLogin.status).toBe(401);
+    const nextLogin = await fetch(`${url}/api/login`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "hello@taskra.ai", password: "new-pass-word" }),
+    });
+    expect(nextLogin.status).toBe(200);
+  });
+
+  it("does not reveal whether a forgot-password email exists", async () => {
+    const { server, url, codes } = await startCtx(tmp(), "secret-pass");
+    servers.push(server);
+    const res = await fetch(`${url}/api/forgot-password`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "stranger@example.com" }),
+    });
+    expect(res.status).toBe(200);
+    expect(codes.length).toBe(0);
   });
 
   it("does not set Secure on HTTP cookies even when dashboardSecureCookie is true", async () => {

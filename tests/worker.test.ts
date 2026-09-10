@@ -25,16 +25,17 @@ describe("tunnel HTML must not leak into login errors", () => {
 });
 
 describe("fallback desk page stays up when the origin is down", () => {
-  it("serves a no-2FA login shell that says auto-trade is off", () => {
+  it("serves a login form with forgot password and no extra banners", () => {
     const html = fallbackDeskHtml();
-    expect(html).toContain("Auto-trade is off");
-    expect(html).toContain("MASTER is killed");
-    expect(html).toContain("originLive");
-    expect(html).toContain("Desk host is offline");
-    expect(html).toContain("Grok Bot / AI invite — no 2FA");
+    expect(html).toContain("Log in");
+    expect(html).toContain("Forgot password");
+    expect(html).toContain("/api/forgot-password");
     expect(html).toContain("function friendlyError");
     expect(html).toContain("hello@taskra.ai");
     expect(html).not.toContain("Email code");
+    expect(html).not.toContain("Auto-trade is off");
+    expect(html).not.toContain("no 2FA");
+    expect(html).not.toContain("Grok Bot / AI invite");
     expect(() => new Function(html.slice(html.lastIndexOf("<script>") + 8, html.lastIndexOf("</script>")))).not.toThrow();
   });
 });

@@ -9,7 +9,7 @@ export async function sendLoginCode(opts: {
   telegramToken?: string;
   telegramChatId?: string;
 }): Promise<MailResult> {
-  const text = `Your CryptoGrokBot login code is ${opts.code}. It expires in 5 minutes.`;
+  const text = `Your CryptoGrokBot password reset code is ${opts.code}. It expires in 5 minutes.`;
 
   const key = opts.resendKey?.trim() ?? "";
   if (key) {
@@ -23,7 +23,7 @@ export async function sendLoginCode(opts: {
         body: JSON.stringify({
           from: "CryptoGrokBot <login@cryptogrokbot.com>",
           to: [opts.to],
-          subject: "CryptoGrokBot login code",
+          subject: "CryptoGrokBot password reset",
           text,
         }),
       });
@@ -40,7 +40,7 @@ export async function sendLoginCode(opts: {
       const res = await fetch(`https://api.telegram.org/bot${tg}/sendMessage`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chat_id: chat, text: `CryptoGrokBot email code for ${opts.to}: ${opts.code}` }),
+        body: JSON.stringify({ chat_id: chat, text: `CryptoGrokBot reset code for ${opts.to}: ${opts.code}` }),
       });
       if (res.ok) return { delivered: true, via: "telegram" };
     } catch {

@@ -41,13 +41,21 @@ import {
   clearPendingCookieHeader,
   clearSessionCookieHeader,
   emailsEqual,
+  hashEmailCode,
+  makeEmailCode,
   parseCookies,
   passwordsEqual,
+  persistDashboardPassword,
+  PENDING_COOKIE,
+  pendingCookieHeader,
   SESSION_COOKIE,
   sessionCookieHeader,
+  signPending,
   signSession,
+  verifyPending,
   verifySession,
 } from "./auth.ts";
+import { sendLoginCode, type SendCodeFn } from "./mail.ts";
 import {
   addGrant,
   createGrant,
@@ -60,7 +68,6 @@ import {
   revokeGrant,
   type AccessKind,
 } from "./access.ts";
-import type { SendCodeFn } from "./mail.ts";
 import { addWallet, listPublicWallets, removeWallet } from "./wallets.ts";
 import { auditorPulseDetail, runAuditorScan } from "./auditor.ts";
 import { getDesk, lastDeskMeta, lastDeskRun, listDesks, runDeskAnalysis } from "./desks.ts";
@@ -171,6 +178,19 @@ function incomingHost(req: IncomingMessage): string {
 }
 
 const ALIAS_HOSTS = new Set(["www.cryptogrokbot.com", "dash.cryptogrokbot.com", "app.cryptogrokbot.com"]);
+const FORGOT_GENERIC = "If that email is the owner account, we sent a reset code.";
+const lastForgotAt = new Map<string, number>();
+
+function sendResetCode(ctx: DashboardContext, to: string, code: string): Promise<{ delivered: boolean; via: string }> {
+  if (ctx.sendCode) return ctx.sendCode(to, code);
+  return sendLoginCode({
+    to,
+    code,
+    resendKey: ctx.cfg.resendApiKey,
+    telegramToken: ctx.cfg.telegramToken,
+    telegramChatId: ctx.cfg.telegramChatId,
+  });
+}
 
 function redirectAliasHost(
   ctx: DashboardContext,
@@ -363,6 +383,69 @@ export async function handleDashboardRequest(
     const secure = isSecure(req, ctx.cfg);
     const session = signSession(ctx.password);
     json(res, 200, { ok: true, email: loginEmail, twoFactor: "off" }, [
+      sessionCookieHeader(session, secure),
+      clearPendingCookieHeader(secure),
+    ]);
+    return;
+  }
+
+  if (path === "/api/forgot-password" && method === "POST") {
+    let body: Record<string, unknown> = {};
+    try {
+      body = await readJson(req);
+    } catch {
+      json(res, 400, { error: "invalid json" });
+      return;
+    }
+    const now = Date.now();
+    const email = str(body.email).trim().toLowerCase();
+    if (now - (lastForgotAt.get(email) ?? 0) < 8_000) {
+      json(res, 200, { ok: true, message: FORGOT_GENERIC });
+      return;
+    }
+    lastForgotAt.set(email, now);
+    const secure = isSecure(req, ctx.cfg);
+    if (!emailsEqual(email, ctx.email)) {
+      json(res, 200, { ok: true, message: FORGOT_GENERIC }, [clearPendingCookieHeader(secure)]);
+      return;
+    }
+    const code = makeEmailCode();
+    await sendResetCode(ctx, ctx.email, code);
+    const pending = signPending(ctx.password, "email", hashEmailCode(code, ctx.password));
+    json(res, 200, { ok: true, message: FORGOT_GENERIC }, [pendingCookieHeader(pending, secure)]);
+    return;
+  }
+
+  if (path === "/api/reset-password" && method === "POST") {
+    let body: Record<string, unknown> = {};
+    try {
+      body = await readJson(req);
+    } catch {
+      json(res, 400, { error: "invalid json" });
+      return;
+    }
+    const email = str(body.email).trim().toLowerCase();
+    const code = str(body.code).trim();
+    const next = str(body.password);
+    if (!emailsEqual(email, ctx.email)) {
+      json(res, 401, { error: "Invalid reset code" });
+      return;
+    }
+    if (next.length < 8 || next.length > 200) {
+      json(res, 400, { error: "Use at least 8 characters." });
+      return;
+    }
+    const pendingTok = parseCookies(req.headers.cookie)[PENDING_COOKIE] ?? "";
+    const pending = verifyPending(pendingTok, ctx.password, "email");
+    if (!pending.ok || !passwordsEqual(hashEmailCode(code, ctx.password), pending.extra)) {
+      json(res, 401, { error: "Invalid reset code" });
+      return;
+    }
+    persistDashboardPassword(ctx.cfg.dashboardPasswordFile, next);
+    ctx.password = next;
+    const secure = isSecure(req, ctx.cfg);
+    const session = signSession(ctx.password);
+    json(res, 200, { ok: true, email: ctx.email }, [
       sessionCookieHeader(session, secure),
       clearPendingCookieHeader(secure),
     ]);

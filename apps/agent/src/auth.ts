@@ -50,8 +50,13 @@ export function resolveDashboardPassword(opts: { envPassword: string; filePath: 
     if (fromFile) return { password: fromFile, generated: false, source: "file" };
   }
   const password = randomBytes(18).toString("base64url");
-  writeFileSync(opts.filePath, `${password}\n`, { mode: 0o600 });
+  persistDashboardPassword(opts.filePath, password);
   return { password, generated: true, source: "generated" };
+}
+
+export function persistDashboardPassword(filePath: string, password: string): void {
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileSync(filePath, `${password.trim()}\n`, { mode: 0o600 });
 }
 
 export function cookieSecretFromPassword(password: string): string {

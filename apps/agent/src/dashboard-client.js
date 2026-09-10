@@ -51,10 +51,90 @@ function go(name) {
 document.querySelectorAll(".nav button").forEach((b) => b.addEventListener("click", () => go(b.dataset.page)));
 
 $("loginStepCreds").addEventListener("submit", (e) => { e.preventDefault(); login(); });
-$("inviteBtn").addEventListener("click", joinInvite);
-$("inviteToken").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") { e.preventDefault(); joinInvite(); }
-});
+const inviteBtn = $("inviteBtn");
+if (inviteBtn) {
+  inviteBtn.addEventListener("click", joinInvite);
+  const inviteToken = $("inviteToken");
+  if (inviteToken) {
+    inviteToken.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); joinInvite(); }
+    });
+  }
+}
+const showForgot = $("showForgot");
+if (showForgot) showForgot.addEventListener("click", (e) => { e.preventDefault(); showForgotForm(); });
+const showLoginForm = $("showLoginForm");
+if (showLoginForm) showLoginForm.addEventListener("click", (e) => { e.preventDefault(); showLoginOnly(); });
+const forgotSend = $("forgotSend");
+if (forgotSend) forgotSend.addEventListener("click", sendResetCode);
+const forgotStep = $("forgotStep");
+if (forgotStep) forgotStep.addEventListener("submit", (e) => { e.preventDefault(); resetPassword(); });
+
+function showForgotForm() {
+  const loginForm = $("loginStepCreds");
+  const forgotForm = $("forgotStep");
+  if (loginForm) loginForm.classList.add("hidden");
+  if (forgotForm) forgotForm.classList.remove("hidden");
+  const fe = $("forgotEmail");
+  const em = $("email");
+  if (fe && em && !fe.value) fe.value = em.value;
+}
+
+function showLoginOnly() {
+  const loginForm = $("loginStepCreds");
+  const forgotForm = $("forgotStep");
+  if (forgotForm) forgotForm.classList.add("hidden");
+  if (loginForm) loginForm.classList.remove("hidden");
+}
+
+async function sendResetCode() {
+  const err = $("forgotErr");
+  const ok = $("forgotOk");
+  if (err) err.textContent = "";
+  if (ok) ok.textContent = "";
+  try {
+    await api("/api/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email: ($("forgotEmail") && $("forgotEmail").value) || "" }),
+    });
+    if (ok) ok.textContent = "If that email is the owner account, we sent a reset code.";
+  } catch (e) {
+    if (err) err.textContent = e.message || "Could not send a reset code";
+  }
+}
+
+async function resetPassword() {
+  const err = $("forgotErr");
+  const ok = $("forgotOk");
+  if (err) err.textContent = "";
+  if (ok) ok.textContent = "";
+  const next = ($("forgotPw") && $("forgotPw").value) || "";
+  const confirm = ($("forgotPw2") && $("forgotPw2").value) || "";
+  if (next.length < 8) {
+    if (err) err.textContent = "Use at least 8 characters.";
+    return;
+  }
+  if (next !== confirm) {
+    if (err) err.textContent = "Passwords do not match.";
+    return;
+  }
+  try {
+    await api("/api/reset-password", {
+      method: "POST",
+      body: JSON.stringify({
+        email: ($("forgotEmail") && $("forgotEmail").value) || "",
+        code: ($("forgotCode") && $("forgotCode").value) || "",
+        password: next,
+      }),
+    });
+    if ($("forgotPw")) $("forgotPw").value = "";
+    if ($("forgotPw2")) $("forgotPw2").value = "";
+    if ($("forgotCode")) $("forgotCode").value = "";
+    showApp();
+  } catch (e) {
+    if (err) err.textContent = e.message || "Reset failed";
+  }
+}
 
 async function login() {
   $("loginErr").textContent = "";
@@ -173,7 +253,7 @@ async function renderHome() {
     '<div class="card"><h2 style="margin-top:0">Intel</h2><p class="muted">Eight Grok desks: X sentiment, gems, project eval, whales, timing, narratives, portfolio, scam radar.</p>' +
     '<button id="goIntel" style="width:100%">Open Intel</button></div>' +
     '<div class="card" id="accessCard"><h2 style="margin-top:0">Access</h2>' +
-    "<p class='muted'>Owner: " + esc(d.email || "") + " · password login, no 2FA. Grok Bot uses an invite token.</p>" +
+    "<p class='muted'>Owner: " + esc(d.email || "") + ". Invite Grok Bot from this card.</p>" +
     '<button id="inviteGrok" style="width:100%">Invite Grok Bot</button>' +
     '<label style="margin-top:12px">Invite by email</label>' +
     '<div class="row"><input id="inviteEmail" type="email" placeholder="teammate@email"/><button class="ghost" id="inviteHuman">Send invite</button></div>' +

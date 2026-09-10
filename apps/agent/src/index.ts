@@ -7,6 +7,7 @@ import { loadAppConfig, loadPolicy } from "./config.ts";
 import { AgentRuntime } from "./loop.ts";
 import { pulseAuditorFromStore, startCrewServer, type DashboardContext } from "./board.ts";
 import { resolveDashboardEmail, resolveDashboardPassword } from "./auth.ts";
+import { sendLoginCode } from "./mail.ts";
 import { buyChosenMint, sellChosen } from "./trade.ts";
 import { applyMasterBootPolicy } from "./master-flag.ts";
 import { probeCloudflare, formatCloudflareProbe } from "./cloudflare.ts";
@@ -49,6 +50,14 @@ async function main(): Promise<void> {
     totpFile: cfg.dashboardTotpFile,
     accessFile: cfg.dashboardAccessFile,
     repoRoot: resolve("."),
+    sendCode: (to, code) =>
+      sendLoginCode({
+        to,
+        code,
+        resendKey: cfg.resendApiKey,
+        telegramToken: cfg.telegramToken,
+        telegramChatId: cfg.telegramChatId,
+      }),
     buy: (opts) =>
       buyChosenMint({
         store,

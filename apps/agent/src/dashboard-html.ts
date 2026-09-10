@@ -94,11 +94,22 @@ export function dashboardHtml(opts?: { ownerEmail?: string }): string {
     <input id="pw" name="password" type="password" autocomplete="current-password" />
     <p id="loginErr" class="bad"></p>
     <button id="loginBtn" type="submit" style="width:100%;margin-top:12px">Log in</button>
-    <p class="muted" style="margin-top:20px">Grok Bot / AI invite — no 2FA</p>
-    <label for="inviteToken">Invite token or URL</label>
-    <input id="inviteToken" name="invite" autocomplete="off" placeholder="cgbot_… or https://…/invite/…" />
-    <p id="inviteErr" class="bad"></p>
-    <button id="inviteBtn" type="button" class="ghost" style="width:100%;margin-top:8px">Join with invite</button>
+    <p style="margin-top:16px;text-align:center"><a href="#forgot" id="showForgot">Forgot password</a></p>
+  </form>
+  <form id="forgotStep" class="hidden">
+    <label for="forgotEmail">Email</label>
+    <input id="forgotEmail" name="forgot-email" type="email" autocomplete="username" inputmode="email" value="${ownerEmail}" />
+    <button id="forgotSend" type="button" class="ghost" style="width:100%;margin-top:12px">Send reset code</button>
+    <label for="forgotCode">Reset code</label>
+    <input id="forgotCode" name="forgot-code" inputmode="numeric" autocomplete="one-time-code" />
+    <label for="forgotPw">New password</label>
+    <input id="forgotPw" name="forgot-password" type="password" autocomplete="new-password" />
+    <label for="forgotPw2">Confirm password</label>
+    <input id="forgotPw2" name="forgot-password2" type="password" autocomplete="new-password" />
+    <p id="forgotErr" class="bad"></p>
+    <p id="forgotOk" class="ok"></p>
+    <button id="forgotReset" type="submit" style="width:100%;margin-top:12px">Reset password</button>
+    <p style="margin-top:16px;text-align:center"><a href="#login" id="showLoginForm">Back to log in</a></p>
   </form>
 </div>
 <div id="app" class="hidden">
