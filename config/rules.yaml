@@ -1,0 +1,109 @@
+# Extra entry/exit rules. Toggle enabled or add new rows — no code change needed.
+# Telegram: /rules   /rule on <id>   /rule off <id>
+# Types: min_age_minutes, max_age_minutes, min_holders, min_volume_5m_usd,
+# min_market_cap_usd, max_market_cap_usd, min_buy_sell_ratio, min_liquidity_usd,
+# require_mint_revoked, require_freeze_revoked, require_graduated, hours_utc,
+# max_consecutive_losses, block_keyword, require_copy_wallet, fade_wallet, max_name_length
+
+rules:
+  - id: skip-fresh-snipe
+    type: min_age_minutes
+    value: 2
+    enabled: true
+    when: entry
+    note: skip sub-2-minute snipes
+
+  - id: skip-stale
+    type: max_age_minutes
+    value: 1440
+    enabled: false
+    when: entry
+    note: skip coins older than 24h
+
+  - id: min-holders
+    type: min_holders
+    value: 30
+    enabled: true
+    when: entry
+
+  - id: min-vol-5m
+    type: min_volume_5m_usd
+    value: 1500
+    enabled: true
+    when: entry
+
+  - id: mcap-floor
+    type: min_market_cap_usd
+    value: 8000
+    enabled: false
+    when: entry
+
+  - id: mcap-ceiling
+    type: max_market_cap_usd
+    value: 2000000
+    enabled: false
+    when: entry
+    note: skip already-huge names
+
+  - id: buy-side
+    type: min_buy_sell_ratio
+    value: 0.4
+    enabled: true
+    when: entry
+
+  - id: mint-revoked
+    type: require_mint_revoked
+    value: true
+    enabled: false
+    when: entry
+    note: bonding-curve coins often still have mint; enable after graduation-only
+
+  - id: freeze-revoked
+    type: require_freeze_revoked
+    value: true
+    enabled: true
+    when: entry
+
+  - id: graduated-only
+    type: require_graduated
+    value: true
+    enabled: false
+    when: entry
+
+  - id: session-hours
+    type: hours_utc
+    value: "00-24"
+    enabled: false
+    when: entry
+    note: e.g. 13-07 to skip your sleep window for NEW buys (exits still run)
+
+  - id: loss-streak
+    type: max_consecutive_losses
+    value: 4
+    enabled: true
+    when: entry
+
+  - id: block-migration-word
+    type: block_keyword
+    value: migration
+    enabled: true
+    when: entry
+
+  - id: copy-wallets-only
+    type: require_copy_wallet
+    value: true
+    enabled: false
+    when: entry
+    note: only buy when a wallet in sources.yaml action=copy is in the hits
+
+  - id: fade-listed-wallets
+    type: fade_wallet
+    value: true
+    enabled: true
+    when: entry
+
+  - id: short-ticker-names
+    type: max_name_length
+    value: 24
+    enabled: false
+    when: entry

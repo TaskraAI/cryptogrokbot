@@ -1,0 +1,7 @@
+{
+  "name": "@night/shared",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

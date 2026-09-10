@@ -1,0 +1,15 @@
+node_modules
+dist
+.env
+data
+*.db
+*.sqlite
+.DS_Store
+coverage
+.turbo
+*.log
+.dashboard-password
+.dashboard-email
+.dashboard-totp
+dashboard-access.json
+wallet-secrets.json

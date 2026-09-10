@@ -1,0 +1,27 @@
+{
+  "name": "crypto-trading",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "agent": "tsx apps/agent/src/index.ts",
+    "dashboard": "tsx apps/agent/src/index.ts",
+    "trade": "tsx apps/agent/src/cli.ts",
+    "dev": "tsx apps/agent/src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}
