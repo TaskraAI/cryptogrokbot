@@ -51,7 +51,7 @@ export function fallbackDeskHtml() {
   <meta name="theme-color" content="#07090c"/>
   <title>CryptoGrokBot</title>
   <style>
-    html, body { margin: 0; background: #07090c; color: #eef1f4; font-family: ui-sans-serif, system-ui, sans-serif; }
+    html, body { margin: 0; background: #07090c; color: #eef1f4; font-family: Arial, Helvetica, sans-serif; }
     .login { min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; padding: 24px; max-width: 420px; margin: 0 auto; }
     h1 { font-size: 22px; margin: 0 0 8px; }
     p, label { font-size: 15px; line-height: 1.45; }

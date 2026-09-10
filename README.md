@@ -2,7 +2,7 @@
 
 Personal assistant for **discovering, buying, and selling Solana meme coins** you choose. Paper (dry-run) is the default. Nothing spends real SOL unless you opt in. This is not financial advice. Meme coins rug.
 
-Mobile dashboard (intended host: **cryptogrokbot.com**): login, crew pulses, paper buys with DexScreener, wallets, P&L, **Intel** (eight Grok desks), **Rung challenge** ($100 → $5k → $10k → $1M, crypto only), todos, lessons, Auditor bug scan.
+Mobile dashboard (intended host: **cryptogrokbot.com**): login, crew pulses, paper buys with DexScreener, wallets, P&L, **Intel** (eight Grok desks), **Bankroll goal** ($100 → $5k → $10k → $1M, crypto only), todos, lessons, Auditor bug scan.
 
 ## Run the dashboard (paper)
 

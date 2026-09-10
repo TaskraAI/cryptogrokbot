@@ -20,6 +20,7 @@ function mem() {
 describe("rung challenge", () => {
   it("loads $100 → $5k → $10k → $1M rungs", () => {
     const chal = loadChallenge(join(process.cwd(), "config/challenge.json"));
+    expect(chal.title).toBe("Bankroll goal");
     expect(chal.startUsd).toBe(100);
     expect(chal.rungsUsd[0]).toBe(100);
     expect(chal.rungsUsd[1]).toBe(5000);

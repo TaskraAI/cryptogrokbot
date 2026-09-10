@@ -27,7 +27,7 @@ export function dashboardHtml(opts?: { ownerEmail?: string }): string {
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; }
+      font-family: Arial, Helvetica, sans-serif; }
     body { min-height: 100dvh; }
     button, input, select, textarea { font: inherit; color: inherit; }
     button { min-height: var(--tap); border-radius: 12px; border: 0; background: var(--accent);

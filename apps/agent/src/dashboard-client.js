@@ -320,10 +320,10 @@ function challengeCardHtml(d) {
   const from = Number(r.from || 100);
   const to = Number(r.to || 5000);
   return (
-    '<div class="card"><h2 style="margin-top:0">Rung challenge</h2>' +
+    '<div class="card"><h2 style="margin-top:0">' + esc(c.title || "Bankroll goal") + "</h2>" +
     "<p><b>$" + from.toLocaleString() + " → $" + to.toLocaleString() + "</b>" +
     " · declared <b>$" + Number(c.bankrollUsd || 0).toLocaleString() + "</b>" +
-    " · " + Number(r.progressPct || 0).toFixed(0) + "% of this rung</p>" +
+    " · " + Number(r.progressPct || 0).toFixed(0) + "% of this step</p>" +
     "<p class='muted'>" + esc((c.playbook && c.playbook.honesty) || "") + "</p>" +
     "<p class='muted'>Crypto via Grok Bot Bearer. Polymarket stays off until you say it is time.</p>" +
     "<ol style='padding-left:18px'>" + jobs + "</ol>" +

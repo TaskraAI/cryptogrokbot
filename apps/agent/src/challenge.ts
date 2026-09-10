@@ -16,7 +16,7 @@ export type ChallengeConfig = {
 };
 
 export const DEFAULT_CHALLENGE: ChallengeConfig = {
-  title: "Rung challenge",
+  title: "Bankroll goal",
   startUsd: 100,
   goalUsd: 1_000_000,
   rungsUsd: [100, 5000, 10000, 20000, 40000, 80000, 160000, 320000, 640000, 1_000_000],
