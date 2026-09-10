@@ -11,10 +11,10 @@ let lastHomeFp = "";
 function friendlyError(text, status) {
   const raw = String(text || "");
   if (/no tunnel here/i.test(raw) || /<html/i.test(raw) || /<h1>/i.test(raw)) {
-    return "Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.";
+    return "Still connecting. Tap Log in again.";
   }
   if (status === 502 || status === 503 || status === 530) {
-    return "Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.";
+    return "Still connecting. Tap Log in again.";
   }
   const stripped = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   if (!stripped || stripped.length > 160) return "Login failed. Try again.";
@@ -138,20 +138,38 @@ async function resetPassword() {
 
 async function login() {
   $("loginErr").textContent = "";
+  const email = $("email").value;
+  const password = $("pw").value;
+  const btn = $("loginBtn");
+  if (btn) btn.disabled = true;
   try {
-    const health = await fetch("/health", { cache: "no-store" }).then((r) => r.json()).catch(() => ({}));
-    if (health && health.origin === "down") {
-      $("loginErr").textContent = "Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.";
-      return;
+    let lastErr = "Still connecting. Tap Log in again.";
+    for (let i = 0; i < 4; i++) {
+      const health = await fetch("/health", { cache: "no-store" }).then((r) => r.json()).catch(() => ({}));
+      if (health && health.origin === "down") {
+        lastErr = "Still connecting. Tap Log in again.";
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+      try {
+        await api("/api/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        });
+        $("pw").value = "";
+        showApp();
+        return;
+      } catch (e) {
+        lastErr = e.message || lastErr;
+        if (e.status && e.status !== 502 && e.status !== 503 && e.status !== 530) throw e;
+        await new Promise((r) => setTimeout(r, 1500));
+      }
     }
-    await api("/api/login", {
-      method: "POST",
-      body: JSON.stringify({ email: $("email").value, password: $("pw").value }),
-    });
-    $("pw").value = "";
-    showApp();
+    $("loginErr").textContent = lastErr;
   } catch (e) {
     $("loginErr").textContent = e.message || "login failed";
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 

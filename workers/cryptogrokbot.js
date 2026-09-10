@@ -5,8 +5,7 @@ const REDIRECT_HOSTS = new Set([
   "app.cryptogrokbot.com",
 ]);
 
-const HOST_OFFLINE =
-  "Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.";
+const HOST_OFFLINE = "Still connecting. Tap Log in again.";
 
 const TUNNEL_DOWN_JSON = JSON.stringify({
   ok: false,
@@ -100,7 +99,7 @@ export function fallbackDeskHtml() {
 function friendlyError(text, status) {
   var raw = String(text || "");
   if (/no tunnel here/i.test(raw) || /<html/i.test(raw) || /<h1>/i.test(raw) || status === 502 || status === 503 || status === 530) {
-    return "Desk host is offline. Ask Chief to run bash scripts/bring-origin-back.sh, then tap Log in again.";
+    return "Still connecting. Tap Log in again.";
   }
   var stripped = raw.replace(/<[^>]+>/g, " ").replace(/\\s+/g, " ").trim();
   if (!stripped || stripped.length > 160) return "Login failed. Try again.";

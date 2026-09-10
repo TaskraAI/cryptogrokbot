@@ -495,9 +495,10 @@ def current_lhr_url() -> str:
     return found[-1] if found else ""
 
 
-def start_lhr() -> subprocess.Popen[str]:
-    kill_pids(lhr_pids())
-    LHR_LOG.write_text("")
+def start_lhr(*, replace: bool = False) -> subprocess.Popen[str]:
+    if replace:
+        kill_pids(lhr_pids())
+        LHR_LOG.write_text("")
     return subprocess.Popen(
         [
             "ssh",
@@ -616,7 +617,12 @@ def reattach_worker_domains() -> None:
 
 
 def monitor_public(proc: subprocess.Popen[str] | None = None, origin_url: str = "") -> None:
-    """Watch the public host. Recycle on 503, origin:down fallback, or dead lhr URL."""
+    """Watch the public host. Recycle only when cryptogrokbot.com stays down.
+
+    localhost.run /health often 503s from this VM while the Worker can still
+    fetch it. Recycling on one origin blip puts the Worker on a dead URL and
+    login shows origin:down.
+    """
     fails = 0
     while True:
         if proc is not None and proc.poll() is not None:
@@ -625,15 +631,14 @@ def monitor_public(proc: subprocess.Popen[str] | None = None, origin_url: str = 
         if origin_url:
             origin_ok, origin_code = health_status(origin_url, quiet=True)
             if not origin_ok:
-                print(f"origin URL died HTTP {origin_code}; recycling", flush=True)
-                return
+                print(f"origin URL miss HTTP {origin_code} (keeping if public is live)", flush=True)
         ok, code = health_status(PUBLIC_HEALTH, quiet=True)
         if ok:
             fails = 0
         else:
             fails += 1
             print(f"public health miss {fails}/3 HTTP {code}", flush=True)
-            if code == 503 or fails >= 3:
+            if fails >= 3:
                 print("public site down; recycling origin", flush=True)
                 return
         time.sleep(12)
@@ -662,36 +667,44 @@ def run_lhr_loop() -> None:
     create the tunnel CNAME. localhost.run is fetchable by the Worker.
     """
     proc: subprocess.Popen[str] | None = None
+    url = ""
     try:
         while True:
-            if proc is None or proc.poll() is not None:
-                print("starting localhost.run origin tunnel", flush=True)
-                proc = start_lhr()
-            url = ""
+            prev = url
+            print("starting localhost.run origin tunnel", flush=True)
+            incoming = start_lhr(replace=proc is None)
+            next_url = ""
             for _ in range(45):
-                url = current_lhr_url()
-                if url:
+                found = current_lhr_url()
+                if found and found != prev:
+                    next_url = found
                     break
-                if proc.poll() is not None:
+                if incoming.poll() is not None:
                     break
                 time.sleep(1)
-            if url:
-                print(f"waiting for origin {url}/health", flush=True)
-                if not wait_until(lambda: http_health(url, quiet=True), timeout=40, interval=1):
+            if next_url:
+                print(f"waiting for origin {next_url}/health", flush=True)
+                if not wait_until(lambda: http_health(next_url, quiet=True), timeout=40, interval=1):
                     print("origin URL never became healthy; recycling", flush=True)
+                    stop_proc(incoming)
                 else:
                     try:
-                        publish(url, force=True)
+                        publish(next_url, force=True)
                     except Exception as e:
                         print(f"origin update error: {e}", flush=True)
                     print("waiting for https://cryptogrokbot.com/health via localhost.run", flush=True)
                     if wait_consecutive(lambda: public_ok(quiet=True), need=3, timeout=90, interval=3):
                         print("cryptogrokbot.com healthy", flush=True)
+                        if proc is not None and proc is not incoming:
+                            stop_proc(proc)
+                        proc = incoming
+                        url = next_url
                         monitor_public(proc, origin_url=url)
-                    else:
-                        print("public site never became healthy; recycling localhost.run", flush=True)
-            stop_proc(proc)
-            kill_pids(lhr_pids())
+                        continue
+                    print("public site never became healthy; recycling localhost.run", flush=True)
+                    stop_proc(incoming)
+            else:
+                stop_proc(incoming)
             print("localhost.run exited; restarting", flush=True)
             time.sleep(2)
     finally:
