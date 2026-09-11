@@ -4,6 +4,8 @@ Personal assistant for **discovering, buying, and selling Solana meme coins** yo
 
 Mobile dashboard (intended host: **cryptogrokbot.com**): login, crew pulses, paper buys with DexScreener, wallets, P&L, **Intel** (eight Grok desks), **Bankroll goal** ($100 → $5k → $10k → $1M, crypto only), todos, lessons, Auditor bug scan.
 
+**24/7 host (VPS):** clone branch `cursor/vps-host-check-1f38` and follow [`grok-bot/VPS.md`](grok-bot/VPS.md). Git never has `.env` — build it on the VPS from `.env.example`. Do not clone `main`.
+
 ## Run the dashboard (paper)
 
 Node 22+. Secrets live in `.env` (gitignored). Never commit keys, seed phrases, or Cloudflare tokens.

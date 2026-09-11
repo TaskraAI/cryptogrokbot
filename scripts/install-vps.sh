@@ -13,15 +13,19 @@ ROOT="$PWD"
 if [[ -z "${FORCE_VPS_INSTALL:-}" ]]; then
   if [[ -n "${CURSOR_AGENT:-}" || -d /opt/cursor || -d /tmp/cursor ]]; then
     echo "BLOCKED: this looks like a Cursor Cloud Agent, not the VPS."
-    echo "Copy the repo + .env + data/ to the VPS and run this script there."
+    echo "Clone the repo on the VPS and run this script there. See grok-bot/VPS.md"
     echo "Override only if you really mean it: FORCE_VPS_INSTALL=1 $0"
     exit 1
   fi
 fi
 
 if [[ ! -f .env ]]; then
-  echo "BLOCKED: .env is missing on this disk. Copy the live .env from the last desk (never commit it)."
-  echo "See grok-bot/HOSTING.md"
+  echo "no .env — creating one from .env.example (no secrets written). See grok-bot/VPS.md"
+  bash scripts/prepare-restore.sh
+fi
+if [[ ! -f .env ]]; then
+  echo "BLOCKED: .env is still missing. Run bash scripts/prepare-restore.sh"
+  echo "See grok-bot/VPS.md"
   exit 1
 fi
 

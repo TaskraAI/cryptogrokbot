@@ -50,26 +50,24 @@ localhost.run hostnames rotate and sometimes 503. The watcher must not kill a tu
 
 ## Move the app to the VPS (the remaining 502)
 
+You do **not** need a backup `.env`. Clone GitHub and follow **[`VPS.md`](VPS.md)** (checklist + exact commands).
+
 Tunnel and DNS are already done when `origin.cryptogrokbot.com` returns **502**. The VPS still needs Grok Bot itself.
 
-On **this** desk (or any machine that has the repo + secrets):
+```bash
+git clone https://github.com/TaskraAI/CryptoTrading.git /opt/cryptogrokbot
+cd /opt/cryptogrokbot
+git checkout cursor/vps-host-check-1f38
+bash scripts/prepare-restore.sh
+# edit .env — set DASHBOARD_PASSWORD= to the login you already use
+bash scripts/install-vps.sh
+```
+
+Optional if you already have a secret `.env` on another disk (never commit it):
 
 ```bash
 bash scripts/pack-vps.sh
-# scp /tmp/cryptogrokbot-app.tgz user@VPS:
-# scp .env user@VPS:
-# scp -r data user@VPS:
-```
-
-On the **VPS** (always-on Linux, not this Cloud Agent):
-
-```bash
-sudo mkdir -p /opt/cryptogrokbot
-sudo tar -xzf cryptogrokbot-app.tgz -C /opt/cryptogrokbot
-# copy .env and data/ into /opt/cryptogrokbot (mode 0600 on .env)
-# Node 22+: https://github.com/nodesource/distributions
-cd /opt/cryptogrokbot
-bash scripts/install-vps.sh
+# scp the tarball, .env, and data/ — never paste secrets in chat
 ```
 
 `install-vps.sh` starts `npm run agent` on `127.0.0.1:8787` (systemd when possible). It does **not** start localhost.run. It refuses to run on a Cursor Cloud Agent unless `FORCE_VPS_INSTALL=1`.
