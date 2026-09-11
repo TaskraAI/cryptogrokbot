@@ -27,6 +27,8 @@ named_code="$(curl -sS --max-time 12 -A "$UA" -o /tmp/named-origin.health -w '%{
 named_body="$(cat /tmp/named-origin.health 2>/dev/null || true)"
 if printf '%s' "$named_body" | grep -q cryptogrokbot-dashboard && ! printf '%s' "$named_body" | grep -q '"origin":"down"'; then
   say "named origin  LIVE  https://origin.cryptogrokbot.com"
+elif [[ "$named_code" == "502" ]] || printf '%s' "$named_body" | grep -qE 'error code: 502'; then
+  say "named origin  TUNNEL UP, APP DOWN  HTTP 502 — cloudflared is connected, but nothing is listening on the VPS at 127.0.0.1:8787. Copy the repo + .env + data/ there and run bash scripts/install-vps.sh. See grok-bot/HOSTING.md"
 elif printf '%s' "$named_body" | grep -qE '1033|530|1016'; then
   say "named origin  DOWN  HTTP $named_code — DNS may exist, but cloudflared is not connected (1033/530). See grok-bot/HOSTING.md"
 else

@@ -4,6 +4,8 @@ Personal assistant for **discovering, buying, and selling Solana meme coins** yo
 
 Mobile dashboard (intended host: **cryptogrokbot.com**): login, crew pulses, paper buys with DexScreener, wallets, P&L, **Intel** (eight Grok desks), **Bankroll goal** ($100 → $5k → $10k → $1M, crypto only), todos, lessons, Auditor bug scan.
 
+**24/7 host (VPS):** clone branch `cursor/vps-host-check-1f38` and follow [`grok-bot/VPS.md`](grok-bot/VPS.md). Git never has `.env` — build it on the VPS from `.env.example`. Do not clone `main`.
+
 ## Run the dashboard (paper)
 
 Node 22+. Secrets live in `.env` (gitignored). Never commit keys, seed phrases, or Cloudflare tokens.
@@ -41,7 +43,7 @@ The dashboard canonical URL is **https://cryptogrokbot.com/**.
 
 `www`, `dash`, and `app` redirect there (301). Nameservers are on Cloudflare (`kanye.ns.cloudflare.com` / `stella.ns.cloudflare.com`). A Worker (`workers/cryptogrokbot.js`) fronts the origin; `npm run agent` on port **8787** plus a Cloudflare Tunnel must be running or the site returns 502 / 1016.
 
-The Worker `ORIGIN` binding must be a hostname the Worker can fetch. `*.cfargotunnel.com` is blocked (Error 1102). trycloudflare `--url` hostnames from this VM return **530 Origin DNS error** even when `cloudflared` is connected. The API token here cannot write the named-tunnel DNS CNAME, so `origin.cryptogrokbot.com` 1016s. The working origin is a **localhost.run** reverse tunnel in front of `127.0.0.1:8787`, with the Worker still on apex/www/dash/app. Keep it alive with:
+The Worker `ORIGIN` binding must be a hostname the Worker can fetch. `*.cfargotunnel.com` is blocked (Error 1102). trycloudflare `--url` hostnames from this VM return **530 Origin DNS error** even when `cloudflared` is connected. `origin.cryptogrokbot.com` **502** means the named tunnel is connected but the VPS has no `npm run agent` on `:8787` yet — do not point Worker `ORIGIN` at it until `/health` is dashboard JSON. Until then the working origin is a **localhost.run** reverse tunnel in front of this box’s `127.0.0.1:8787`. Keep it alive with:
 
 ```bash
 CLOUDFLARE_API_TOKEN_FILE=/tmp/cf-api.token python3 scripts/keep-cf-origin.py

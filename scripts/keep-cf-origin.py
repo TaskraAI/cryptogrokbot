@@ -4,8 +4,9 @@
 Worker ORIGIN must be a hostname Cloudflare Workers can fetch:
 - `*.cfargotunnel.com` → Error 1102
 - trycloudflare `--url` hostnames from this VM → 530 Origin DNS error
-- `origin.cryptogrokbot.com` → 1016 unless zone DNS is a tunnel CNAME (this
-  API token cannot write DNS records)
+- `origin.cryptogrokbot.com` → 502 when cloudflared is up but :8787 is empty;
+  1033/1016 when the connector or DNS CNAME is still missing. Never publish
+  that hostname as Worker ORIGIN until /health is dashboard JSON.
 
 Working path: Worker custom domains on apex/www/dash/app, ORIGIN = a
 localhost.run HTTPS URL reverse-tunnelled to `127.0.0.1:8787`. The named
@@ -659,8 +660,8 @@ def monitor_public(proc: subprocess.Popen[str] | None = None, origin_url: str = 
 
 
 def start_named_sidecar() -> None:
-    """Keep the named tunnel up. Do not publish it as Worker ORIGIN — this token
-    cannot write the tunnel CNAME, so origin.cryptogrokbot.com 1016s.
+    """Keep the named tunnel up. Do not publish it as Worker ORIGIN until
+    origin.cryptogrokbot.com /health is dashboard JSON (502 means app not running).
     """
     if not save_named_tunnel_token():
         return
@@ -789,5 +790,31 @@ def main() -> int:
     return 0
 
 
+def publish_named_if_live() -> int:
+    """Point Worker ORIGIN at the named host only after /health is dashboard JSON.
+
+    A 502/1033 named origin would take the public site down. Never publish that.
+    """
+    if not http_health(NAMED_ORIGIN_URL, quiet=False):
+        print(
+            f"refusing to publish {NAMED_ORIGIN_URL} — /health is not live "
+            "(tunnel may be up with no app on :8787). See grok-bot/HOSTING.md",
+            flush=True,
+        )
+        return 1
+    try:
+        publish(NAMED_ORIGIN_URL, force=True)
+    except Exception as e:
+        print(f"named origin publish failed: {e}", flush=True)
+        return 1
+    if public_ok(attempts=5):
+        print("cryptogrokbot.com healthy via named tunnel", flush=True)
+        return 0
+    print("published named origin but public /health is not live yet", flush=True)
+    return 1
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] in ("--publish-named", "publish-named"):
+        raise SystemExit(publish_named_if_live())
     raise SystemExit(main())

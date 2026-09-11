@@ -48,5 +48,5 @@ for k, v in wanted.items():
 p.write_text("".join(out))
 p.chmod(0o600)
 print("set MASTER_ENABLED=false DASHBOARD_BIND=0.0.0.0 DASHBOARD_HOST=cryptogrokbot.com DASHBOARD_EMAIL=hello@taskra.ai")
-print("WALLET_SECRET_KEY and Cloudflare token were not written. See grok-bot/RESTORE.md")
+print("WALLET_SECRET_KEY and Cloudflare token were not written. See grok-bot/VPS.md")
 PY
