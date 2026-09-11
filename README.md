@@ -41,7 +41,7 @@ The dashboard canonical URL is **https://cryptogrokbot.com/**.
 
 `www`, `dash`, and `app` redirect there (301). Nameservers are on Cloudflare (`kanye.ns.cloudflare.com` / `stella.ns.cloudflare.com`). A Worker (`workers/cryptogrokbot.js`) fronts the origin; `npm run agent` on port **8787** plus a Cloudflare Tunnel must be running or the site returns 502 / 1016.
 
-The Worker `ORIGIN` binding must be a hostname the Worker can fetch. `*.cfargotunnel.com` is blocked (Error 1102). trycloudflare `--url` hostnames from this VM return **530 Origin DNS error** even when `cloudflared` is connected. The API token here cannot write the named-tunnel DNS CNAME, so `origin.cryptogrokbot.com` 1016s. The working origin is a **localhost.run** reverse tunnel in front of `127.0.0.1:8787`, with the Worker still on apex/www/dash/app. Keep it alive with:
+The Worker `ORIGIN` binding must be a hostname the Worker can fetch. `*.cfargotunnel.com` is blocked (Error 1102). trycloudflare `--url` hostnames from this VM return **530 Origin DNS error** even when `cloudflared` is connected. `origin.cryptogrokbot.com` **502** means the named tunnel is connected but the VPS has no `npm run agent` on `:8787` yet — do not point Worker `ORIGIN` at it until `/health` is dashboard JSON. Until then the working origin is a **localhost.run** reverse tunnel in front of this box’s `127.0.0.1:8787`. Keep it alive with:
 
 ```bash
 CLOUDFLARE_API_TOKEN_FILE=/tmp/cf-api.token python3 scripts/keep-cf-origin.py
