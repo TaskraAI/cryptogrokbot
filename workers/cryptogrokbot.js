@@ -79,6 +79,13 @@ export function fallbackDeskHtml() {
     <button id="loginBtn" type="submit">Log in</button>
     <p style="margin-top:16px;text-align:center"><a href="#forgot" id="showForgot">Forgot password</a></p>
   </form>
+  <div id="inviteStep">
+    <p class="muted" style="margin:24px 0 8px;text-align:center">or</p>
+    <label for="inviteToken">Grok Bot invite</label>
+    <input id="inviteToken" type="text" autocomplete="off" placeholder="cgbot_… or invite URL"/>
+    <p id="inviteErr" class="bad"></p>
+    <button id="inviteBtn" type="button" class="ghost">Join with invite</button>
+  </div>
   <form id="forgotStep" class="hidden">
     <label for="forgotEmail">Email</label>
     <input id="forgotEmail" type="email" autocomplete="username" value="hello@taskra.ai"/>
@@ -119,11 +126,15 @@ async function api(path, opts) {
 }
 function showForgotForm() {
   document.getElementById("loginStepCreds").classList.add("hidden");
+  var inv = document.getElementById("inviteStep");
+  if (inv) inv.classList.add("hidden");
   document.getElementById("forgotStep").classList.remove("hidden");
 }
 function showLoginOnly() {
   document.getElementById("forgotStep").classList.add("hidden");
   document.getElementById("loginStepCreds").classList.remove("hidden");
+  var inv = document.getElementById("inviteStep");
+  if (inv) inv.classList.remove("hidden");
 }
 document.getElementById("loginStepCreds").addEventListener("submit", async function (e) {
   e.preventDefault();
@@ -158,6 +169,22 @@ document.getElementById("loginStepCreds").addEventListener("submit", async funct
 });
 document.getElementById("showForgot").addEventListener("click", function (e) { e.preventDefault(); showForgotForm(); });
 document.getElementById("showLoginForm").addEventListener("click", function (e) { e.preventDefault(); showLoginOnly(); });
+var inviteBtn = document.getElementById("inviteBtn");
+if (inviteBtn) {
+  inviteBtn.addEventListener("click", async function () {
+    document.getElementById("inviteErr").textContent = "";
+    var raw = (document.getElementById("inviteToken").value || "").trim();
+    var m = raw.match(new RegExp("/invite/([^/?#]+)"));
+    if (m) raw = decodeURIComponent(m[1]);
+    if (!raw) { document.getElementById("inviteErr").textContent = "Paste the invite token"; return; }
+    try {
+      await api("/api/bot-token", { method: "POST", body: JSON.stringify({ token: raw }) });
+      location.reload();
+    } catch (err) {
+      document.getElementById("inviteErr").textContent = err.message || "invite failed";
+    }
+  });
+}
 document.getElementById("forgotSend").addEventListener("click", async function () {
   document.getElementById("forgotErr").textContent = "";
   document.getElementById("forgotOk").textContent = "";

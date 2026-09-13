@@ -73,7 +73,9 @@ if (forgotStep) forgotStep.addEventListener("submit", (e) => { e.preventDefault(
 function showForgotForm() {
   const loginForm = $("loginStepCreds");
   const forgotForm = $("forgotStep");
+  const inviteStep = $("inviteStep");
   if (loginForm) loginForm.classList.add("hidden");
+  if (inviteStep) inviteStep.classList.add("hidden");
   if (forgotForm) forgotForm.classList.remove("hidden");
   const fe = $("forgotEmail");
   const em = $("email");
@@ -83,8 +85,10 @@ function showForgotForm() {
 function showLoginOnly() {
   const loginForm = $("loginStepCreds");
   const forgotForm = $("forgotStep");
+  const inviteStep = $("inviteStep");
   if (forgotForm) forgotForm.classList.add("hidden");
   if (loginForm) loginForm.classList.remove("hidden");
+  if (inviteStep) inviteStep.classList.remove("hidden");
 }
 
 async function sendResetCode() {
@@ -99,7 +103,7 @@ async function sendResetCode() {
     });
     if (ok) ok.textContent = "If that email is the owner account, we sent a reset code.";
   } catch (e) {
-    if (err) err.textContent = e.message || "Could not send a reset code";
+    if (err) err.textContent = e.message || "Could not send a reset code. On the VPS run bash scripts/set-dashboard-password.sh";
   }
 }
 

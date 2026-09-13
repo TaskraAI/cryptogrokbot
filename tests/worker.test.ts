@@ -47,7 +47,9 @@ describe("fallback desk page stays up when the origin is down", () => {
     expect(html).not.toContain("Email code");
     expect(html).not.toContain("Auto-trade is off");
     expect(html).not.toContain("no 2FA");
-    expect(html).not.toContain("Grok Bot / AI invite");
+    expect(html).toContain("Grok Bot invite");
+    expect(html).toContain("Join with invite");
+    expect(html).not.toContain("Grok Bot / AI invite — no 2FA");
     expect(() => new Function(html.slice(html.lastIndexOf("<script>") + 8, html.lastIndexOf("</script>")))).not.toThrow();
   });
 });

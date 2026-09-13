@@ -180,7 +180,9 @@ describe("dashboard auth and paper API", () => {
     expect(html).toContain("Log in");
     expect(html).toContain("Forgot password");
     expect(html).toContain('id="forgotStep"');
-    expect(html).not.toContain("Join with invite");
+    expect(html).toContain("Join with invite");
+    expect(html).toContain("Grok Bot invite");
+    expect(html).toContain('id="inviteToken"');
     expect(html).not.toContain("no 2FA");
     expect(html).not.toContain("Auto-trade is off");
     expect(html).toContain('data-page="intel"');
@@ -210,6 +212,7 @@ describe("dashboard auth and paper API", () => {
     expect(js).toContain("Desk never auto-trades");
     expect(js).toContain("/api/forgot-password");
     expect(js).toContain("/api/reset-password");
+    expect(html).toContain("Grok Bot invite");
     expect(html).not.toContain("Grok Bot / AI invite — no 2FA");
     expect(() => new Function(js)).not.toThrow();
     const head = await fetch(`${url}/`, { method: "HEAD" });
@@ -329,6 +332,21 @@ describe("dashboard auth and paper API", () => {
       body: JSON.stringify({ email: "hello@taskra.ai", password: "new-pass-word" }),
     });
     expect(nextLogin.status).toBe(200);
+  });
+
+  it("returns 503 when the owner reset email cannot be delivered", async () => {
+    const { server, url, ctx } = await startCtx(tmp(), "old-pass-word", "owner-reset@taskra.ai");
+    servers.push(server);
+    ctx.sendCode = async () => ({ delivered: false, via: "log" });
+    const asked = await fetch(`${url}/api/forgot-password`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "owner-reset@taskra.ai" }),
+    });
+    expect(asked.status).toBe(503);
+    const body = (await asked.json()) as { error?: string };
+    expect(body.error).toMatch(/Reset email could not be sent/);
+    expect(body.error).toMatch(/set-dashboard-password/);
   });
 
   it("does not reveal whether a forgot-password email exists", async () => {

@@ -96,6 +96,13 @@ export function dashboardHtml(opts?: { ownerEmail?: string }): string {
     <button id="loginBtn" type="submit" style="width:100%;margin-top:12px">Log in</button>
     <p style="margin-top:16px;text-align:center"><a href="#forgot" id="showForgot">Forgot password</a></p>
   </form>
+  <div id="inviteStep">
+    <p class="muted" style="margin:24px 0 8px;text-align:center">or</p>
+    <label for="inviteToken">Grok Bot invite</label>
+    <input id="inviteToken" name="invite" type="text" autocomplete="off" placeholder="cgbot_… or invite URL" />
+    <p id="inviteErr" class="bad"></p>
+    <button id="inviteBtn" type="button" class="ghost" style="width:100%;margin-top:8px">Join with invite</button>
+  </div>
   <form id="forgotStep" class="hidden">
     <label for="forgotEmail">Email</label>
     <input id="forgotEmail" name="forgot-email" type="email" autocomplete="username" inputmode="email" value="${ownerEmail}" />
