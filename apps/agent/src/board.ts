@@ -411,9 +411,17 @@ export async function handleDashboardRequest(
       return;
     }
     const code = makeEmailCode();
-    await sendResetCode(ctx, ctx.email, code);
+    const sent = await sendResetCode(ctx, ctx.email, code);
+    if (!sent.delivered) {
+      json(res, 503, {
+        ok: false,
+        error:
+          "Reset email could not be sent. On the VPS run: bash scripts/set-dashboard-password.sh",
+      });
+      return;
+    }
     const pending = signPending(ctx.password, "email", hashEmailCode(code, ctx.password));
-    json(res, 200, { ok: true, message: FORGOT_GENERIC }, [pendingCookieHeader(pending, secure)]);
+    json(res, 200, { ok: true, message: FORGOT_GENERIC, delivered: true }, [pendingCookieHeader(pending, secure)]);
     return;
   }
 

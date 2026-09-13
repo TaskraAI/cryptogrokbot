@@ -48,8 +48,8 @@ git checkout cursor/vps-host-check-1f38
 bash scripts/prepare-restore.sh
 # created .env from .env.example (paper, MASTER off)
 nano .env
-# set DASHBOARD_PASSWORD= to the login you already use
-# optional now: RESEND_API_KEY=  XAI_API_KEY=  CLOUDFLARE_API_TOKEN=
+# set DASHBOARD_PASSWORD to the login you already use (leave WALLET empty)
+# optional now: Resend, xAI, and Cloudflare API keys in .env
 # leave WALLET_SECRET_KEY= empty
 chmod 600 .env
 
@@ -79,4 +79,20 @@ bash scripts/desk-status.sh
 
 `--publish-named` **refuses** if origin is still 502. That protects the public site.
 
-Then log in at https://cryptogrokbot.com (email + password). Invite Grok Bot from Home. Paper only until you choose LIVE later.
+Then log in at https://cryptogrokbot.com (email + password). The login page also has **Join with invite** for a Grok Bot `cgbot_…` token. Invite Grok Bot from Home after you are in. Paper only until you choose LIVE later.
+
+## Cannot log in / no reset email
+
+The public site hits the **VPS** book. A new VPS `.env` with empty `DASHBOARD_PASSWORD` created an unknown password in `data/.dashboard-password`. Forgot password only emails if `RESEND_API_KEY` is set on **that** VPS.
+
+On the VPS:
+
+```bash
+cd /opt/cryptogrokbot
+git pull
+# optional: put RESEND_API_KEY= in .env so future resets email hello@taskra.ai
+bash scripts/set-dashboard-password.sh
+sudo systemctl restart cryptogrokbot-agent
+```
+
+Then log in with `hello@taskra.ai` and the password you just typed. Do not paste the password in chat.
