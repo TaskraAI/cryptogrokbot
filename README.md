@@ -160,15 +160,20 @@ Sign in with the **same Cursor account**. Walkthrough: [`grok-bot/WALKTHROUGH.md
 ```
 apps/agent          loop, dashboard (auth + APIs), watchman, entries, `npm run trade` CLI
 apps/telegram       grammy cockpit
-packages/risk       budget, scorer, guardrails
+packages/risk       budget, scorer, guardrails, decideTrade (APPROVE / reduce / REJECT / HALT)
 packages/patterns   dip/dump/fade/climax + exits
 packages/tape       MC / volume / sentiment snapshot
 packages/social     sources.yaml, CA extract, X/RSS
 packages/signals    DexScreener, Jupiter, Pump.fun, RPC health
-packages/execution  paper + Jupiter swap + PumpPortal local-sign
-packages/storage    SQLite journal, wallets, todos, feedback, auditor scans
+packages/execution  paper + Jupiter/PumpPortal + executeApprovedTrade (Risk token + idempotency)
+packages/portfolio  SQLite ledger summary (exposure, reserved SOL, PnL hooks)
+packages/liquidity  Dex/Jupiter-style enterable/exitable + maxSafeSizeSol
+packages/storage    SQLite journal, wallets, todos, feedback, auditor scans, risk tokens
 packages/learning   review, lessons, nightly pattern stats
 packages/crew       six parallel desks including Auditor
-config/             policy, sources, guardrails, lessons, rules
+config/             policy, desk-risk, sources, guardrails, lessons, rules
+docs/desk-agents.md host crew vs Risk/Execution/Portfolio/Liquidity; Chief→Risk→Execution
 grok-bot/           Grok Bot app profiles, skills, first tasks
 ```
+
+Desk flow (Solana only): Discovery → Validation → Chief → Risk → Execution. Grok must not freelance fills — see [`docs/desk-agents.md`](docs/desk-agents.md). Tunable Risk limits: [`config/desk-risk.json`](config/desk-risk.json).

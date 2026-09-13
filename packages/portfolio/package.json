@@ -1,13 +1,11 @@
 {
-  "name": "@night/risk",
+  "name": "@night/portfolio",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
     "@night/shared": "*",
-    "@night/liquidity": "*",
-    "@night/portfolio": "*",
-    "yaml": "^2.7.0"
+    "@night/storage": "*"
   }
 }

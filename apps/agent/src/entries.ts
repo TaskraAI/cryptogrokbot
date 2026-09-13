@@ -1,6 +1,7 @@
 import type { Policy, RuntimeFlags, SourceHit, TokenMetrics } from "@night/shared";
 import { applyEntryToBudget, canEnter, effectiveDailyBudgetSol, evaluateExtraRules, letterGrade, pickCostOutMultiple, scoreCandidate, type ExtraRule, type Guardrail } from "@night/risk";
-import { executeBuy } from "@night/execution";
+import { decideDeskTrade, executeDeskTrade, forensicsFromToken, liquidityFromToken } from "./desk-flow.ts";
+import { deskRiskFromPolicy, type DeskRiskConfig } from "@night/risk";
 import { simulateSell } from "@night/signals";
 import { scoreSentiment } from "@night/tape";
 import {
@@ -165,6 +166,12 @@ export async function tryEnter(opts: {
   chiefApproved?: boolean;
   /** Add SOL onto an existing open row. Only honored with grokBotOrder + chiefApproved. */
   add?: boolean;
+  /** Idempotency key for Execution. Retries with the same key do not double-submit. */
+  clientOrderId?: string;
+  strategy?: string;
+  originatingAgent?: string;
+  deskRisk?: DeskRiskConfig;
+  walletSol?: number | null;
 }): Promise<string> {
   const now = opts.now ?? Date.now();
   const open = listOpenPositions(opts.store);
@@ -388,18 +395,63 @@ export async function tryEnter(opts: {
     return `blocked ${opts.token.ticker}: daily budget exhausted (${budget.spentSol.toFixed(3)}/${daily.cap} SOL)`;
   }
 
-  const result = await executeBuy({
-    mode: opts.flags.mode,
-    graduated: opts.token.graduated,
+  const deskRisk = opts.deskRisk ?? deskRiskFromPolicy(opts.policy);
+  const strategy = opts.strategy || (opts.grokBotOrder ? "grok" : "scout");
+  const originatingAgent = opts.originatingAgent || (opts.grokBotOrder ? "grok" : "scout");
+  const decided = decideDeskTrade({
+    store: opts.store,
+    policy: opts.policy,
+    flags: opts.flags,
+    deskRisk,
+    proposed: {
+      mint: opts.token.mint,
+      side: "buy",
+      sizeSol: requested,
+      strategy,
+      originatingAgent,
+      liquidity: liquidityFromToken(opts.token),
+      forensics: forensicsFromToken(opts.token),
+      ageMinutes: opts.token.ageMinutes,
+      top10HolderPct: opts.token.top10HolderPct,
+      isLaunch: !opts.token.graduated,
+    },
+    walletSol: opts.walletSol,
+    dayKey: opts.dayKey,
+    now,
+    allowExplicitLive: Boolean(opts.grokBotOrder),
+    skipDailyBudget: explicitAdd,
+    skipOpenSlot: explicitAdd,
+  });
+  if (decided.result.decision === "HALT_TRADING" || decided.result.decision === "REJECT") {
+    insertDecision(opts.store, {
+      at: now,
+      kind: "block",
+      mint: opts.token.mint,
+      allowed: false,
+      reason: `risk ${decided.result.decision}: ${decided.result.reasons.join("; ")}`,
+      score: scored.score,
+      payload: decided.result.checks,
+    });
+    return `blocked ${opts.token.ticker}: ${decided.result.reasons.join("; ")}`;
+  }
+  const execSize = decided.result.sizeSol ?? requested;
+  const clientOrderId = opts.clientOrderId?.trim() || `tryEnter:${opts.token.mint}:buy:${now}`;
+  const result = await executeDeskTrade({
+    store: opts.store,
+    policy: opts.policy,
+    flags: opts.flags,
+    deskRisk,
+    riskToken: decided.row.token,
+    clientOrderId,
     mint: opts.token.mint,
-    sol: requested,
-    maxSolPerTrade: cap,
-    masterEnabled: opts.flags.masterEnabled,
+    side: "buy",
+    sizeSol: execSize,
+    graduated: opts.token.graduated,
     grokBotOrder: opts.grokBotOrder,
-    slippagePct: opts.policy.slippagePctCap,
     connection: opts.connection,
     keypair: opts.keypair,
     pumpApiKey: opts.pumpApiKey,
+    now,
   });
   if (result.error) {
     insertDecision(opts.store, {
@@ -438,6 +490,7 @@ export async function tryEnter(opts: {
       score: scored.score,
       entryTx: result.signature,
       costOutMultiple,
+      strategy,
     });
   }
   insertFill(opts.store, {

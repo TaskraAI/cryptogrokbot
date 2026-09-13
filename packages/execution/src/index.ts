@@ -1,17 +1,12 @@
 import { Connection, Keypair, VersionedTransaction } from "@solana/web3.js";
 import bs58 from "bs58";
 import { DEFAULT_POLICY, type Mode } from "@night/shared";
+import { refuseLiveExecution, refuseOversizeBuy, type ExecResult } from "./refuse.ts";
+
+export { refuseLiveExecution, refuseOversizeBuy, type ExecResult } from "./refuse.ts";
 
 const SOL = "So11111111111111111111111111111111111111112";
 const JUP_SWAP = "https://lite-api.jup.ag/swap/v1";
-
-export interface ExecResult {
-  paper: boolean;
-  signature?: string;
-  sol: number;
-  tokens: number;
-  error?: string;
-}
 
 export function loadKeypair(secret: string): Keypair {
   const trimmed = secret.trim();
@@ -83,29 +78,6 @@ export async function pumpLocalTrade(opts: {
   });
   if (!res.ok) throw new Error(`PumpPortal local trade failed: ${res.status}`);
   return Buffer.from(await res.arrayBuffer()).toString("base64");
-}
-
-/** Refuse oversize at the execution boundary so callers cannot bypass tryEnter. */
-export function refuseOversizeBuy(sol: number, maxSolPerTrade: number): string | null {
-  if (!Number.isFinite(sol) || sol <= 0) return "invalid SOL size";
-  if (!Number.isFinite(maxSolPerTrade) || maxSolPerTrade <= 0) return "invalid maxSolPerTrade";
-  if (sol > maxSolPerTrade + 1e-12) {
-    return `size ${sol} SOL exceeds maxSolPerTrade ${maxSolPerTrade}`;
-  }
-  return null;
-}
-
-export function refuseLiveExecution(opts: {
-  mode: Mode;
-  masterEnabled?: boolean;
-  hasWallet: boolean;
-  /** Explicit Grok Bot order: skip the auto-desk MASTER kill. */
-  grokBotOrder?: boolean;
-}): string | null {
-  if (opts.mode !== "LIVE") return null;
-  if (opts.masterEnabled !== true && !opts.grokBotOrder) return "LIVE execution refused: MASTER_ENABLED is not true";
-  if (!opts.hasWallet) return "LIVE execution refused: WALLET_SECRET_KEY is missing";
-  return null;
 }
 
 export async function executeBuy(opts: {
@@ -239,3 +211,21 @@ export async function executeSell(opts: {
 function estimateTokens(sol: number): number {
   return sol * 1_000_000;
 }
+
+export {
+  executeApprovedTrade,
+  riskAllowsExecution,
+  makeIdempotencyKey,
+  duplicateOrderResult,
+  gateApprovedTrade,
+  isRetryableExecError,
+  confirmSignature,
+  MemoryOrderRegistry,
+  EXECUTABLE_RISK_DECISIONS,
+  type ApprovedDecision,
+  type ApprovedExecResult,
+  type OrderRecord,
+  type OrderRegistry,
+  type RiskVerdict,
+} from "./approved.ts";
+
