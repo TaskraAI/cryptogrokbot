@@ -1,6 +1,6 @@
 import type { Connection, Keypair } from "@solana/web3.js";
 import { dayKey, type Policy, type RuntimeFlags, type TokenMetrics } from "@night/shared";
-import { effectiveDailyBudgetSol, loadExtraRules, type ExtraRule } from "@night/risk";
+import { effectiveDailyBudgetSol, loadExtraRules, type DeskRiskConfig, type ExtraRule } from "@night/risk";
 import {
   fetchDexSearch,
   fetchDexToken,
@@ -60,6 +60,10 @@ export async function buyChosenMint(opts: {
   chiefApproved?: boolean;
   /** Add SOL onto an existing open row. Requires grokBotOrder + chiefApproved. */
   add?: boolean;
+  clientOrderId?: string;
+  strategy?: string;
+  originatingAgent?: string;
+  deskRisk?: DeskRiskConfig;
 }): Promise<TradeOutcome> {
   const blocked = liveTxBlocked(opts.flags, "buy", Boolean(opts.keypair), opts.grokBotOrder);
   if (blocked) {
@@ -97,6 +101,10 @@ export async function buyChosenMint(opts: {
     grokBotOrder: opts.grokBotOrder,
     chiefApproved: opts.chiefApproved,
     add: opts.add,
+    clientOrderId: opts.clientOrderId,
+    strategy: opts.strategy,
+    originatingAgent: opts.originatingAgent,
+    deskRisk: opts.deskRisk,
     connection: opts.connection,
     keypair: opts.keypair,
     pumpApiKey: opts.pumpApiKey,

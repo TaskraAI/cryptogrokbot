@@ -122,8 +122,16 @@ function checkLiveFailClosed(repoRoot: string): AuditorCheck {
     loadAppConfig({ ALLOW_EXTRA_BUDGET: "true" } as NodeJS.ProcessEnv).allowExtraBudget === true;
   const trade = readFileSync(resolve(repoRoot, "apps/agent/src/trade.ts"), "utf8");
   const board = readFileSync(resolve(repoRoot, "apps/agent/src/board.ts"), "utf8");
-  const exec = readFileSync(resolve(repoRoot, "packages/execution/src/index.ts"), "utf8");
-  const risk = readFileSync(resolve(repoRoot, "packages/risk/src/index.ts"), "utf8");
+  const exec = [
+    readFileSync(resolve(repoRoot, "packages/execution/src/index.ts"), "utf8"),
+    readFileSync(resolve(repoRoot, "packages/execution/src/refuse.ts"), "utf8"),
+    readFileSync(resolve(repoRoot, "packages/execution/src/approved.ts"), "utf8"),
+  ].join("\n");
+  const risk = [
+    readFileSync(resolve(repoRoot, "packages/risk/src/index.ts"), "utf8"),
+    readFileSync(resolve(repoRoot, "packages/risk/src/can-enter.ts"), "utf8"),
+    readFileSync(resolve(repoRoot, "packages/risk/src/decide.ts"), "utf8"),
+  ].join("\n");
   const loop = readFileSync(resolve(repoRoot, "apps/agent/src/loop.ts"), "utf8");
   const indexSrc = readFileSync(resolve(repoRoot, "apps/agent/src/index.ts"), "utf8");
   const masterFlag = readFileSync(resolve(repoRoot, "apps/agent/src/master-flag.ts"), "utf8");

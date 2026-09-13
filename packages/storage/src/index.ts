@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Grade, Mode, Pattern } from "@night/shared";
+import { migrateDeskFlow } from "./desk-flow.ts";
 
 export interface Store {
   db: DatabaseSync;
@@ -208,8 +209,10 @@ function migrate(db: DatabaseSync): void {
   `);
   migrateBudgetByMode(db);
   ensureColumn(db, "positions", "cost_out_multiple", "REAL NOT NULL DEFAULT 2");
+  ensureColumn(db, "positions", "strategy", "TEXT NOT NULL DEFAULT ''");
   ensureColumn(db, "opportunities", "chief_approved", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "opportunities", "approved_by", "TEXT NOT NULL DEFAULT ''");
+  migrateDeskFlow(db);
   seedStarterTodos(db);
 }
 
@@ -275,6 +278,7 @@ export interface NewPosition {
   score?: number;
   entryTx?: string;
   costOutMultiple?: number;
+  strategy?: string;
 }
 
 export function insertPosition(store: Store, p: NewPosition): number {
@@ -283,8 +287,8 @@ export function insertPosition(store: Store, p: NewPosition): number {
       `INSERT INTO positions (
         mint, ticker, mode, opened_at, entry_price_usd, principal_sol,
         tokens_held, tokens_initial, sol_spent, peak_price_usd, sources_json,
-        entry_metrics_json, thesis, score, entry_tx, cost_out_multiple
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        entry_metrics_json, thesis, score, entry_tx, cost_out_multiple, strategy
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       p.mint,
@@ -303,6 +307,7 @@ export function insertPosition(store: Store, p: NewPosition): number {
       p.score ?? null,
       p.entryTx ?? null,
       p.costOutMultiple ?? 2,
+      (p.strategy ?? "").slice(0, 48),
     );
   return Number(result.lastInsertRowid);
 }
@@ -394,6 +399,7 @@ export interface PositionRow {
   post_exit_price_usd: number | null;
   mistake: string | null;
   cost_out_multiple: number;
+  strategy: string;
 }
 
 export function updatePosition(store: Store, id: number, patch: Record<string, unknown>): void {
@@ -1019,3 +1025,23 @@ export function markOpportunityMissed(
     )
     .run(Date.now(), opts.postPriceUsd, opts.multipleSeen, (opts.note ?? "").slice(0, 1000), id);
 }
+
+export {
+  migrateDeskFlow,
+  insertRiskDecision,
+  getRiskDecision,
+  getRiskDecisionByToken,
+  consumeRiskDecision,
+  listRecentRiskDecisions,
+  reserveCapital,
+  consumeReservation,
+  releaseExpiredReservations,
+  sumPendingReserved,
+  getExecutionOrder,
+  upsertExecutionOrder,
+  type RiskDecisionRow,
+  type CapitalReservationRow,
+  type ExecutionOrderRow,
+  type ExecutionOrderStatus,
+} from "./desk-flow.ts";
+

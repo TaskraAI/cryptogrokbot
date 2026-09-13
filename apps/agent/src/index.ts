@@ -4,6 +4,7 @@ import { dayKey } from "@night/shared";
 import { listOpenOpportunities, openStore } from "@night/storage";
 import { createTelegramBot } from "@night/telegram";
 import { loadAppConfig, loadPolicy } from "./config.ts";
+import { loadDeskRisk } from "@night/risk";
 import { AgentRuntime } from "./loop.ts";
 import { pulseAuditorFromStore, startCrewServer, type DashboardContext } from "./board.ts";
 import { resolveDashboardEmail, resolveDashboardPassword } from "./auth.ts";
@@ -16,6 +17,7 @@ import { runAuditorScan } from "./auditor.ts";
 async function main(): Promise<void> {
   const cfg = loadAppConfig();
   const policy = loadPolicy(cfg.policyPath);
+  const deskRisk = loadDeskRisk(cfg.deskRiskPath, policy);
   const store = openStore(cfg.databasePath);
   applyMasterBootPolicy(store, cfg.masterEnabled);
   const runtime = new AgentRuntime(cfg, policy, store);
@@ -71,6 +73,10 @@ async function main(): Promise<void> {
         grokBotOrder: opts.grokBotOrder,
         chiefApproved: opts.chiefApproved,
         add: opts.add,
+        clientOrderId: opts.clientOrderId,
+        strategy: opts.strategy,
+        originatingAgent: opts.originatingAgent,
+        deskRisk,
         extraRulesPath: cfg.rulesPath,
         dayKey: dayKey(Date.now(), policy.timezone),
         connection: runtime.connection,

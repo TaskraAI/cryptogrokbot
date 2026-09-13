@@ -6,6 +6,8 @@
   },
   "dependencies": {
     "@night/execution": "*",
+    "@night/liquidity": "*",
+    "@night/portfolio": "*",
     "@night/learning": "*",
     "@night/patterns": "*",
     "@night/risk": "*",

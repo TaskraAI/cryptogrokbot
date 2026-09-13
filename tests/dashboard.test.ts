@@ -84,6 +84,9 @@ async function startCtx(
         grokBotOrder: opts.grokBotOrder,
         chiefApproved: opts.chiefApproved,
         add: opts.add,
+        clientOrderId: opts.clientOrderId,
+        strategy: opts.strategy,
+        originatingAgent: opts.originatingAgent,
         dayKey: dayKey(),
       }),
     sell: (idOrMint, opts) =>

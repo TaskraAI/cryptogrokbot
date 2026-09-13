@@ -1,0 +1,26 @@
+{
+  "maxPositionSizeSol": 0.1,
+  "feeReserveSol": 0.02,
+  "maxPortfolioExposureSol": 0.3,
+  "maxExposurePerTokenSol": 0.1,
+  "maxExposurePerStrategySol": 0.2,
+  "maxOpenPositions": 3,
+  "dailyLossLimitSol": 0.1,
+  "maxDrawdownPct": 25,
+  "maxSlippageBps": 1500,
+  "minLiquidityUsd": 5000,
+  "minTokenAgeMinutes": 0,
+  "maxHolderConcentrationPct": 40,
+  "maxVolatilityHint": 2,
+  "strategyRiskMultipliers": {
+    "default": 1,
+    "scout": 1,
+    "altscout": 0.75,
+    "swing": 1,
+    "narrative": 0.85,
+    "launch": 0.5
+  },
+  "launchStricterMultiplier": 0.5,
+  "decisionTtlMs": 300000,
+  "maxSubmitRetries": 2
+}

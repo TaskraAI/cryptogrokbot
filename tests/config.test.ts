@@ -10,6 +10,7 @@ describe("fail-closed config defaults", () => {
     expect(cfg.allowExtraBudget).toBe(false);
     expect(cfg.dashboardSecureCookie).toBe(false);
     expect(cfg.challengePath).toMatch(/challenge\.json$/);
+    expect(cfg.deskRiskPath).toMatch(/desk-risk\.json$/);
     expect(cfg.resendFrom).toBe("CryptoGrokBot <hello@taskra.ai>");
   });
 

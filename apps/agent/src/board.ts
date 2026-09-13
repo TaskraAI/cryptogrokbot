@@ -29,7 +29,11 @@ import {
   type Store,
 } from "@night/storage";
 import { appendLesson, buildReview, loadLessons } from "@night/learning";
-import { loadExtraRules, setExtraRuleEnabled, effectiveDailyBudgetSol } from "@night/risk";
+import { loadExtraRules, setExtraRuleEnabled, effectiveDailyBudgetSol, loadDeskRisk } from "@night/risk";
+import { summarizePortfolio } from "@night/portfolio";
+import { assessLiquidity } from "@night/liquidity";
+import { decideDeskTrade } from "./desk-flow.ts";
+import { getRiskDecision, getRiskDecisionByToken, listRecentRiskDecisions } from "@night/storage";
 import { loadSources } from "@night/social";
 import { fetchDexToken } from "@night/signals";
 import type { TradeOutcome } from "./trade.ts";
@@ -96,6 +100,9 @@ export interface DashboardContext {
     grokBotOrder?: boolean;
     chiefApproved?: boolean;
     add?: boolean;
+    clientOrderId?: string;
+    strategy?: string;
+    originatingAgent?: string;
   }) => Promise<TradeOutcome>;
   sell: (idOrMint: string, opts?: { grokBotOrder?: boolean }) => Promise<TradeOutcome>;
   repoRoot?: string;
@@ -844,6 +851,9 @@ async function routeAuthed(
       grokBotOrder: true,
       chiefApproved,
       add: parseAddOn(body),
+      clientOrderId: str(body.clientOrderId).trim() || undefined,
+      strategy: str(body.strategy).trim() || undefined,
+      originatingAgent: str(body.originatingAgent).trim() || "grok",
     });
     json(res, result.ok ? 200 : 400, result);
     return;
@@ -859,6 +869,107 @@ async function routeAuthed(
     }
     const result = await ctx.sell(idOrMint, { grokBotOrder: true });
     json(res, result.ok ? 200 : 400, result);
+    return;
+  }
+
+  if (path === "/api/risk/decide" && method === "POST") {
+    if (!canDecideTrades(actor)) {
+      json(res, 403, { error: "only Taskra, Chief, Grok Bot, or invited team can ask Risk", ok: false });
+      return;
+    }
+    const body = await readJson(req);
+    const mint = str(body.mint).trim();
+    const side = str(body.side).trim().toLowerCase();
+    const sizeSol = typeof body.sizeSol === "number" ? body.sizeSol : Number(body.sizeSol);
+    if (!mint || !["buy", "sell", "partial"].includes(side) || !Number.isFinite(sizeSol) || sizeSol <= 0) {
+      json(res, 400, { error: "mint, side buy|sell|partial, and sizeSol required" });
+      return;
+    }
+    const deskRisk = loadDeskRisk(ctx.cfg.deskRiskPath, ctx.policy);
+    const decided = decideDeskTrade({
+      store: ctx.store,
+      policy: ctx.policy,
+      flags: ctx.flags(),
+      deskRisk,
+      proposed: {
+        mint,
+        side: side as "buy" | "sell" | "partial",
+        sizeSol,
+        strategy: str(body.strategy).trim() || undefined,
+        originatingAgent: str(body.originatingAgent).trim() || actor?.kind || "unknown",
+        liquidity: body.liquidity && typeof body.liquidity === "object" ? (body.liquidity as Record<string, number>) : undefined,
+        forensics: body.forensics && typeof body.forensics === "object" ? body.forensics : undefined,
+      },
+      dayKey: dayKey(Date.now(), ctx.policy.timezone),
+      allowExplicitLive: actor?.kind === "grokbot",
+      skipDailyBudget: Boolean(body.add || body.skipDailyBudget),
+    });
+    json(res, 200, {
+      ok: decided.result.decision === "APPROVE" || decided.result.decision === "APPROVE_REDUCED_SIZE",
+      id: decided.row.id,
+      token: decided.row.token,
+      decision: decided.result.decision,
+      sizeSol: decided.result.sizeSol,
+      reasons: decided.result.reasons,
+      checks: decided.result.checks,
+      expiresAt: decided.row.expires_at,
+    });
+    return;
+  }
+
+  if (path === "/api/risk/decision" && method === "GET") {
+    const id = Number(url.searchParams.get("id") ?? "");
+    const token = url.searchParams.get("token") ?? "";
+    const row = token ? getRiskDecisionByToken(ctx.store, token) : id ? getRiskDecision(ctx.store, id) : undefined;
+    if (!row) {
+      json(res, 404, { error: "risk decision not found" });
+      return;
+    }
+    json(res, 200, {
+      id: row.id,
+      token: row.token,
+      decision: row.decision,
+      mint: row.mint,
+      side: row.side,
+      sizeSol: row.approved_sol,
+      requestedSol: row.requested_sol,
+      reasons: JSON.parse(row.reasons_json),
+      checks: JSON.parse(row.checks_json),
+      consumed: row.consumed === 1,
+      expiresAt: row.expires_at,
+    });
+    return;
+  }
+
+  if (path === "/api/risk/recent" && method === "GET") {
+    json(res, 200, { decisions: listRecentRiskDecisions(ctx.store) });
+    return;
+  }
+
+  if (path === "/api/portfolio" && method === "GET") {
+    const deskRisk = loadDeskRisk(ctx.cfg.deskRiskPath, ctx.policy);
+    const flags = ctx.flags();
+    json(res, 200, summarizePortfolio({
+      store: ctx.store,
+      mode: flags.mode,
+      feeReserveSol: deskRisk.feeReserveSol,
+      timezone: ctx.policy.timezone,
+    }));
+    return;
+  }
+
+  if (path === "/api/liquidity/assess" && method === "POST") {
+    const body = await readJson(req);
+    const deskRisk = loadDeskRisk(ctx.cfg.deskRiskPath, ctx.policy);
+    const sizeSol = typeof body.sizeSol === "number" ? body.sizeSol : Number(body.sizeSol) || deskRisk.maxPositionSizeSol;
+    const snapshot = body.liquidity && typeof body.liquidity === "object" ? body.liquidity : body;
+    json(res, 200, assessLiquidity(snapshot, {
+      minLiquidityUsd: deskRisk.minLiquidityUsd,
+      maxSlippageBps: deskRisk.maxSlippageBps,
+      maxHolderConcentrationPct: deskRisk.maxHolderConcentrationPct,
+      maxVolatilityHint: deskRisk.maxVolatilityHint,
+      minTokenAgeMinutes: deskRisk.minTokenAgeMinutes,
+    }, sizeSol));
     return;
   }
 

@@ -1,7 +1,8 @@
 import type { MarketSnapshot, Pattern, Policy, PositionState, RuntimeFlags } from "@night/shared";
 import { appendPatternPath, applyPeakAndGreen, classifyPattern, decideExit, mergeLlmAction } from "@night/patterns";
 import { tokensToRecoverPrincipal } from "@night/risk";
-import { executeSell } from "@night/execution";
+import { decideDeskTrade, executeDeskTrade } from "./desk-flow.ts";
+import { deskRiskFromPolicy } from "@night/risk";
 import type { Connection, Keypair } from "@solana/web3.js";
 import {
   insertDecision,
@@ -147,18 +148,61 @@ export async function managePosition(opts: {
     }
   }
   const execMode = wantLiveTx ? "LIVE" : "PAPER";
-  const result = await executeSell({
+  const sellFlags = opts.flags ?? {
     mode: execMode,
-    graduated: true,
+    masterEnabled: false,
+    rpcHealthy: true,
+    jupiterHealthy: true,
+    telegramHealthy: false,
+  };
+  const deskRisk = deskRiskFromPolicy(opts.policy);
+  const side = action.type === "flatten" || opts.sellAll ? "sell" : "partial";
+  const decided = decideDeskTrade({
+    store: opts.store,
+    policy: opts.policy,
+    flags: { ...sellFlags, mode: execMode },
+    deskRisk,
+    proposed: {
+      mint: pos.mint,
+      side,
+      sizeSol: solEstimate,
+      strategy: opts.row.strategy || "sentinel",
+      originatingAgent: opts.grokBotOrder ? "grok" : "sentinel",
+    },
+    dayKey: new Date(now).toISOString().slice(0, 10),
+    now,
+    allowExplicitLive: Boolean(opts.grokBotOrder),
+  });
+  if (decided.result.decision === "HALT_TRADING" || decided.result.decision === "REJECT") {
+    insertDecision(opts.store, {
+      at: now,
+      kind: "block",
+      mint: pos.mint,
+      allowed: false,
+      reason: `risk ${decided.result.decision}: ${decided.result.reasons.join("; ")}`,
+      pattern,
+    });
+    updatePosition(opts.store, pos.id, patch);
+    return `sell failed #${pos.id} ${decided.result.reasons.join("; ")}`;
+  }
+  const result = await executeDeskTrade({
+    store: opts.store,
+    policy: opts.policy,
+    flags: { ...sellFlags, mode: execMode },
+    deskRisk,
+    riskToken: decided.row.token,
+    clientOrderId: `exit:${pos.id}:${side}:${now}`,
     mint: pos.mint,
+    side,
+    sizeSol: solEstimate,
+    graduated: true,
     tokens: tokensToSell,
-    slippagePct: opts.policy.slippagePctCap,
     solEstimate,
-    masterEnabled: opts.flags?.masterEnabled,
     grokBotOrder: opts.grokBotOrder,
     connection: opts.connection,
     keypair: opts.keypair,
     pumpApiKey: opts.pumpApiKey,
+    now,
   });
   if (result.error) {
     insertDecision(opts.store, {

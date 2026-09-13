@@ -40,6 +40,7 @@ export interface AppConfig {
   patternStatsPath: string;
   rulesPath: string;
   challengePath: string;
+  deskRiskPath: string;
 }
 
 export function isLoopbackBind(bind: string): boolean {
@@ -95,6 +96,7 @@ export function loadAppConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     patternStatsPath: resolve(configDir, "pattern-stats.json"),
     rulesPath: resolve(configDir, "rules.yaml"),
     challengePath: resolve(configDir, "challenge.json"),
+    deskRiskPath: resolve(configDir, "desk-risk.json"),
   };
 }
 
